@@ -82,7 +82,7 @@ export async function GET(
 // PUT - Asignar proyectos e items a un usuario
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { userId: string } }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -153,7 +153,7 @@ export async function PUT(
         if (deleteProjectScope.length > 0) {
           await tx.projectAssignment.deleteMany({
             where: {
-              userId: params.id,
+              userId: params.userId,
               projectId: { in: deleteProjectScope },
             },
           });
@@ -178,7 +178,7 @@ export async function PUT(
         if (deleteItemScope.length > 0) {
           await tx.budgetItemAssignment.deleteMany({
             where: {
-              userId: params.id,
+              userId: params.userId,
               projectId: { in: deleteItemScope },
             },
           });

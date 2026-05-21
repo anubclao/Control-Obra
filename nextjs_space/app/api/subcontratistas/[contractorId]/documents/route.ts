@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { contractorId: string } }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -89,7 +89,7 @@ export async function POST(
         cloudStoragePath: cloud_storage_path,
         isPublic: isPublic ?? false,
         expirationDate: expirationDate ? new Date(expirationDate) : null,
-        contractorId: params.id,
+        contractorId: params.contractorId,
       },
     });
 
@@ -124,7 +124,7 @@ export async function POST(
       // Continuar aunque falle SharePoint
     }
 
-    await syncContractorStatus(params.id);
+    await syncContractorStatus(params.contractorId);
 
     return NextResponse.json(document, { status: 201 });
   } catch (error) {

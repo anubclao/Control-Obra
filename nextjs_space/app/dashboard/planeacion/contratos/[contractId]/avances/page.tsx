@@ -25,7 +25,9 @@ export default async function ContractorProgressPage({ params }: Props) {
       contractor: {
         select: { id: true, name: true }
       },
-      budget: {
+      budgets: {
+        where: { isActive: true },
+        take: 1,
         include: {
           layers: {
             include: { items: true },
@@ -53,8 +55,10 @@ export default async function ContractorProgressPage({ params }: Props) {
     notFound();
   }
 
+  const activeBudget = contract.budgets[0];
+
   // Calcular resumen de avance
-  const itemsSummary = contract.budget?.layers.flatMap(layer => 
+  const itemsSummary = activeBudget?.layers.flatMap(layer => 
     layer.items.map(item => {
       const totalExecuted = contract.dailyProgress?.flatMap(dp => dp.entries)
         .filter(e => e.budgetItemId === item.id)
@@ -83,7 +87,7 @@ export default async function ContractorProgressPage({ params }: Props) {
   let totalValuePC = 0;
   let executedValuePC = 0;
 
-  contract.budget?.layers.forEach(layer => {
+  activeBudget?.layers.forEach(layer => {
     layer.items.forEach(item => {
       totalValuePC += item.totalPC;
       const executed = contract.dailyProgress?.flatMap(dp => dp.entries)

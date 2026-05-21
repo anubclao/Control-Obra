@@ -92,8 +92,9 @@ async function initializeQueue() {
     initialized = true;
   } catch (error) {
     initError = error as Error;
-    logger.error('init_queue_error', error as Error, {}, 
-      'Failed to initialize BullMQ queue, falling back to in-memory');
+    logger.error('init_queue_error', error as Error, {
+      fallback: 'in-memory',
+    });
     console.info('Falling back to in-memory queue');
     initialized = true;
   }
@@ -127,8 +128,7 @@ export async function enqueueFinancialReportJobBullMQ(projectId: string | null) 
       createdAt: new Date().toISOString(),
     };
   } catch (error) {
-    logger.error('enqueue_bullmq_error', error as Error, { projectId }, 
-      'Failed to enqueue job to BullMQ');
+    logger.error('enqueue_bullmq_error', error as Error, { projectId });
     return null;
   }
 }
@@ -149,7 +149,7 @@ export async function getFinancialReportJobBullMQ(jobId: string) {
     }
 
     const state = await job.getState();
-    const progress = job.progress();
+    const progress = typeof job.progress === 'number' ? job.progress : 0;
 
     const result = {
       id: job.id ?? '',

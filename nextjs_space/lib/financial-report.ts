@@ -184,9 +184,7 @@ export async function buildFinancialReport(projectId: string | null) {
     };
   } catch (error) {
     const duration = Date.now() - startTime;
-    logger.error('build_report_error', error as Error, 
-      { projectId, duration }, 
-      'Failed to build report');
+    logger.error('build_report_error', error as Error, { projectId, duration });
     throw error;
   }
 }

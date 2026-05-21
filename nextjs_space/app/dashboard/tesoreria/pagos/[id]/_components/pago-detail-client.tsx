@@ -131,7 +131,8 @@ export function PagoDetailClient({ payment, userRole, currentUser }: PagoDetailC
 
   // Verificar si el usuario puede aprobar el nivel actual
   const currentLevelConfig = APPROVAL_LEVELS[payment.currentApprovalLevel as keyof typeof APPROVAL_LEVELS];
-  const canApproveCurrentLevel = currentLevelConfig?.roles.includes(userRole as ApproverRoleKey) || false;
+  const currentLevelRoles: readonly string[] = currentLevelConfig?.roles ?? [];
+  const canApproveCurrentLevel = currentLevelRoles.includes(userRole);
 
   // Verificar si ya aprobó en este nivel
   const alreadyApprovedAtLevel = payment.approvals.some(

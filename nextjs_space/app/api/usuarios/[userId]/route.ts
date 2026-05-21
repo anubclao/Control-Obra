@@ -23,7 +23,7 @@ export async function PUT(
     const { role, isActive, phone } = body;
 
     const user = await prisma.user.update({
-      where: { userId: params.userId },
+      where: { id: params.userId },
       data: {
         ...(role && { role }),
         ...(isActive !== undefined && { isActive }),

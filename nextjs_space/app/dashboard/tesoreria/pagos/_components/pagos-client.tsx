@@ -48,8 +48,8 @@ interface Payment {
   paymentType: string;
   priority: string;
   status: string;
-  dueDate: string | null;
-  createdAt: string;
+  dueDate: string | Date | null;
+  createdAt: string | Date;
   project: { id: string; name: string; code: string | null };
   contractor: { id: string; name: string; nit: string } | null;
   workCut: { id: string; cutNumber: number } | null;

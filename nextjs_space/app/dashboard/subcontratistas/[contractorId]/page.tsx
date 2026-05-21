@@ -9,15 +9,17 @@ import { syncContractorStatus } from "@/lib/contractor-status";
 export const dynamic = "force-dynamic";
 
 export default async function SubcontratistaDetailsPage({
-  params: { contractorId: string },
+  params,
 }: {
   params: { contractorId: string };
 }) {
+  const { contractorId } = params;
+
   const session = await getServerSession(authOptions);
-  await syncContractorStatus(params.contractorId);
+  await syncContractorStatus(contractorId);
 
   const contractor = await prisma.contractor.findUnique({
-    where: { id: params.contractorId },
+    where: { id: contractorId },
     include: {
       documents: {
         orderBy: { uploadedAt: "desc" },

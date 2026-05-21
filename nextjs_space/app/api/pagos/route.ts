@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import type { Prisma } from '@prisma/client';
+import { PaymentPriority, PaymentStatus, type Prisma } from '@prisma/client';
 import { authOptions } from '@/app/api/auth/[...nextauth]/auth-options';
 import { prisma } from '@/lib/db';
 import { invalidateFinancialReportCache } from '@/lib/financial-report';
 import { ROLES_CAN_CREATE_PAYMENTS, ROLES_CAN_VIEW_FINANCIAL } from '@/lib/constants';
+
+function isPaymentStatus(value: string): value is PaymentStatus {
+  return Object.values(PaymentStatus).includes(value as PaymentStatus);
+}
+
+function isPaymentPriority(value: string): value is PaymentPriority {
+  return Object.values(PaymentPriority).includes(value as PaymentPriority);
+}
 
 // GET - Listar solicitudes de pago
 export async function GET(request: NextRequest) {
@@ -26,8 +34,8 @@ export async function GET(request: NextRequest) {
 
     const where: Prisma.PaymentRequestWhereInput = {};
     if (projectId) where.projectId = projectId;
-    if (status) where.status = status;
-    if (priority) where.priority = priority;
+    if (status && isPaymentStatus(status)) where.status = status;
+    if (priority && isPaymentPriority(priority)) where.priority = priority;
 
     const payments = await prisma.paymentRequest.findMany({
       where,
