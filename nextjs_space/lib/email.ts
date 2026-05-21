@@ -6,9 +6,9 @@ const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
 const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER;
 
-let transporter: nodemailer.Transporter | null = null;
+let transporter: any = null;
 
-function getTransporter(): nodemailer.Transporter {
+function getTransporter(): any {
   if (transporter) {
     return transporter;
   }
