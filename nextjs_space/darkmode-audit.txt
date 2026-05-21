@@ -1,0 +1,154 @@
+﻿darkmode-audit
+Generado: 2026-05-20 10:30:05
+Patron: bg-white|text-gray-|border-gray-|hover:bg-gray-50|bg-blue-50|bg-green-50|bg-amber-50|bg-red-50|text-black
+
+52 | app\dashboard\subcontratistas\[contractorId]\_components\subcontratista-details.tsx
+  L157 | <h1 className="text-3xl font-bold text-gray-900">
+  L168 | <p className="text-gray-600">NIT: {contractor.nit}</p>
+  L287 | <p className="text-sm text-gray-600">Persona de Contacto</p>
+
+45 | components\dashboard-contratista-history.tsx
+  L218 | textClass: "text-gray-500",
+  L226 | textClass: "text-gray-500",
+  L422 | <div className="p-4 rounded-lg bg-white text-gray-900 dark:bg-slate-950 dark:text-slate-100">
+
+44 | app\dashboard\tesoreria\pagos\[id]\_components\pago-detail-client.tsx
+  L264 | <h1 className="text-2xl font-bold text-gray-900">{payment.paymentNumber}</h1>
+  L273 | <p className="text-gray-500 mt-1">
+  L285 | className="text-red-600 border-red-200 hover:bg-red-50"
+
+38 | app\dashboard\presupuestos\[projectId]\_components\presupuesto-detail-client.tsx
+  L166 | <div className="flex items-center gap-2 text-sm text-gray-500">
+  L194 | <h1 className="text-xl font-bold text-gray-900">{project.name}</h1>
+  L195 | <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-gray-600">
+
+37 | app\dashboard\cortes\_components\cortes-client.tsx
+  L104 | <h1 className="text-3xl font-bold text-gray-900">Cortes de Obra</h1>
+  L105 | <p className="text-gray-600 mt-1">Control de cortes, aprobaciones y avance</p>
+  L137 | <p className="text-sm text-gray-600">Total</p>
+
+28 | app\dashboard\rrhh\empleados\[id]\_components\empleado-details.tsx
+  L145 | <p className="text-gray-500 flex items-center gap-2 mt-1">
+  L205 | <p className="font-medium text-gray-800 flex items-center gap-1">
+  L211 | <li key={idx} className="text-sm text-gray-700">
+
+26 | app\dashboard\planeacion\contratos\[contractId]\_components\contrato-details.tsx
+  L167 | <h1 className="text-2xl font-bold text-gray-900">
+  L172 | <p className="text-gray-600">{contract.contractor.name}</p>
+  L247 | <p className="text-sm text-gray-500">Tipo de Contrato</p>
+
+24 | app\dashboard\planeacion\aiu\_components\aiu-client.tsx
+  L136 | return <Bell className="w-5 h-5 text-gray-500" />;
+  L143 | return "bg-red-50 border-red-200";
+  L149 | return "bg-blue-50 border-blue-200";
+
+22 | app\dashboard\tesoreria\pagos\_components\pagos-client.tsx
+  L130 | <h1 className="text-2xl font-bold text-gray-900">Flujo de Pagos</h1>
+  L131 | <p className="text-gray-500 mt-1">Gestión de solicitudes de pago y aprobaciones</p>
+  L147 | <p className="text-sm font-medium text-gray-500">Total Solicitudes</p>
+
+22 | app\dashboard\proyectos\[id]\_components\proyecto-details-client.tsx
+  L84 | <h1 className="text-3xl font-bold text-gray-900">{project?.name}</h1>
+  L93 | <p className="text-gray-600 mt-1">Cliente: {project?.client}</p>
+  L107 | <p className="text-sm text-gray-600">Fecha de Inicio</p>
+
+21 | app\dashboard\cortes\[id]\_components\corte-details-client.tsx
+  L175 | <h1 className="text-3xl font-bold text-gray-900">
+  L180 | <p className="text-gray-600 mt-1">Proyecto: {workCut?.project?.name}</p>
+  L183 | <p className="text-sm text-gray-600">Monto Solicitado</p>
+
+21 | app\dashboard\reportes\financiero\_components\reporte-financiero-client.tsx
+  L91 | <h1 className="text-2xl font-bold text-gray-900">Reporte Financiero</h1>
+  L92 | <p className="text-gray-500 mt-1">Presupuesto vs Ejecutado con análisis de impuestos</p>
+  L132 | <p className="text-sm font-medium text-gray-500">Presupuesto Total (PC)</p>
+
+20 | app\dashboard\proyectos\_components\proyectos-client.tsx
+  L78 | <h1 className="text-3xl font-bold text-gray-900">Proyectos</h1>
+  L79 | <p className="text-gray-600 mt-1">Gestión de proyectos y presupuestos</p>
+  L97 | <p className="text-sm text-gray-600">Total Proyectos</p>
+
+20 | app\dashboard\programacion\[projectId]\[date]\_components\progress-detail-client.tsx
+  L230 | <Calendar className="h-5 w-5 text-gray-500" />
+  L235 | <p className="text-gray-500">
+  L263 | <p className="text-sm text-gray-500">Clima</p>
+
+18 | app\dashboard\planeacion\contratos\[contractId]\avances\_components\contractor-progress-list-client.tsx
+  L85 | if (percentage >= 100) return "bg-green-500";
+  L86 | if (percentage >= 50) return "bg-blue-500";
+  L106 | <p className="text-gray-500">{contract.contractor.name}</p>
+
+18 | app\dashboard\bitacora\_components\bitacora-client.tsx
+  L49 | return <Cloud className="w-4 h-4 text-gray-500" />;
+  L57 | <h1 className="text-3xl font-bold text-gray-900">Bitácora de Obra</h1>
+  L58 | <p className="text-gray-600 mt-1">Registro diario de actividades</p>
+
+17 | app\dashboard\presupuestos\_components\presupuestos-client.tsx
+  L85 | <h1 className="text-2xl font-bold text-gray-900">Presupuestos</h1>
+  L86 | <p className="text-gray-600">
+  L123 | <div className="mt-4 flex items-center gap-2 text-sm text-gray-600">
+
+17 | app\dashboard\administracion\usuarios\_components\usuarios-client.tsx
+  L94 | CLIENTE: "bg-gray-100 text-gray-700",
+  L95 | USER: "bg-gray-100 text-gray-600",
+  L114 | <h1 className="text-2xl font-bold text-gray-900">Administración de Usuarios</h1>
+
+17 | app\dashboard\programacion\[projectId]\_components\project-progress-client.tsx
+  L121 | <span className="font-mono text-sm text-gray-500">{project.code}</span>
+  L125 | <p className="text-gray-500">{project.client}</p>
+  L153 | <p className="text-sm font-medium text-gray-500">Avance General</p>
+
+15 | app\dashboard\proveedores\[id]\_components\proveedor-details.tsx
+  L182 | <h1 className="text-3xl font-bold text-gray-900">
+  L187 | <p className="text-gray-600">NIT: {supplier.nit}</p>
+  L208 | <Card className="border-amber-200 bg-amber-50">
+
+15 | app\dashboard\programacion\_components\programacion-client.tsx
+  L60 | <p className="text-gray-500 mt-1">Seguimiento diario del avance de obra</p>
+  L70 | <p className="text-sm font-medium text-gray-500">Proyectos</p>
+  L82 | <p className="text-sm font-medium text-gray-500">Con Presupuesto</p>
+
+15 | app\dashboard\rrhh\empleados\_components\empleados-client.tsx
+  L132 | <p className="text-gray-500 mt-1">Gestión de personal y documentos corporativos</p>
+  L150 | <p className="text-sm font-medium text-gray-500">Total</p>
+  L162 | <p className="text-sm font-medium text-gray-500">Activos</p>
+
+14 | app\dashboard\planeacion\contratos\_components\contratos-client.tsx
+  L115 | <h1 className="text-2xl font-bold text-gray-900">Contratos</h1>
+  L116 | <p className="text-gray-600">
+  L127 | <p className="text-sm text-gray-600">Total</p>
+
+14 | app\dashboard\bitacora\[id]\_components\bitacora-details-client.tsx
+  L48 | return <Cloud className="w-6 h-6 text-gray-500" />;
+  L62 | <h1 className="text-3xl font-bold text-gray-900">
+  L66 | <p className="text-gray-600 mt-1">{formatDate(workLog?.date)}</p>
+
+13 | app\dashboard\subcontratistas\_components\subcontratistas-client.tsx
+  L59 | <h1 className="text-3xl font-bold text-gray-900">Subcontratistas</h1>
+  L60 | <p className="text-gray-600 mt-1">
+  L76 | <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+
+11 | components\dashboard-overview.tsx
+  L102 | blue:  { border: "border-l-blue-500",  icon: "text-blue-500",  bg: "hover:bg-blue-50/50" },
+  L103 | amber: { border: "border-l-amber-500", icon: "text-amber-500", bg: "hover:bg-amber-50/50" },
+  L104 | green: { border: "border-l-green-500", icon: "text-green-500", bg: "hover:bg-green-50/50" },
+
+9 | app\dashboard\reportes\impuestos\_components\impuestos-client.tsx
+  L211 | <h1 className="text-2xl font-bold text-gray-900">Configuración de Impuestos</h1>
+  L212 | <p className="text-gray-500 mt-1">Administre los impuestos por proyecto</p>
+  L239 | <Alert className="bg-green-50 border-green-200">
+
+8 | app\dashboard\proveedores\_components\proveedores-client.tsx
+  L87 | <h1 className="text-3xl font-bold text-gray-900">Proveedores</h1>
+  L88 | <p className="text-gray-600 mt-1">
+  L104 | <p className="text-sm text-gray-600">Total Proveedores</p>
+
+8 | components\dashboard-nav.tsx
+  L202 | return { bg: "bg-blue-600 dark:bg-blue-700", text: "text-blue-700 dark:text-blue-400", border: "border-blue-200 dark:border-blue-800", activeBg: "bg-blue-50 dark:bg-blue-950/50" };
+  L204 | return { bg: "bg-amber-600 dark:bg-amber-700", text: "text-amber-700 dark:text-amber-400", border: "border-amber-200 dark:border-amber-800", activeBg: "bg-amber-50 dark:bg-amber-95...
+  L206 | return { bg: "bg-green-600 dark:bg-green-700", text: "text-green-700 dark:text-green-400", border: "border-green-200 dark:border-green-800", activeBg: "bg-green-50 dark:bg-green-95...
+
+7 | app\dashboard\presupuestos\_components\upload-budget-dialog.tsx
+  L551 | <p className="text-gray-600 mt-2">
+  L588 | className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:bg-gray-50 transition-colors"
+  L591 | <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+

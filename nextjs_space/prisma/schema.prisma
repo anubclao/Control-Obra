@@ -1,0 +1,1198 @@
+// Control de Obra - Schema Prisma
+generator client {
+    provider      = "prisma-client-js"
+    binaryTargets = ["native"]
+}
+
+datasource db {
+    provider = "mysql"
+    url      = env("DATABASE_URL")
+    relationMode = "prisma"
+}
+
+// AUTENTICACIÓN
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  password      String
+  role          UserRole  @default(USER)
+  phone         String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relaciones
+  projectsCreated Project[] @relation("ProjectCreator")
+  workLogs        WorkLog[]
+  workCutsApproved WorkCut[] @relation("WorkCutApprover")
+  invitationUsed  Invitation? @relation("InvitationUser")
+  invitationsSent Invitation[] @relation("InvitationCreator")
+  projectAssignments ProjectAssignment[]
+  paymentRequestsCreated PaymentRequest[] @relation("PaymentRequestCreator")
+  paymentApprovals PaymentApproval[] @relation("PaymentApprover")
+  employee        Employee?
+  dailyProgressCreated DailyProgress[] @relation("DailyProgressCreator")
+  progressEntriesApproved ProgressEntry[] @relation("ProgressEntryApprover")
+  contractorDailyProgressCreated ContractorDailyProgress[] @relation("ContractorDailyProgressCreator")
+  contractorProgressEntriesApproved ContractorProgressEntry[] @relation("ContractorProgressEntryApprover")
+}
+
+enum UserRole {
+  ADMIN           // Super administrador del sistema
+  GERENTE         // Gerencia - puede invitar usuarios y aprobar pagos
+  DIRECTOR        // Director de obra
+  RESIDENTE       // Residente de obra
+  CONTABILIDAD    // Área contable
+  TESORERIA       // Tesorería - ejecuta pagos
+  HSEQ            // Seguridad y salud en el trabajo
+  CLIENTE         // Cliente externo - solo ve su proyecto
+  USER            // Usuario básico (legacy)
+}
+
+// INVITACIONES CON CÓDIGO
+model Invitation {
+  id            String           @id @default(cuid())
+  code          String           @unique  // Código de 8 caracteres
+  email         String?          // Email específico (opcional)
+  role          UserRole         @default(USER)
+  projectId     String?          // Proyecto específico (opcional)
+  project       Project?         @relation(fields: [projectId], references: [id])
+  expiresAt     DateTime         // Fecha de expiración
+  maxUses       Int              @default(1)  // Máximo de usos
+  usedCount     Int              @default(0)  // Veces usado
+  isActive      Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+  
+  // Relaciones
+  createdById   String
+  createdBy     User             @relation("InvitationCreator", fields: [createdById], references: [id])
+  usedById      String?          @unique
+  usedBy        User?            @relation("InvitationUser", fields: [usedById], references: [id])
+}
+
+// OTP DE LOGIN POR EMAIL
+model EmailOtp {
+  id            String   @id @default(cuid())
+  email         String
+  codeHash      String
+  expiresAt     DateTime
+  usedAt        DateTime?
+  requestedIp   String?
+  createdAt     DateTime @default(now())
+
+  @@index([email, createdAt])
+}
+
+// ASIGNACIÓN DE USUARIOS A PROYECTOS (para roles específicos por proyecto)
+model ProjectAssignment {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId     String
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  role          UserRole  // Rol específico en este proyecto
+  createdAt     DateTime  @default(now())
+  
+  @@unique([userId, projectId])
+}
+
+// PROYECTOS
+model Project {
+  id                String        @id @default(cuid())
+  code              String?       // Código del proyecto (PRY-2024-001)
+  name              String
+  client            String
+  location          String?       // Ubicación (Bogotá D.C., etc.)
+  startDate         DateTime
+  estimatedEndDate  DateTime
+  totalBudget       Float
+  status            ProjectStatus @default(IN_PLANNING)
+  description       String?       @db.Text
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  
+  // Relaciones
+  createdById       String
+  createdBy         User          @relation("ProjectCreator", fields: [createdById], references: [id])
+  costCenters       CostCenter[]
+  workCuts          WorkCut[]
+  workLogs          WorkLog[]
+  budget            Budget?
+  budgetFiles       BudgetFile[]
+  contracts         Contract[]
+  invitations       Invitation[]
+  assignments       ProjectAssignment[]
+  budgetItemAssignments BudgetItemAssignment[]
+  paymentRequests   PaymentRequest[]
+  taxConfigs        TaxConfig[]
+  dailyProgress     DailyProgress[]
+}
+
+enum ProjectStatus {
+  IN_PLANNING
+  IN_EXECUTION
+  PAUSED
+  COMPLETED
+}
+
+// CENTROS DE COSTO
+model CostCenter {
+  id              String   @id @default(cuid())
+  name            String
+  assignedBudget  Float
+  spentAmount     Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relaciones
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  workCuts        WorkCut[]
+}
+
+// SUBCONTRATISTAS
+model Contractor {
+  id              String   @id @default(cuid())
+  name            String
+  nit             String   @unique
+  contact         String
+  email           String
+  phone           String
+  status          ContractorStatus @default(INCOMPLETE)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Información de contacto extendida
+  address         String?
+  city            String?
+  department      String?
+  postalCode      String?
+  website         String?
+  
+  // Representante legal
+  legalRepName    String?
+  legalRepEmail   String?
+  legalRepPhone   String?
+  legalRepCedula  String?
+  
+  // Información financiera
+  reportedIncome  Float?    // Ingresos reportados año anterior
+  incomeYear      Int?      // Año de los ingresos reportados
+  
+  // Referencias comerciales
+  ref1Name        String?
+  ref1Company     String?
+  ref1Phone       String?
+  ref1Email       String?
+  
+  ref2Name        String?
+  ref2Company     String?
+  ref2Phone       String?
+  ref2Email       String?
+  
+  ref3Name        String?
+  ref3Company     String?
+  ref3Phone       String?
+  ref3Email       String?
+  
+  // Relaciones
+  documents       Document[]
+  workCuts        WorkCut[]
+  workLogs        WorkLog[]
+  contracts       Contract[]
+  paymentRequests PaymentRequest[]
+  progressEntries ProgressEntry[]
+}
+
+enum ContractorStatus {
+  COMPLETE
+  INCOMPLETE
+  EXPIRED
+}
+
+// DOCUMENTOS DE SUBCONTRATISTAS
+model Document {
+  id              String       @id @default(cuid())
+  type            DocumentType
+  fileName        String
+  cloudStoragePath String
+  isPublic        Boolean      @default(false)
+  expirationDate  DateTime?
+  uploadedAt      DateTime     @default(now())
+  sharepointPath  String?
+  
+  // Relaciones
+  contractorId    String
+  contractor      Contractor   @relation(fields: [contractorId], references: [id], onDelete: Cascade)
+}
+
+enum DocumentType {
+  CEDULA
+  RUT
+  CAMARA_COMERCIO
+  CERTIFICADO_BANCARIO
+}
+
+// CORTES DE OBRA
+model WorkCut {
+  id              String      @id @default(cuid())
+  cutNumber       Int
+  periodStart     DateTime
+  periodEnd       DateTime
+  requestedAmount Float
+  description     String      @db.Text
+  status          WorkCutStatus @default(PENDING)
+  rejectionReason String?     @db.Text
+  approvedAt      DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  // Relaciones
+  projectId       String
+  project         Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  contractorId    String
+  contractor      Contractor  @relation(fields: [contractorId], references: [id])
+  
+  costCenterId    String
+  costCenter      CostCenter  @relation(fields: [costCenterId], references: [id])
+  
+  approvedById    String?
+  approvedBy      User?       @relation("WorkCutApprover", fields: [approvedById], references: [id])
+  
+  documents       WorkCutDocument[]
+  paymentRequests PaymentRequest[]
+}
+
+enum WorkCutStatus {
+  PENDING
+  IN_REVIEW
+  APPROVED
+  REJECTED
+}
+
+// DOCUMENTOS DE CORTES DE OBRA
+model WorkCutDocument {
+  id              String   @id @default(cuid())
+  fileName        String
+  cloudStoragePath String
+  isPublic        Boolean  @default(false)
+  description     String?
+  uploadedAt      DateTime @default(now())
+  sharepointPath  String?
+  
+  // Relaciones
+  workCutId       String
+  workCut         WorkCut  @relation(fields: [workCutId], references: [id], onDelete: Cascade)
+}
+
+// BITÁCORA DE OBRA
+model WorkLog {
+  id              String   @id @default(cuid())
+  date            DateTime
+  activities      String   @db.Text
+  weather         String
+  personnel       String   @db.Text
+  observations    String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relaciones
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  contractorId    String?
+  contractor      Contractor? @relation(fields: [contractorId], references: [id])
+  
+  createdById     String
+  createdBy       User     @relation(fields: [createdById], references: [id])
+  
+  photos          WorkLogPhoto[]
+}
+
+// FOTOS DE BITÁCORA
+model WorkLogPhoto {
+  id              String   @id @default(cuid())
+  fileName        String
+  cloudStoragePath String
+  isPublic        Boolean  @default(false)
+  description     String?
+  uploadedAt      DateTime @default(now())
+  sharepointPath  String?
+  
+  // Relaciones
+  workLogId       String
+  workLog         WorkLog  @relation(fields: [workLogId], references: [id], onDelete: Cascade)
+}
+
+// =============================================
+// MÓDULO DE PRESUPUESTOS
+// =============================================
+
+// PRESUPUESTO - Vinculado a un proyecto
+model Budget {
+  id              String   @id @default(cuid())
+  aiuPercentage   Float    @default(18)  // % AIU Global (A+I+U) - se calcula automáticamente
+  adminPercentage Float    @default(8)   // % Administración
+  imprevistoPercentage Float @default(5) // % Imprevistos
+  utilidadPercentage Float @default(5)   // % Utilidad
+  ivaUtilityPercentage Float @default(19) // % IVA sobre la Utilidad
+  ptIndexPercentage Float  @default(100) // Índice PT vs PC (100 = PT igual a PC)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Totales calculados (se actualizan con cada cambio)
+  totalDirectCostPC  Float  @default(0)  // Costo Directo PC (Cliente)
+  totalDirectCostPT  Float  @default(0)  // Costo Directo PT (Tope)
+  totalAIU_PC        Float  @default(0)  // AIU calculado PC (A+I+U)
+  totalAIU_PT        Float  @default(0)  // AIU calculado PT (A+I+U)
+  totalIvaUtilidad_PC Float @default(0)  // IVA sobre Utilidad PC
+  totalIvaUtilidad_PT Float @default(0)  // IVA sobre Utilidad PT
+  totalPC            Float  @default(0)  // Total PC (Costo Directo + AIU + IVA)
+  totalPT            Float  @default(0)  // Total PT (Costo Directo + AIU + IVA)
+  
+  // Relaciones
+  projectId       String   @unique
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  versions        BudgetVersion[]
+  layers          BudgetLayer[]
+}
+
+// VERSIÓN DE PRESUPUESTO
+model BudgetVersion {
+  id              String   @id @default(cuid())
+  name            String   // Ej: "V1 Inicial", "V2 Ajuste Cliente"
+  description     String?  @db.Text
+  isActive        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  
+  // Snapshot de totales al momento de crear la versión
+  snapshotTotalPC Float    @default(0)
+  snapshotTotalPT Float    @default(0)
+  
+  // Relaciones
+  budgetId        String
+  budget          Budget   @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+}
+
+// CAPAS DEL PRESUPUESTO (DM-Demoliciones, AC-Acabados, etc.)
+model BudgetLayer {
+  id              String   @id @default(cuid())
+  code            String   // Ej: "DM", "AC", "SN"
+  name            String   // Ej: "Demoliciones", "Acabados", "Señalización"
+  order           Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Totales de la capa
+  totalDirectCostPC  Float  @default(0)
+  totalDirectCostPT  Float  @default(0)
+  
+  // Relaciones
+  budgetId        String
+  budget          Budget   @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  
+  items           BudgetItem[]
+  
+  @@unique([budgetId, code])
+}
+
+// ÍTEMS DEL PRESUPUESTO
+model BudgetItem {
+  id              String   @id @default(cuid())
+  itemNumber      String   // Número del ítem (1.1, 1.2, etc.)
+  description     String   @db.Text
+  unit            String   // Unidad de medida (m2, ml, un, gl)
+  quantity        Float    // Cantidad
+  unitPricePC     Float    // Precio unitario PC (Cliente)
+  unitPricePT     Float    // Precio unitario PT (Tope/Interno)
+  totalPC         Float    // Total PC (cantidad * precio unitario PC)
+  totalPT         Float    // Total PT (cantidad * precio unitario PT)
+  status          BudgetItemStatus @default(GREEN)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relaciones
+  layerId         String
+  layer           BudgetLayer @relation(fields: [layerId], references: [id], onDelete: Cascade)
+  progressEntries ProgressEntry[]
+  itemAssignments BudgetItemAssignment[]
+}
+
+// ASIGNACIÓN DE ITEMS A USUARIOS (flujo director de obra)
+model BudgetItemAssignment {
+  id            String   @id @default(cuid())
+  userId        String
+  budgetItemId  String
+  projectId     String
+  assignedById  String
+  createdAt     DateTime @default(now())
+
+  budgetItem    BudgetItem @relation(fields: [budgetItemId], references: [id], onDelete: Cascade)
+  project       Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, budgetItemId])
+  @@index([projectId, userId])
+}
+
+enum BudgetItemStatus {
+  GREEN   // PC >= PT (Rentable)
+  YELLOW  // PC < PT pero diferencia < 10%
+  RED     // PC < PT y diferencia >= 10% (Pérdida)
+}
+
+// ARCHIVO DE PRESUPUESTO CARGADO
+model BudgetFile {
+  id              String   @id @default(cuid())
+  fileName        String
+  cloudStoragePath String
+  isPublic        Boolean  @default(false)
+  sharepointPath  String?
+  layerCode       String?  // Capa a la que se importó
+  itemsImported   Int      @default(0)
+  uploadedAt      DateTime @default(now())
+  
+  // Relaciones
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+// =============================================
+// PRESUPUESTO DE CONTRATISTA - Similar a presupuesto de proyecto
+// =============================================
+
+model ContractorBudget {
+  id              String   @id @default(cuid())
+  versionNumber   Int      @default(1)  // Número de versión para historial
+  isActive        Boolean  @default(true)  // Indica si es el presupuesto activo/actual
+  aiuPercentage   Float    @default(18)
+  adminPercentage Float    @default(8)
+  imprevistoPercentage Float @default(5)
+  utilidadPercentage Float @default(5)
+  ivaUtilityPercentage Float @default(19)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Totales calculados
+  totalDirectCostPC  Float  @default(0)
+  totalDirectCostPT  Float  @default(0)
+  totalAIU_PC        Float  @default(0)
+  totalAIU_PT        Float  @default(0)
+  totalIvaUtilidad_PC Float @default(0)
+  totalIvaUtilidad_PT Float @default(0)
+  totalPC            Float  @default(0)
+  totalPT            Float  @default(0)
+  
+  // Relaciones
+  contractId      String
+  contract        Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  
+  layers          ContractorBudgetLayer[]
+  
+  @@index([contractId])
+  @@index([contractId, isActive])
+}
+
+// CAPAS DEL PRESUPUESTO DEL CONTRATISTA
+model ContractorBudgetLayer {
+  id              String   @id @default(cuid())
+  code            String   // Ej: "DM", "AC"
+  name            String   // Ej: "Demoliciones", "Acabados"
+  order           Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Totales de la capa
+  totalDirectCostPC  Float  @default(0)
+  totalDirectCostPT  Float  @default(0)
+  
+  // Relaciones
+  budgetId        String
+  budget          ContractorBudget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  
+  items           ContractorBudgetItem[]
+  
+  @@unique([budgetId, code])
+}
+
+// ÍTEMS DEL PRESUPUESTO DEL CONTRATISTA
+model ContractorBudgetItem {
+  id              String   @id @default(cuid())
+  itemNumber      String   // Ej: "1.1", "1.2"
+  description     String   @db.Text
+  unit            String   // m2, ml, un, gl, etc.
+  quantity        Float    // Cantidad
+  unitPricePC     Float    // Precio unitario PC
+  unitPricePT     Float    // Precio unitario PT
+  totalPC         Float    // Total PC
+  totalPT         Float    // Total PT
+  status          BudgetItemStatus @default(GREEN)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relaciones
+  layerId         String
+  layer           ContractorBudgetLayer @relation(fields: [layerId], references: [id], onDelete: Cascade)
+  progressEntries ContractorProgressEntry[]
+}
+
+// REGISTRO DIARIO DE AVANCE DEL CONTRATISTA
+model ContractorDailyProgress {
+  id              String   @id @default(cuid())
+  date            DateTime // Fecha del avance
+  weather         String?  // Condición climática
+  temperature     Float?   // Temperatura
+  generalNotes    String?  @db.Text
+  personnelCount  Int      @default(0)  // Personal en obra
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relaciones
+  contractId      String
+  contract        Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  
+  createdById     String
+  createdBy       User     @relation("ContractorDailyProgressCreator", fields: [createdById], references: [id])
+  
+  entries         ContractorProgressEntry[]
+  
+  @@index([contractId, date])
+}
+
+// ENTRADA DE AVANCE POR ÍTEM DEL CONTRATISTA
+model ContractorProgressEntry {
+  id              String   @id @default(cuid())
+  quantityToday   Float    // Cantidad ejecutada
+  notes           String?  @db.Text
+  exceedsQuantity Boolean  @default(false)
+  status          String   @default("APPROVED")
+  approvedById    String?
+  approvedBy      User?    @relation("ContractorProgressEntryApprover", fields: [approvedById], references: [id])
+  approvedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relaciones
+  dailyProgressId String
+  dailyProgress   ContractorDailyProgress @relation(fields: [dailyProgressId], references: [id], onDelete: Cascade)
+  
+  budgetItemId    String
+  budgetItem      ContractorBudgetItem @relation(fields: [budgetItemId], references: [id])
+}
+
+// =============================================
+// MÓDULO DE CONTRATOS
+// =============================================
+
+model Contract {
+  id              String         @id @default(cuid())
+  contractNumber  String         @unique  // CTR-2026-001
+  contractType    ContractType   @default(OBRA)
+  paymentMethod   PaymentMethod  @default(POR_CORTES)
+  startDate       DateTime
+  endDate         DateTime?
+  contractObject  String         @db.Text  // Objeto del contrato
+  contractValue   Float          @default(0)  // Valor del contrato
+  status          ContractStatus @default(DRAFT)
+  observations    String?        @db.Text
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  
+  // Relaciones
+  projectId       String
+  project         Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  contractorId    String
+  contractor      Contractor     @relation(fields: [contractorId], references: [id])
+  
+  documents       ContractDocument[]
+  paymentRequests PaymentRequest[]
+  budgets         ContractorBudget[]     // Historial de presupuestos del contratista
+  dailyProgress   ContractorDailyProgress[] // Registro de avances del contratista
+}
+
+enum ContractType {
+  OBRA           // Contrato de Obra
+  SUMINISTRO     // Contrato de Suministro
+  SERVICIOS      // Contrato de Servicios
+  CONSULTORIA    // Contrato de Consultoría
+  MIXTO          // Contrato Mixto
+}
+
+enum PaymentMethod {
+  POR_CORTES     // Pago por cortes de obra
+  ANTICIPO       // Anticipo + Cortes
+  PRECIO_GLOBAL  // Precio global fijo
+  ADMINISTRACION // Administración delegada
+}
+
+enum ContractStatus {
+  DRAFT          // Borrador
+  ENABLED        // Habilitado
+  SUSPENDED      // Suspendido
+  CLOSED         // Cerrado
+  CANCELLED      // Cancelado
+}
+
+// DOCUMENTOS DE CONTRATOS
+model ContractDocument {
+  id              String   @id @default(cuid())
+  fileName        String
+  cloudStoragePath String
+  isPublic        Boolean  @default(false)
+  documentType    String?  // Tipo de documento (Contrato, Otrosí, Acta, etc.)
+  description     String?
+  uploadedAt      DateTime @default(now())
+  sharepointPath  String?
+  
+  // Relaciones
+  contractId      String
+  contract        Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+}
+
+// =============================================
+// MÓDULO DE FLUJO DE PAGOS
+// =============================================
+
+model PaymentRequest {
+  id              String         @id @default(cuid())
+  paymentNumber   String         @unique  // PAG-2026-0001
+  concept         String         @db.Text  // Concepto del pago
+  amount          Float          // Monto solicitado
+  currency        String         @default("COP")  // Moneda
+  paymentType     PaymentType    @default(CORTE_OBRA)
+  priority        PaymentPriority @default(NORMAL)
+  status          PaymentStatus  @default(PENDING)
+  
+  // Información del beneficiario
+  beneficiaryName String?        // Nombre del beneficiario (si no es subcontratista)
+  beneficiaryNit  String?        // NIT del beneficiario
+  bankName        String?        // Banco
+  accountType     String?        // Tipo de cuenta (Ahorros/Corriente)
+  accountNumber   String?        // Número de cuenta
+  
+  // Nivel actual de aprobación
+  currentApprovalLevel Int       @default(1)  // 1 = Director, 2 = Gerente, 3 = Admin
+  requiredApprovalLevel Int      @default(2)  // Nivel requerido para aprobar
+  
+  // Fechas
+  dueDate         DateTime?      // Fecha límite de pago
+  paidAt          DateTime?      // Fecha de pago
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  
+  // Notas y observaciones
+  notes           String?        @db.Text
+  rejectionReason String?        @db.Text
+  
+  // Relaciones
+  projectId       String
+  project         Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  contractorId    String?        // Puede ser nulo si es pago a terceros
+  contractor      Contractor?    @relation(fields: [contractorId], references: [id])
+  
+  workCutId       String?        // Referencia al corte de obra (si aplica)
+  workCut         WorkCut?       @relation(fields: [workCutId], references: [id])
+  
+  contractId      String?        // Referencia al contrato (si aplica)
+  contract        Contract?      @relation(fields: [contractId], references: [id])
+  
+  createdById     String
+  createdBy       User           @relation("PaymentRequestCreator", fields: [createdById], references: [id])
+  
+  approvals       PaymentApproval[]
+  documents       PaymentDocument[]
+}
+
+enum PaymentType {
+  CORTE_OBRA       // Pago de corte de obra
+  ANTICIPO         // Anticipo
+  RETENCION        // Devolución de retención
+  SUMINISTRO       // Pago de suministros
+  SERVICIOS        // Pago de servicios
+  HONORARIOS       // Honorarios
+  OTROS            // Otros pagos
+}
+
+enum PaymentPriority {
+  LOW              // Baja
+  NORMAL           // Normal
+  HIGH             // Alta
+  URGENT           // Urgente
+}
+
+enum PaymentStatus {
+  PENDING          // Pendiente de aprobación
+  APPROVED_LEVEL_1 // Aprobado por Director
+  APPROVED_LEVEL_2 // Aprobado por Gerente
+  APPROVED         // Completamente aprobado
+  REJECTED         // Rechazado
+  PAID             // Pagado
+  CANCELLED        // Cancelado
+}
+
+// APROBACIONES DE PAGOS
+model PaymentApproval {
+  id              String         @id @default(cuid())
+  level           Int            // Nivel de aprobación (1, 2, 3)
+  action          ApprovalAction
+  comments        String?        @db.Text
+  createdAt       DateTime       @default(now())
+  
+  // Relaciones
+  paymentRequestId String
+  paymentRequest   PaymentRequest @relation(fields: [paymentRequestId], references: [id], onDelete: Cascade)
+  
+  approverId      String
+  approver        User           @relation("PaymentApprover", fields: [approverId], references: [id])
+}
+
+enum ApprovalAction {
+  APPROVED         // Aprobado
+  REJECTED         // Rechazado
+  RETURNED         // Devuelto para corrección
+}
+
+// DOCUMENTOS DE SOLICITUD DE PAGO
+model PaymentDocument {
+  id              String   @id @default(cuid())
+  fileName        String
+  cloudStoragePath String
+  isPublic        Boolean  @default(false)
+  documentType    String?  // Factura, Soporte, etc.
+  description     String?
+  uploadedAt      DateTime @default(now())
+  
+  // Relaciones
+  paymentRequestId String
+  paymentRequest   PaymentRequest @relation(fields: [paymentRequestId], references: [id], onDelete: Cascade)
+}
+
+// =============================================
+// MÓDULO DE REPORTES FINANCIEROS
+// =============================================
+
+// CONFIGURACIÓN DE IMPUESTOS POR PROYECTO
+model TaxConfig {
+  id              String   @id @default(cuid())
+  name            String   // Nombre del impuesto (IVA, Retención Fuente, etc.)
+  rate            Float    // Porcentaje (ej: 19 para 19%)
+  type            TaxType  // Tipo de impuesto
+  appliesTo       TaxAppliesTo // A qué aplica (ventas, compras, ambos)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relaciones
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  @@unique([projectId, name])
+}
+
+enum TaxType {
+  IVA              // Impuesto al Valor Agregado
+  RETENCION_FUENTE // Retención en la Fuente
+  RETENCION_IVA    // Retención de IVA
+  RETENCION_ICA    // Retención de ICA
+  ESTAMPILLAS      // Estampillas
+  OTROS            // Otros impuestos
+}
+
+enum TaxAppliesTo {
+  VENTAS           // Solo a ventas/facturación cliente
+  COMPRAS          // Solo a compras/pagos a proveedores
+  AMBOS            // A ambos
+}
+
+// =============================================
+// MÓDULO DE RRHH BÁSICO
+// =============================================
+
+model Employee {
+  id              String          @id @default(cuid())
+  employeeNumber  String          @unique  // Número de empleado (EMP-001)
+  position        String          // Cargo
+  department      EmployeeDepartment @default(OPERACIONES)
+  contractType    EmployeeContractType @default(INDEFINIDO)
+  startDate       DateTime        // Fecha de ingreso
+  endDate         DateTime?       // Fecha de terminación (si aplica)
+  salary          Float?          // Salario base (opcional, sensible)
+  legalBonus      Float?          // Auxilio de transporte legal
+  extraLegalBonus Float?          // Auxilio extralegal (opcional)
+  eps             String?         // EPS
+  pensionFund     String?         // Fondo de Pensiones
+  arl             String?         // ARL
+  riskLevel       Int             @default(1)  // Nivel de riesgo ARL (1-5)
+  bankName        String?         // Banco para nómina
+  accountType     String?         // Tipo de cuenta
+  accountNumber   String?         // Número de cuenta
+  status          EmployeeStatus  @default(ACTIVE)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  // Relaciones
+  userId          String?         @unique  // Vinculado a usuario del sistema (opcional)
+  user            User?           @relation(fields: [userId], references: [id])
+  
+  documents       EmployeeDocument[]
+}
+
+enum EmployeeDepartment {
+  GERENCIA         // Gerencia
+  OPERACIONES      // Operaciones / Obra
+  CONTABILIDAD     // Contabilidad y Finanzas
+  TESORERIA        // Tesorería
+  HSEQ             // Seguridad y Salud
+  COMERCIAL        // Comercial / Ventas
+  ADMINISTRATIVO   // Administrativo
+}
+
+enum EmployeeContractType {
+  INDEFINIDO       // Contrato a término indefinido
+  FIJO             // Contrato a término fijo
+  OBRA_LABOR       // Contrato por obra o labor
+  PRESTACION       // Prestación de servicios
+  APRENDIZAJE      // Contrato de aprendizaje
+}
+
+enum EmployeeStatus {
+  ACTIVE           // Activo
+  INACTIVE         // Inactivo
+  ON_LEAVE         // En licencia
+  TERMINATED       // Terminado
+}
+
+// DOCUMENTOS DE EMPLEADOS
+model EmployeeDocument {
+  id              String              @id @default(cuid())
+  type            EmployeeDocumentType
+  fileName        String
+  cloudStoragePath String
+  isPublic        Boolean             @default(false)
+  expirationDate  DateTime?           // Fecha de vencimiento (para exámenes, certificaciones)
+  uploadedAt      DateTime            @default(now())
+  sharepointPath  String?
+  notes           String?             @db.Text
+  
+  // Relaciones
+  employeeId      String
+  employee        Employee            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+enum EmployeeDocumentType {
+  CEDULA              // Cédula de ciudadanía
+  CONTRATO            // Contrato de trabajo
+  AFILIACION_EPS      // Afiliación EPS
+  AFILIACION_PENSION  // Afiliación Pensión
+  AFILIACION_ARL      // Afiliación ARL
+  EXAMEN_INGRESO      // Examen médico de ingreso
+  EXAMEN_PERIODICO    // Examen médico periódico
+  CERTIFICACION_ALTURAS // Certificación trabajo en alturas
+  LICENCIA_CONDUCIR   // Licencia de conducción
+  CURSO_SST           // Curso SST 50 horas
+  TITULO_PROFESIONAL  // Título profesional
+  DIPLOMA             // Diploma
+  LIBRETA_MILITAR     // Libreta militar
+  CERTIFICADOS_EXPERIENCIA // Certificados de experiencia laboral
+  OTROS               // Otros documentos
+}
+
+// =============================================
+// MÓDULO DE PROGRAMACIÓN Y AVANCE
+// =============================================
+
+// REGISTRO DIARIO DE AVANCE
+model DailyProgress {
+  id              String   @id @default(cuid())
+  date            DateTime // Fecha del avance
+  weather         String?  // Condición climática
+  temperature     Float?   // Temperatura (opcional)
+  generalNotes    String?  @db.Text  // Notas generales del día
+  personnelCount  Int      @default(0)  // Cantidad de personal en obra
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relaciones
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  createdById     String
+  createdBy       User     @relation("DailyProgressCreator", fields: [createdById], references: [id])
+  
+  entries         ProgressEntry[]
+  photos          ProgressPhoto[]
+  
+  @@index([projectId, date])  // Índice para consultas por proyecto y fecha
+}
+
+// ENTRADA DE AVANCE POR ÍTEM DE PRESUPUESTO
+model ProgressEntry {
+  id              String   @id @default(cuid())
+  quantityToday   Float    // Cantidad ejecutada hoy
+  notes           String?  @db.Text  // Notas específicas del ítem
+  exceedsQuantity Boolean  @default(false)  // Si la cantidad supera el total presupuestado
+  status          String   @default("APPROVED")  // APPROVED, PENDING_APPROVAL, REJECTED
+  approvedById    String?  // Admin que aprobó (si aplica)
+  approvedBy      User?    @relation("ProgressEntryApprover", fields: [approvedById], references: [id])
+  approvedAt      DateTime? // Fecha de aprobación
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relaciones
+  dailyProgressId String
+  dailyProgress   DailyProgress @relation(fields: [dailyProgressId], references: [id], onDelete: Cascade)
+  
+  budgetItemId    String
+  budgetItem      BudgetItem @relation(fields: [budgetItemId], references: [id])
+  
+  contractorId    String?  // Subcontratista que ejecutó (opcional)
+  contractor      Contractor? @relation(fields: [contractorId], references: [id])
+}
+
+// AUDITORÍA DE CAMBIOS EN ENTRADAS DE AVANCE
+model ProgressEntryAudit {
+  id              String   @id @default(cuid())
+  progressEntryId String?
+  projectId       String
+  budgetItemId    String
+  actorUserId     String
+  action          String   // CREATE, EDIT, APPROVE, REJECT
+  oldQuantity     Float?
+  newQuantity     Float?
+  oldNotes        String?  @db.Text
+  newNotes        String?  @db.Text
+  oldStatus       String?
+  newStatus       String?
+  oldContractorId String?
+  newContractorId String?
+  createdAt       DateTime @default(now())
+
+  @@index([projectId, createdAt])
+  @@index([actorUserId, createdAt])
+}
+
+// FOTOS DE AVANCE
+model ProgressPhoto {
+  id              String   @id @default(cuid())
+  fileName        String
+  cloudStoragePath String
+  isPublic        Boolean  @default(false)
+  caption         String?  // Descripción de la foto
+  uploadedAt      DateTime @default(now())
+  
+  // Relaciones
+  dailyProgressId String
+  dailyProgress   DailyProgress @relation(fields: [dailyProgressId], references: [id], onDelete: Cascade)
+}
+
+// =============================================
+// MÓDULO DE VENTAS / CRM
+// =============================================
+
+// CLIENTES / PROSPECTOS
+model Client {
+  id              String       @id @default(cuid())
+  clientNumber    String       @unique  // CLI-001
+  companyName     String       // Razón social
+  nit             String?      @unique  // NIT
+  contactName     String       // Nombre de contacto
+  contactPosition String?      // Cargo del contacto
+  email           String
+  phone           String
+  address         String?
+  city            String?
+  sector          String?      // Sector económico
+  source          ClientSource @default(REFERIDO)
+  status          ClientStatus @default(PROSPECT)
+  notes           String?      @db.Text
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  
+  // Relaciones
+  quotations      Quotation[]
+}
+
+enum ClientSource {
+  REFERIDO         // Referido por cliente existente
+  WEB              // Sitio web
+  REDES_SOCIALES   // Redes sociales
+  FERIA            // Feria o evento
+  LLAMADA_FRIA     // Llamada en frío
+  OTROS            // Otros
+}
+
+enum ClientStatus {
+  PROSPECT         // Prospecto inicial
+  CONTACTED        // Contactado
+  QUALIFIED        // Calificado
+  PROPOSAL         // En propuesta
+  NEGOTIATION      // En negociación
+  WON              // Cliente ganado
+  LOST             // Cliente perdido
+}
+
+// COTIZACIONES
+model Quotation {
+  id              String          @id @default(cuid())
+  quotationNumber String          @unique  // COT-2026-0001
+  title           String          // Título de la cotización
+  description     String?         @db.Text  // Descripción general
+  validUntil      DateTime        // Fecha de validez
+  status          QuotationStatus @default(DRAFT)
+  
+  // Valores
+  subtotal        Float           @default(0)  // Subtotal sin impuestos
+  discountPercent Float           @default(0)  // Porcentaje de descuento
+  discountAmount  Float           @default(0)  // Monto de descuento
+  ivaPercent      Float           @default(19) // % IVA (19% por defecto Colombia)
+  ivaAmount       Float           @default(0)  // Monto IVA
+  total           Float           @default(0)  // Total final
+  
+  // Condiciones
+  paymentTerms    String?         @db.Text  // Términos de pago
+  deliveryTerms   String?         @db.Text  // Términos de entrega
+  warranty        String?         // Garantía
+  observations    String?         @db.Text  // Observaciones
+  
+  // Fechas
+  sentAt          DateTime?       // Fecha de envío al cliente
+  respondedAt     DateTime?       // Fecha de respuesta del cliente
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  // Relaciones
+  clientId        String
+  client          Client          @relation(fields: [clientId], references: [id])
+  
+  projectId       String?         // Proyecto relacionado (opcional)
+  
+  items           QuotationItem[]
+}
+
+enum QuotationStatus {
+  DRAFT            // Borrador
+  SENT             // Enviada
+  VIEWED           // Vista por cliente
+  ACCEPTED         // Aceptada
+  REJECTED         // Rechazada
+  EXPIRED          // Expirada
+  CANCELLED        // Cancelada
+}
+
+// ÍTEMS DE COTIZACIÓN
+model QuotationItem {
+  id              String   @id @default(cuid())
+  itemNumber      Int      // Número de ítem (1, 2, 3...)
+  description     String   @db.Text  // Descripción del ítem
+  unit            String   // Unidad (un, m2, ml, gl, etc.)
+  quantity        Float    // Cantidad
+  unitPrice       Float    // Precio unitario
+  totalPrice      Float    // Precio total (cantidad * precio unitario)
+  notes           String?  @db.Text  // Notas adicionales
+  
+  // Relaciones
+  quotationId     String
+  quotation       Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+}
+
+// =============================================
+// MÓDULO DE PROVEEDORES
+// =============================================
+
+model Supplier {
+  id              String   @id @default(cuid())
+  name            String
+  nit             String   @unique
+  contact         String   // Nombre de contacto principal
+  email           String
+  phone           String
+  status          SupplierStatus @default(INCOMPLETE)
+  category        SupplierCategory @default(MATERIALES)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Información de contacto extendida
+  address         String?
+  city            String?
+  department      String?
+  postalCode      String?
+  website         String?
+  
+  // Representante legal
+  legalRepName    String?
+  legalRepEmail   String?
+  legalRepPhone   String?
+  legalRepCedula  String?
+  
+  // Información financiera
+  reportedIncome  Float?    // Ingresos reportados año anterior
+  incomeYear      Int?      // Año de los ingresos reportados
+  
+  // Referencias comerciales
+  ref1Name        String?
+  ref1Company     String?
+  ref1Phone       String?
+  ref1Email       String?
+  
+  ref2Name        String?
+  ref2Company     String?
+  ref2Phone       String?
+  ref2Email       String?
+  
+  ref3Name        String?
+  ref3Company     String?
+  ref3Phone       String?
+  ref3Email       String?
+  
+  // Información adicional de proveedor
+  paymentTerms    String?   // Términos de pago (30 días, etc.)
+  deliveryTerms   String?   // Términos de entrega
+  minOrderValue   Float?    // Valor mínimo de orden
+  
+  // Relaciones
+  documents       SupplierDocument[]
+}
+
+enum SupplierStatus {
+  COMPLETE
+  INCOMPLETE
+  EXPIRED
+}
+
+enum SupplierCategory {
+  MATERIALES       // Materiales de construcción
+  FERRETERIA       // Ferretería
+  ACABADOS         // Acabados
+  ELECTRICO        // Eléctrico
+  HIDRAULICO       // Hidráulico
+  MAQUINARIA       // Maquinaria y equipos
+  TRANSPORTE       // Transporte
+  OTROS            // Otros
+}
+
+// DOCUMENTOS DE PROVEEDORES
+model SupplierDocument {
+  id              String              @id @default(cuid())
+  type            SupplierDocumentType
+  fileName        String
+  cloudStoragePath String
+  isPublic        Boolean             @default(false)
+  expirationDate  DateTime?
+  uploadedAt      DateTime            @default(now())
+  sharepointPath  String?
+  
+  // Relaciones
+  supplierId      String
+  supplier        Supplier            @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+}
+
+enum SupplierDocumentType {
+  CEDULA
+  RUT
+  CAMARA_COMERCIO
+  CERTIFICADO_BANCARIO
+}
