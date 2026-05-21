@@ -4,6 +4,8 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/auth-options";
 import { prisma } from "@/lib/db";
 import { ROLES_CAN_INVITE } from "@/lib/constants";
 
+export const dynamic = "force-dynamic";
+
 // GET - Listar usuarios
 export async function GET(request: NextRequest) {
   try {

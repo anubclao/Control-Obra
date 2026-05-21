@@ -4,6 +4,8 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/auth-options';
 import { prisma } from '@/lib/db';
 import { ROLES_CAN_VIEW_PROGRESS } from '@/lib/constants';
 
+export const dynamic = 'force-dynamic';
+
 type UserRole = keyof typeof import('@/lib/constants').USER_ROLE;
 
 // GET - Obtener resumen de avance por proyecto

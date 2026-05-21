@@ -4,6 +4,8 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/auth-options';
 import { getFinancialReportPayload } from '@/lib/financial-report';
 import { ROLES_CAN_VIEW_FINANCIAL } from '@/lib/constants';
 
+export const dynamic = 'force-dynamic';
+
 // GET - Obtener reporte financiero
 export async function GET(request: NextRequest) {
   try {

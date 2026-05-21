@@ -4,6 +4,8 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/auth-options";
 import { prisma } from "@/lib/db";
 import { calculateAiuBaseTotals } from "@/lib/budget-aiu";
 
+export const dynamic = "force-dynamic";
+
 // GET - Obtener configuración AIU de todos los proyectos
 export async function GET(_request: NextRequest) {
   try {
