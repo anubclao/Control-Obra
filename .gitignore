@@ -16,6 +16,7 @@ pnpm-debug.log*
 .env
 .env.*
 !.env.example
+!nextjs_space/.env.production.example
 
 # OS / Editor
 .DS_Store
