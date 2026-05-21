@@ -44,6 +44,14 @@ En la app Node.js, sección **Environment Variables**, crea estas claves:
 - `NEXTAUTH_SECRET=SECRETO_LARGO_ALEATORIO`
 - `DATABASE_URL=mysql://USUARIO:PASSWORD@HOST:PUERTO/NOMBRE_DB`
 
+### Obligatorias para OTP por correo (Gmail)
+
+- `SMTP_HOST=smtp.gmail.com`
+- `SMTP_PORT=465`
+- `SMTP_USER=tu_correo@gmail.com`
+- `SMTP_PASS=app_password_de_16_caracteres`
+- `SMTP_FROM="Control Obra <tu_correo@gmail.com>"`
+
 ### Recomendadas (pool)
 
 - `DB_POOL_CONNECTION_LIMIT=20`

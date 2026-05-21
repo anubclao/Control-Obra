@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
+import { sendOtpEmail } from "@/lib/email";
 
 function generateOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -57,8 +58,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // TODO: Integrar proveedor SMTP/SES/SendGrid.
-    console.log(`[OTP LOGIN] ${email} -> ${otp}`);
+    await sendOtpEmail(email, otp);
 
     const response: Record<string, unknown> = { success: true };
     if (process.env.NODE_ENV !== "production") {
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Error requesting OTP:", error);
     return NextResponse.json(
-      { error: "No se pudo generar el codigo OTP" },
+      { error: "No se pudo generar o enviar el codigo OTP" },
       { status: 500 }
     );
   }
