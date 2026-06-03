@@ -5,6 +5,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/auth-options";
 import { ProveedorDetails } from "./_components/proveedor-details";
 import { calculateDaysUntil } from "@/lib/format";
 import { SupplierDocument } from "@prisma/client";
+import { SUPPLIER_PERSON_TYPE, SUPPLIER_COMMERCIAL_TYPE } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,10 @@ export default async function ProveedorDetailPage({
 
   const serializedSupplier = {
     ...supplier,
+    personType: supplier.personType as keyof typeof SUPPLIER_PERSON_TYPE,
+    commercialType: supplier.commercialType as
+      | keyof typeof SUPPLIER_COMMERCIAL_TYPE
+      | null,
     createdAt: supplier.createdAt.toISOString(),
     updatedAt: supplier.updatedAt.toISOString(),
     documents: documentAlerts,

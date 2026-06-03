@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { authOptions } from "@/app/api/auth/[...nextauth]/auth-options";
 import { ProveedoresClient } from "./_components/proveedores-client";
 import { SupplierDocument, Supplier } from "@prisma/client";
+import { SUPPLIER_COMMERCIAL_TYPE, SUPPLIER_PERSON_TYPE } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +72,10 @@ export default async function ProveedoresPage() {
 
   const serializedSuppliers = updatedSuppliers.map((s: Supplier & { documents: SupplierDocument[] }) => ({
     ...s,
+    personType: s.personType as keyof typeof SUPPLIER_PERSON_TYPE,
+    commercialType: s.commercialType as
+      | keyof typeof SUPPLIER_COMMERCIAL_TYPE
+      | null,
     createdAt: s.createdAt.toISOString(),
     updatedAt: s.updatedAt.toISOString(),
     documents: s.documents.map((d: SupplierDocument) => ({
