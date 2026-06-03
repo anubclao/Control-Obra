@@ -364,6 +364,38 @@ export const SUPPLIER_STATUS = {
   EXPIRED: 'Vencido'
 } as const;
 
+export const SUPPLIER_PERSON_TYPE = {
+  NATURAL: 'Persona natural',
+  JURIDICA: 'Persona jurídica'
+} as const;
+
+export const SUPPLIER_COMMERCIAL_TYPE = {
+  PRODUCTO: 'Producto',
+  SERVICIO: 'Servicio'
+} as const;
+
+export const SUPPLIER_PRODUCT_SUBCATEGORY = {
+  ELECTRICO: 'Eléctrico',
+  AIRES_ACONDICIONADOS: 'Aires acondicionados',
+  HIDRAULICO: 'Hidráulico',
+  OBRA_CIVIL: 'Obra civil',
+  RED_CONTRA_INCENDIOS: 'Red contra incendios',
+  DRYWALL: 'Drywall',
+  PISOS: 'Pisos',
+  ACABADOS: 'Acabados',
+  OTROS: 'Otros'
+} as const;
+
+export const SUPPLIER_SERVICE_SUBCATEGORY = {
+  ALQUILER: 'Alquiler',
+  TRANSPORTE: 'Transporte',
+  MANO_DE_OBRA: 'Mano de obra',
+  CAPACITACIONES: 'Capacitaciones',
+  GASTOS_MEDICOS: 'Gastos médicos',
+  HONORARIOS: 'Honorarios',
+  OTROS: 'Otros'
+} as const;
+
 export const SUPPLIER_CATEGORY = {
   MATERIALES: 'Materiales de Construcción',
   FERRETERIA: 'Ferretería',

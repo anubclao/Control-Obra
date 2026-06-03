@@ -29,6 +29,8 @@ import {
 import {
   SUPPLIER_STATUS,
   SUPPLIER_CATEGORY,
+  SUPPLIER_PERSON_TYPE,
+  SUPPLIER_COMMERCIAL_TYPE,
   SUPPLIER_DOCUMENT_TYPE,
 } from "@/lib/constants";
 import { formatCurrency, formatShortDate } from "@/lib/format";
@@ -52,9 +54,14 @@ type Supplier = {
   nit: string;
   contact: string;
   email: string;
+  secondaryEmail: string | null;
   phone: string;
+  secondaryPhone: string | null;
+  personType: keyof typeof SUPPLIER_PERSON_TYPE;
   status: keyof typeof SUPPLIER_STATUS;
   category: keyof typeof SUPPLIER_CATEGORY;
+  commercialType: keyof typeof SUPPLIER_COMMERCIAL_TYPE | null;
+  commercialSubcategory: string | null;
   address: string | null;
   city: string | null;
   department: string | null;
@@ -183,6 +190,9 @@ export function ProveedorDetails({ supplier, documentAlerts, userRole }: Props) 
                 {supplier.name}
               </h1>
               {getStatusBadge(supplier.status)}
+              <Badge variant="outline">
+                {SUPPLIER_PERSON_TYPE[supplier.personType]}
+              </Badge>
             </div>
             <p className="text-gray-600">NIT: {supplier.nit}</p>
           </div>
@@ -258,10 +268,22 @@ export function ProveedorDetails({ supplier, documentAlerts, userRole }: Props) 
               <Mail className="w-4 h-4 text-gray-400" />
               <span>{supplier.email}</span>
             </div>
+            {supplier.secondaryEmail && (
+              <div className="flex items-center gap-2">
+                <Mail className="w-4 h-4 text-gray-400" />
+                <span>{supplier.secondaryEmail}</span>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <Phone className="w-4 h-4 text-gray-400" />
               <span>{supplier.phone}</span>
             </div>
+            {supplier.secondaryPhone && (
+              <div className="flex items-center gap-2">
+                <Phone className="w-4 h-4 text-gray-400" />
+                <span>{supplier.secondaryPhone}</span>
+              </div>
+            )}
             {supplier.website && (
               <div className="flex items-center gap-2">
                 <Globe className="w-4 h-4 text-gray-400" />
@@ -277,6 +299,12 @@ export function ProveedorDetails({ supplier, documentAlerts, userRole }: Props) 
             <Badge variant="outline">
               {SUPPLIER_CATEGORY[supplier.category]}
             </Badge>
+            {supplier.commercialType && (
+              <Badge variant="secondary">
+                {SUPPLIER_COMMERCIAL_TYPE[supplier.commercialType]}
+                {supplier.commercialSubcategory ? ` · ${supplier.commercialSubcategory}` : ""}
+              </Badge>
+            )}
           </CardContent>
         </Card>
 

@@ -1110,6 +1110,7 @@ model Supplier {
   contact         String   // Nombre de contacto principal
   email           String
   phone           String
+  personType      String   @default("JURIDICA")
   status          SupplierStatus @default(INCOMPLETE)
   category        SupplierCategory @default(MATERIALES)
   createdAt       DateTime @default(now())
@@ -1121,6 +1122,10 @@ model Supplier {
   department      String?
   postalCode      String?
   website         String?
+  secondaryEmail  String?
+  secondaryPhone  String?
+  commercialType  String?
+  commercialSubcategory String?
   
   // Representante legal
   legalRepName    String?

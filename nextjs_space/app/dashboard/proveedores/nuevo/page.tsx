@@ -9,31 +9,41 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  Truck,
   ArrowLeft,
   Loader2,
   Building2,
   MapPin,
   User,
-  DollarSign,
-  Users,
-  Package,
+  Tags,
 } from "lucide-react";
-import { SUPPLIER_CATEGORY } from "@/lib/constants";
+import {
+  SUPPLIER_COMMERCIAL_TYPE,
+  SUPPLIER_PERSON_TYPE,
+  SUPPLIER_PRODUCT_SUBCATEGORY,
+  SUPPLIER_SERVICE_SUBCATEGORY,
+} from "@/lib/constants";
+
+type PersonType = keyof typeof SUPPLIER_PERSON_TYPE;
+type CommercialType = keyof typeof SUPPLIER_COMMERCIAL_TYPE;
 
 export default function NuevoProveedorPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [personType, setPersonType] = useState<PersonType>("JURIDICA");
+  const [commercialType, setCommercialType] = useState<CommercialType>("PRODUCTO");
 
   const [formData, setFormData] = useState({
+    personType: "JURIDICA",
     name: "",
     nit: "",
     contact: "",
     email: "",
+    secondaryEmail: "",
     phone: "",
-    category: "MATERIALES",
-    website: "",
+    secondaryPhone: "",
+    commercialType: "PRODUCTO",
+    commercialSubcategory: "ELECTRICO",
     address: "",
     city: "",
     department: "",
@@ -42,27 +52,36 @@ export default function NuevoProveedorPage() {
     legalRepCedula: "",
     legalRepEmail: "",
     legalRepPhone: "",
-    reportedIncome: "",
-    incomeYear: new Date().getFullYear().toString(),
-    paymentTerms: "",
-    deliveryTerms: "",
-    minOrderValue: "",
-    ref1Name: "",
-    ref1Company: "",
-    ref1Phone: "",
-    ref1Email: "",
-    ref2Name: "",
-    ref2Company: "",
-    ref2Phone: "",
-    ref2Email: "",
-    ref3Name: "",
-    ref3Company: "",
-    ref3Phone: "",
-    ref3Email: "",
   });
+
+  const commercialSubcategories =
+    commercialType === "PRODUCTO"
+      ? Object.entries(SUPPLIER_PRODUCT_SUBCATEGORY)
+      : Object.entries(SUPPLIER_SERVICE_SUBCATEGORY);
 
   const updateField = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handlePersonTypeChange = (value: PersonType) => {
+    setPersonType(value);
+    setFormData((prev) => ({
+      ...prev,
+      personType: value,
+      legalRepName: value === "JURIDICA" ? prev.legalRepName : "",
+      legalRepCedula: value === "JURIDICA" ? prev.legalRepCedula : "",
+      legalRepEmail: value === "JURIDICA" ? prev.legalRepEmail : "",
+      legalRepPhone: value === "JURIDICA" ? prev.legalRepPhone : "",
+    }));
+  };
+
+  const handleCommercialTypeChange = (value: CommercialType) => {
+    setCommercialType(value);
+    setFormData((prev) => ({
+      ...prev,
+      commercialType: value,
+      commercialSubcategory: value === "PRODUCTO" ? "ELECTRICO" : "ALQUILER",
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -76,9 +95,15 @@ export default function NuevoProveedorPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
-          reportedIncome: formData.reportedIncome ? parseFloat(formData.reportedIncome) : null,
-          incomeYear: formData.incomeYear ? parseInt(formData.incomeYear) : null,
-          minOrderValue: formData.minOrderValue ? parseFloat(formData.minOrderValue) : null,
+          personType,
+          commercialType,
+          category: "MATERIALES",
+          secondaryEmail: formData.secondaryEmail || null,
+          secondaryPhone: formData.secondaryPhone || null,
+          legalRepName: personType === "JURIDICA" ? formData.legalRepName : null,
+          legalRepCedula: personType === "JURIDICA" ? formData.legalRepCedula : null,
+          legalRepEmail: personType === "JURIDICA" ? formData.legalRepEmail : null,
+          legalRepPhone: personType === "JURIDICA" ? formData.legalRepPhone : null,
         }),
       });
 
@@ -99,11 +124,7 @@ export default function NuevoProveedorPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => router.back()}
-        >
+        <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <div>
@@ -129,22 +150,36 @@ export default function NuevoProveedorPage() {
             <CardDescription>Datos principales del proveedor</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-4">
+            <div className="space-y-2 col-span-2">
+              <Label htmlFor="personType">Tipo de Persona *</Label>
+              <Select value={personType} onValueChange={(v) => handlePersonTypeChange(v as PersonType)}>
+                <SelectTrigger id="personType">
+                  <SelectValue placeholder="Seleccione tipo de persona" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NATURAL">Persona natural</SelectItem>
+                  <SelectItem value="JURIDICA">Persona jurídica</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
-              <Label htmlFor="name">Razón Social *</Label>
+              <Label htmlFor="name">{personType === "NATURAL" ? "Nombre Completo *" : "Razón Social *"}</Label>
               <Input
                 id="name"
                 value={formData.name}
                 onChange={(e) => updateField("name", e.target.value)}
                 required
+                placeholder={personType === "NATURAL" ? "Nombre completo" : "Nombre de la empresa"}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="nit">NIT *</Label>
+              <Label htmlFor="nit">{personType === "NATURAL" ? "CC / NIT *" : "NIT *"}</Label>
               <Input
                 id="nit"
                 value={formData.nit}
                 onChange={(e) => updateField("nit", e.target.value)}
                 required
+                placeholder={personType === "NATURAL" ? "Cédula o NIT" : "000000000-0"}
               />
             </div>
             <div className="space-y-2">
@@ -157,7 +192,7 @@ export default function NuevoProveedorPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email *</Label>
+              <Label htmlFor="email">Email 1 *</Label>
               <Input
                 id="email"
                 type="email"
@@ -167,7 +202,17 @@ export default function NuevoProveedorPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phone">Teléfono *</Label>
+              <Label htmlFor="secondaryEmail">Email 2</Label>
+              <Input
+                id="secondaryEmail"
+                type="email"
+                value={formData.secondaryEmail}
+                onChange={(e) => updateField("secondaryEmail", e.target.value)}
+                placeholder="Opcional"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Teléfono 1 *</Label>
               <Input
                 id="phone"
                 value={formData.phone}
@@ -176,16 +221,35 @@ export default function NuevoProveedorPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="category">Categoría</Label>
-              <Select
-                value={formData.category}
-                onValueChange={(v) => updateField("category", v)}
-              >
+              <Label htmlFor="secondaryPhone">Teléfono 2</Label>
+              <Input
+                id="secondaryPhone"
+                value={formData.secondaryPhone}
+                onChange={(e) => updateField("secondaryPhone", e.target.value)}
+                placeholder="Opcional"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Clasificación Comercial */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Tags className="w-5 h-5 text-amber-600" />
+              <CardTitle>Clasificación Comercial</CardTitle>
+            </div>
+            <CardDescription>Tipo y subcategoría comercial del proveedor</CardDescription>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="commercialType">Tipo *</Label>
+              <Select value={commercialType} onValueChange={(v) => handleCommercialTypeChange(v as CommercialType)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(SUPPLIER_CATEGORY).map(([key, label]) => (
+                  {Object.entries(SUPPLIER_COMMERCIAL_TYPE).map(([key, label]) => (
                     <SelectItem key={key} value={key}>
                       {label}
                     </SelectItem>
@@ -194,13 +258,22 @@ export default function NuevoProveedorPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="website">Sitio Web</Label>
-              <Input
-                id="website"
-                value={formData.website}
-                onChange={(e) => updateField("website", e.target.value)}
-                placeholder="https://"
-              />
+              <Label htmlFor="commercialSubcategory">Subcategoría *</Label>
+              <Select
+                value={formData.commercialSubcategory}
+                onValueChange={(v) => updateField("commercialSubcategory", v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccione subcategoría" />
+                </SelectTrigger>
+                <SelectContent>
+                  {commercialSubcategories.map(([key, label]) => (
+                    <SelectItem key={key} value={key}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>
@@ -250,175 +323,55 @@ export default function NuevoProveedorPage() {
         </Card>
 
         {/* Representante Legal */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <User className="w-5 h-5 text-amber-600" />
-              <CardTitle>Representante Legal</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="legalRepName">Nombre Completo</Label>
-              <Input
-                id="legalRepName"
-                value={formData.legalRepName}
-                onChange={(e) => updateField("legalRepName", e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="legalRepCedula">Cédula</Label>
-              <Input
-                id="legalRepCedula"
-                value={formData.legalRepCedula}
-                onChange={(e) => updateField("legalRepCedula", e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="legalRepEmail">Email</Label>
-              <Input
-                id="legalRepEmail"
-                type="email"
-                value={formData.legalRepEmail}
-                onChange={(e) => updateField("legalRepEmail", e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="legalRepPhone">Teléfono</Label>
-              <Input
-                id="legalRepPhone"
-                value={formData.legalRepPhone}
-                onChange={(e) => updateField("legalRepPhone", e.target.value)}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Información Comercial */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Package className="w-5 h-5 text-amber-600" />
-              <CardTitle>Información Comercial</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="grid grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="paymentTerms">Términos de Pago</Label>
-              <Input
-                id="paymentTerms"
-                value={formData.paymentTerms}
-                onChange={(e) => updateField("paymentTerms", e.target.value)}
-                placeholder="Ej: 30 días"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="deliveryTerms">Términos de Entrega</Label>
-              <Input
-                id="deliveryTerms"
-                value={formData.deliveryTerms}
-                onChange={(e) => updateField("deliveryTerms", e.target.value)}
-                placeholder="Ej: 5 días hábiles"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="minOrderValue">Valor Mínimo de Orden</Label>
-              <Input
-                id="minOrderValue"
-                type="number"
-                value={formData.minOrderValue}
-                onChange={(e) => updateField("minOrderValue", e.target.value)}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Información Financiera */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <DollarSign className="w-5 h-5 text-amber-600" />
-              <CardTitle>Información Financiera</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="reportedIncome">Ingresos Reportados</Label>
-              <Input
-                id="reportedIncome"
-                type="number"
-                value={formData.reportedIncome}
-                onChange={(e) => updateField("reportedIncome", e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="incomeYear">Año</Label>
-              <Input
-                id="incomeYear"
-                type="number"
-                value={formData.incomeYear}
-                onChange={(e) => updateField("incomeYear", e.target.value)}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Referencias Comerciales */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-amber-600" />
-              <CardTitle>Referencias Comerciales</CardTitle>
-            </div>
-            <CardDescription>Mínimo 3 referencias comerciales</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {[1, 2, 3].map((num) => (
-              <div key={num} className="p-4 border rounded-lg">
-                <h4 className="font-medium mb-3">Referencia {num}</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Nombre</Label>
-                    <Input
-                      value={(formData as any)[`ref${num}Name`]}
-                      onChange={(e) => updateField(`ref${num}Name`, e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Empresa</Label>
-                    <Input
-                      value={(formData as any)[`ref${num}Company`]}
-                      onChange={(e) => updateField(`ref${num}Company`, e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Teléfono</Label>
-                    <Input
-                      value={(formData as any)[`ref${num}Phone`]}
-                      onChange={(e) => updateField(`ref${num}Phone`, e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Email</Label>
-                    <Input
-                      type="email"
-                      value={(formData as any)[`ref${num}Email`]}
-                      onChange={(e) => updateField(`ref${num}Email`, e.target.value)}
-                    />
-                  </div>
-                </div>
+        {personType === "JURIDICA" && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <User className="w-5 h-5 text-amber-600" />
+                <CardTitle>Representante Legal</CardTitle>
               </div>
-            ))}
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="legalRepName">Nombre Completo *</Label>
+                <Input
+                  id="legalRepName"
+                  value={formData.legalRepName}
+                  onChange={(e) => updateField("legalRepName", e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="legalRepCedula">Cédula *</Label>
+                <Input
+                  id="legalRepCedula"
+                  value={formData.legalRepCedula}
+                  onChange={(e) => updateField("legalRepCedula", e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="legalRepEmail">Email</Label>
+                <Input
+                  id="legalRepEmail"
+                  type="email"
+                  value={formData.legalRepEmail}
+                  onChange={(e) => updateField("legalRepEmail", e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="legalRepPhone">Teléfono</Label>
+                <Input
+                  id="legalRepPhone"
+                  value={formData.legalRepPhone}
+                  onChange={(e) => updateField("legalRepPhone", e.target.value)}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Botones */}
         <div className="flex justify-end gap-4">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => router.back()}
-          >
+          <Button type="button" variant="outline" onClick={() => router.back()}>
             Cancelar
           </Button>
           <Button type="submit" disabled={loading}>

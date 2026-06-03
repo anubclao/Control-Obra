@@ -52,10 +52,22 @@ export async function PUT(
     }
 
     const body = await request.json();
+    const normalizedPersonType = body.personType || "JURIDICA";
 
     const supplier = await prisma.supplier.update({
       where: { id: params.supplierId },
-      data: body,
+      data: {
+        ...body,
+        personType: normalizedPersonType,
+        legalRepName: normalizedPersonType === "JURIDICA" ? body.legalRepName ?? null : null,
+        legalRepCedula: normalizedPersonType === "JURIDICA" ? body.legalRepCedula ?? null : null,
+        legalRepEmail: normalizedPersonType === "JURIDICA" ? body.legalRepEmail ?? null : null,
+        legalRepPhone: normalizedPersonType === "JURIDICA" ? body.legalRepPhone ?? null : null,
+        secondaryEmail: body.secondaryEmail ?? null,
+        secondaryPhone: body.secondaryPhone ?? null,
+        commercialType: body.commercialType ?? null,
+        commercialSubcategory: body.commercialSubcategory ?? null,
+      },
     });
 
     return NextResponse.json(supplier);

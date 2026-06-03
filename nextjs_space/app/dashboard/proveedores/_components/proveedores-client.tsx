@@ -17,7 +17,7 @@ import {
   Mail,
   Phone,
 } from "lucide-react";
-import { SUPPLIER_STATUS, SUPPLIER_CATEGORY } from "@/lib/constants";
+import { SUPPLIER_STATUS, SUPPLIER_CATEGORY, SUPPLIER_PERSON_TYPE, SUPPLIER_COMMERCIAL_TYPE } from "@/lib/constants";
 
 type Supplier = {
   id: string;
@@ -25,9 +25,14 @@ type Supplier = {
   nit: string;
   contact: string;
   email: string;
+  secondaryEmail: string | null;
   phone: string;
+  secondaryPhone: string | null;
+  personType: keyof typeof SUPPLIER_PERSON_TYPE;
   status: keyof typeof SUPPLIER_STATUS;
   category: keyof typeof SUPPLIER_CATEGORY;
+  commercialType: keyof typeof SUPPLIER_COMMERCIAL_TYPE | null;
+  commercialSubcategory: string | null;
   documents: any[];
   createdAt: string;
 };
@@ -177,7 +182,12 @@ export function ProveedoresClient({ suppliers }: Props) {
                         </h3>
                         {getStatusBadge(supplier.status)}
                         <Badge variant="outline">
-                          {SUPPLIER_CATEGORY[supplier.category]}
+                          {SUPPLIER_PERSON_TYPE[supplier.personType]}
+                        </Badge>
+                        <Badge variant="outline">
+                          {supplier.commercialType
+                            ? `${SUPPLIER_COMMERCIAL_TYPE[supplier.commercialType]}${supplier.commercialSubcategory ? ` · ${supplier.commercialSubcategory}` : ""}`
+                            : SUPPLIER_CATEGORY[supplier.category]}
                         </Badge>
                       </div>
                       <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
@@ -186,10 +196,22 @@ export function ProveedoresClient({ suppliers }: Props) {
                           <Mail className="w-3 h-3" />
                           {supplier.email}
                         </span>
+                        {supplier.secondaryEmail && (
+                          <span className="flex items-center gap-1">
+                            <Mail className="w-3 h-3" />
+                            {supplier.secondaryEmail}
+                          </span>
+                        )}
                         <span className="flex items-center gap-1">
                           <Phone className="w-3 h-3" />
                           {supplier.phone}
                         </span>
+                        {supplier.secondaryPhone && (
+                          <span className="flex items-center gap-1">
+                            <Phone className="w-3 h-3" />
+                            {supplier.secondaryPhone}
+                          </span>
+                        )}
                         <span className="flex items-center gap-1">
                           <FileText className="w-3 h-3" />
                           {supplier.documents.length} documentos
