@@ -1,0 +1,1128 @@
+// =============================================================================
+// Control de Obra Pro — Prisma schema
+// =============================================================================
+// MySQL 8.0+ / MariaDB 10.5+
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// USUARIOS
+// =============================================================================
+enum Role {
+  ADMIN
+  GERENTE
+  DIRECTOR
+  RESIDENTE
+  CONTABILIDAD
+  TESORERIA
+  HSEQ
+  CLIENTE
+  USER
+}
+
+enum Area {
+  tecnico
+  administrativo
+  ventas
+}
+
+model User {
+  id           String   @id @db.VarChar(36)
+  email        String   @unique @db.VarChar(180)
+  name         String   @db.VarChar(180)
+  role         Role
+  area         Area
+  avatarUrl    String?  @map("avatar_url") @db.VarChar(500)
+  isActive     Boolean  @default(true) @map("is_active")
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  createdInvitations  Invitation[] @relation("inv_creator")
+  acceptedInvitations Invitation[] @relation("inv_acceptor")
+  createdProjects     Project[]   @relation("proj_creator")
+  createdContracts    Contract[]  @relation("contract_creator")
+  createdExpenses     Expense[]   @relation("exp_creator")
+  approvedExpenses    Expense[]   @relation("exp_approver")
+  updatedAiu          AiuConfig[] @relation("aiu_user")
+  createdWorkCuts     WorkCut[]   @relation("wcut_creator")
+  workCutApprovals    WorkCutApproval[]
+  createdPayments     PaymentRequest[] @relation("pay_creator")
+  paymentApprovals    PaymentApproval[]
+  createdWorkLogs     WorkLog[]   @relation("wlog_creator")
+  createdEmployees    Employee[]
+
+  @@map("users")
+  @@index([role])
+  @@index([area])
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  CANCELLED
+}
+
+model Invitation {
+  id         String           @id @db.VarChar(36)
+  code       String           @unique @db.VarChar(20)
+  email      String           @db.VarChar(180)
+  role       Role
+  area       Area?
+  projectId  String?          @map("project_id") @db.VarChar(36)
+  status     InvitationStatus @default(PENDING)
+  maxUses    Int              @default(1) @map("max_uses")
+  uses       Int              @default(0)
+  expiresAt  DateTime         @map("expires_at")
+  createdBy  String           @map("created_by") @db.VarChar(36)
+  acceptedBy String?          @map("accepted_by") @db.VarChar(36)
+  acceptedAt DateTime?        @map("accepted_at")
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  creator  User  @relation("inv_creator", fields: [createdBy], references: [id], onDelete: Cascade)
+  acceptor User? @relation("inv_acceptor", fields: [acceptedBy], references: [id], onDelete: SetNull)
+
+  @@map("invitations")
+  @@index([email])
+  @@index([status])
+}
+
+// =============================================================================
+// PROYECTOS
+// =============================================================================
+enum ProjectStatus {
+  IN_PLANNING
+  IN_EXECUTION
+  PAUSED
+  COMPLETED
+}
+
+model Project {
+  id                String        @id @db.VarChar(36)
+  code              String        @unique @db.VarChar(40)
+  name              String        @db.VarChar(255)
+  client            String        @db.VarChar(255)
+  location          String        @db.VarChar(255)
+  startDate         DateTime      @map("start_date") @db.Date
+  estimatedEndDate  DateTime      @map("estimated_end_date") @db.Date
+  totalBudget       Decimal       @default(0) @map("total_budget") @db.Decimal(15, 2)
+  executedAmount    Decimal       @default(0) @map("executed_amount") @db.Decimal(15, 2)
+  status            ProjectStatus @default(IN_PLANNING)
+  description       String?       @db.Text
+  createdBy         String?       @map("created_by") @db.VarChar(36)
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  creator    User?     @relation("proj_creator", fields: [createdBy], references: [id], onDelete: SetNull)
+  budget     Budget?
+  contracts  Contract[]
+  cuts       WorkCut[]
+  pscs       Psc[]
+  expenses   Expense[]
+  workLogs   WorkLog[]
+  aiuConfig  AiuConfig?
+  taxes      TaxConfig[]
+  payments   PaymentRequest[]
+  quotations Quotation[]
+
+  @@map("projects")
+  @@index([status])
+  @@index([startDate, estimatedEndDate])
+}
+
+// =============================================================================
+// PROVEEDORES
+// =============================================================================
+enum PersonType {
+  NATURAL
+  JURIDICA
+}
+
+enum ProviderCategory {
+  PRODUCTO
+  SERVICIO
+}
+
+enum ProviderStatus {
+  COMPLETE
+  INCOMPLETE
+  EXPIRED
+}
+
+model Provider {
+  id               String           @id @db.VarChar(36)
+  personType       PersonType       @map("person_type")
+  name             String           @db.VarChar(255)
+  nit              String           @unique @db.VarChar(40)
+  contact          String           @db.VarChar(180)
+  email            String           @db.VarChar(180)
+  email2           String?          @map("email2") @db.VarChar(180)
+  phone            String           @db.VarChar(60)
+  phone2           String?          @map("phone2") @db.VarChar(60)
+  website          String?          @db.VarChar(500)
+  address          String?          @db.VarChar(255)
+  city             String?          @db.VarChar(120)
+  department       String?          @db.VarChar(120)
+  postalCode       String?          @map("postal_code") @db.VarChar(30)
+  category         ProviderCategory?
+  subcategory      String?          @db.VarChar(60)
+  subcategoryOther String?          @map("subcategory_other") @db.VarChar(255)
+  legalRepName     String?          @map("legal_rep_name") @db.VarChar(255)
+  legalRepCedula   String?          @map("legal_rep_cedula") @db.VarChar(40)
+  legalRepEmail    String?          @map("legal_rep_email") @db.VarChar(180)
+  legalRepPhone    String?          @map("legal_rep_phone") @db.VarChar(60)
+  reportedIncome   Decimal?         @map("reported_income") @db.Decimal(15, 2)
+  incomeYear       Int?             @map("income_year")
+  status           ProviderStatus   @default(INCOMPLETE)
+  rating           Int?             @db.TinyInt
+  notes            String?          @db.Text
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  documents ProviderDocument[]
+  references ProviderReference[]
+  contracts Contract[]
+  cuts      WorkCut[]
+  pscs      Psc[]
+  expenses  Expense[]
+  payments  PaymentRequest[]
+
+  @@map("providers")
+  @@index([personType])
+  @@index([status])
+  @@index([category, subcategory])
+  @@index([name])
+}
+
+model ProviderReference {
+  id         String   @id @default(uuid()) @db.VarChar(36)
+  providerId String   @map("provider_id") @db.VarChar(36)
+  name       String   @db.VarChar(180)
+  company    String?  @db.VarChar(180)
+  phone      String?  @db.VarChar(60)
+  email      String?  @db.VarChar(180)
+  position   Int      @default(0)
+
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@map("provider_references")
+  @@index([providerId])
+}
+
+enum ProviderDocumentType {
+  CEDULA
+  RUT
+  CAMARA_COMERCIO
+  CERTIFICADO_BANCARIO
+  CERTIFICACIONES_COMERCIALES
+  OTROS
+}
+
+model ProviderDocument {
+  id             String               @id @default(uuid()) @db.VarChar(36)
+  providerId     String               @map("provider_id") @db.VarChar(36)
+  type           ProviderDocumentType
+  fileName       String               @map("file_name") @db.VarChar(255)
+  fileUrl        String?              @map("file_url") @db.VarChar(500)
+  uploadedAt     DateTime             @default(now()) @map("uploaded_at")
+  expirationDate DateTime?            @map("expiration_date") @db.Date
+
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@map("provider_documents")
+  @@index([providerId])
+  @@index([type])
+  @@index([expirationDate])
+}
+
+// =============================================================================
+// CONTRATOS
+// =============================================================================
+enum ContractType {
+  OBRA
+  SUMINISTRO
+  SERVICIOS
+  CONSULTORIA
+}
+
+enum ContractStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  SUSPENDED
+}
+
+enum ContractDocumentType {
+  CONTRATO_FIRMADO
+  POLIZA_CUMPLIMIENTO
+  POLIZA_RESPONSABILIDAD
+  POLIZA_ANTICIPO
+  ACTA_INICIO
+  OTROS
+}
+
+model Contract {
+  id               String              @id @db.VarChar(36)
+  contractNumber   String              @unique @map("contract_number") @db.VarChar(40)
+  projectId        String              @map("project_id") @db.VarChar(36)
+  providerId       String              @map("provider_id") @db.VarChar(36)
+  type             ContractType
+  value            Decimal             @db.Decimal(15, 2)
+  startDate        DateTime            @map("start_date") @db.Date
+  endDate          DateTime            @map("end_date") @db.Date
+  status           ContractStatus      @default(DRAFT)
+  scopeOfWork      String              @map("scope_of_work") @db.Text
+  retentionPercent Decimal             @default(0) @map("retention_percent") @db.Decimal(5, 2)
+  advancePercent   Decimal             @default(0) @map("advance_percent") @db.Decimal(5, 2)
+  notes            String?             @db.Text
+  createdBy        String?             @map("created_by") @db.VarChar(36)
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+
+  project  Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  provider Provider            @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  creator  User?               @relation("contract_creator", fields: [createdBy], references: [id], onDelete: SetNull)
+  documents ContractDocument[]
+
+  @@map("contracts")
+  @@index([projectId])
+  @@index([providerId])
+  @@index([status])
+}
+
+model ContractDocument {
+  id             String               @id @default(uuid()) @db.VarChar(36)
+  contractId     String               @map("contract_id") @db.VarChar(36)
+  type           ContractDocumentType
+  fileName       String               @map("file_name") @db.VarChar(255)
+  fileUrl        String?              @map("file_url") @db.VarChar(500)
+  uploadedAt     DateTime             @default(now()) @map("uploaded_at")
+  expirationDate DateTime?            @map("expiration_date") @db.Date
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@map("contract_documents")
+  @@index([contractId])
+}
+
+// =============================================================================
+// PRESUPUESTOS (PT)
+// =============================================================================
+model Budget {
+  id                String   @id @db.VarChar(36)
+  projectId         String   @unique @map("project_id") @db.VarChar(36)
+  activeVersionId   String?  @map("active_version_id") @db.VarChar(36)
+  totalValue        Decimal  @default(0) @map("total_value") @db.Decimal(15, 2)
+  clientValue       Decimal  @default(0) @map("client_value") @db.Decimal(15, 2)
+  unforeseenValue   Decimal  @default(0) @map("unforeseen_value") @db.Decimal(15, 2)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  project       Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versions      BudgetVersion[]
+  layers        BudgetLayer[]
+  unforeseenItems BudgetUnforeseenItem[]
+  pscs          Psc[]
+
+  @@map("budgets")
+}
+
+model BudgetVersion {
+  id         String   @id @default(uuid()) @db.VarChar(36)
+  budgetId   String   @map("budget_id") @db.VarChar(36)
+  version    Int
+  isActive   Boolean  @default(false) @map("is_active")
+  totalValue Decimal  @map("total_value") @db.Decimal(15, 2)
+  notes      String?  @db.Text
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  budget  Budget        @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  layers  BudgetLayer[]
+
+  @@unique([budgetId, version])
+  @@map("budget_versions")
+  @@index([budgetId, isActive])
+}
+
+enum BudgetLayerType {
+  CHAPTER
+  SUBCHAPTER
+  ITEM
+}
+
+model BudgetLayer {
+  id         String          @id @default(uuid()) @db.VarChar(36)
+  budgetId   String          @map("budget_id") @db.VarChar(36)
+  versionId  String?         @map("version_id") @db.VarChar(36)
+  code       String          @db.VarChar(20)
+  name       String          @db.VarChar(255)
+  layerType  BudgetLayerType @map("layer_type")
+  parentId   String?         @map("parent_id") @db.VarChar(36)
+  isClient   Boolean         @default(false) @map("is_client") // true = snapshot Presupuesto Cliente
+
+  budget     Budget?        @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  version    BudgetVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  parent     BudgetLayer?   @relation("LayerChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children   BudgetLayer[]  @relation("LayerChildren")
+  items      BudgetItem[]
+
+  @@map("budget_layers")
+  @@index([budgetId])
+  @@index([parentId])
+  @@index([budgetId, isClient])
+}
+
+model BudgetItem {
+  id                String  @id @default(uuid()) @db.VarChar(36)
+  layerId           String  @map("layer_id") @db.VarChar(36)
+  description       String  @db.VarChar(500)
+  unit              String  @db.VarChar(20)
+  quantity          Decimal @default(0) @db.Decimal(15, 3)
+  unitPrice         Decimal @default(0) @map("unit_price") @db.Decimal(15, 2)
+  totalPrice        Decimal @default(0) @map("total_price") @db.Decimal(15, 2)
+  executedQuantity  Decimal @default(0) @map("executed_quantity") @db.Decimal(15, 3)
+  executedAmount    Decimal @default(0) @map("executed_amount") @db.Decimal(15, 2)
+  budgetItemCode    String? @map("budget_item_code") @db.VarChar(40)
+
+  layer       BudgetLayer @relation(fields: [layerId], references: [id], onDelete: Cascade)
+  pscItems    PscItem[]
+
+  @@map("budget_items")
+  @@index([layerId])
+}
+
+model BudgetUnforeseenItem {
+  id          String  @id @default(uuid()) @db.VarChar(36)
+  budgetId    String  @map("budget_id") @db.VarChar(36)
+  description String  @db.VarChar(500)
+  unit        String  @db.VarChar(20)
+  quantity    Decimal @default(0) @db.Decimal(15, 3)
+  unitPrice   Decimal @default(0) @map("unit_price") @db.Decimal(15, 2)
+  totalPrice  Decimal @default(0) @map("total_price") @db.Decimal(15, 2)
+  isResolved  Boolean @default(false) @map("is_resolved")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  budget Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+
+  @@map("budget_unforeseen_items")
+  @@index([budgetId])
+}
+
+// =============================================================================
+// PSC — Presupuesto Proveedor
+// =============================================================================
+enum PscStatus {
+  DRAFT
+  ACTIVE
+  SUSPENDED
+  COMPLETED
+  CANCELLED
+}
+
+model Psc {
+  id          String    @id @db.VarChar(36)
+  pscNumber   String    @unique @map("psc_number") @db.VarChar(40)
+  projectId   String    @map("project_id") @db.VarChar(36)
+  budgetId    String    @map("budget_id") @db.VarChar(36)
+  providerId  String    @map("provider_id") @db.VarChar(36)
+  totalValue  Decimal   @default(0) @map("total_value") @db.Decimal(15, 2)
+  status      PscStatus @default(DRAFT)
+  notes       String?   @db.Text
+  startDate   DateTime? @map("start_date") @db.Date
+  endDate     DateTime? @map("end_date") @db.Date
+  createdBy   String?   @map("created_by") @db.VarChar(36)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  budget   Budget    @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  provider Provider  @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  items    PscItem[]
+
+  @@map("pscs")
+  @@index([projectId])
+  @@index([providerId])
+  @@index([status])
+}
+
+model PscItem {
+  id               String  @id @default(uuid()) @db.VarChar(36)
+  pscId            String  @map("psc_id") @db.VarChar(36)
+  budgetItemId     String  @map("budget_item_id") @db.VarChar(36)
+  description      String  @db.VarChar(500)
+  unit             String  @db.VarChar(20)
+  quantity         Decimal @default(0) @db.Decimal(15, 3)
+  unitPrice        Decimal @default(0) @map("unit_price") @db.Decimal(15, 2)
+  totalPrice       Decimal @default(0) @map("total_price") @db.Decimal(15, 2)
+  executedQuantity Decimal @default(0) @map("executed_quantity") @db.Decimal(15, 3)
+  executedAmount   Decimal @default(0) @map("executed_amount") @db.Decimal(15, 2)
+
+  psc        Psc        @relation(fields: [pscId], references: [id], onDelete: Cascade)
+  budgetItem BudgetItem @relation(fields: [budgetItemId], references: [id], onDelete: Restrict)
+
+  @@map("psc_items")
+  @@index([pscId])
+}
+
+// =============================================================================
+// AIU
+// =============================================================================
+model AiuConfig {
+  id             String   @id @default(uuid()) @db.VarChar(36)
+  projectId      String   @unique @map("project_id") @db.VarChar(36)
+  administration Decimal  @default(0) @db.Decimal(5, 2)
+  imprevistos    Decimal  @default(0) @db.Decimal(5, 2)
+  utilidad       Decimal  @default(0) @db.Decimal(5, 2)
+  notes          String?  @db.Text
+  updatedBy      String?  @map("updated_by") @db.VarChar(36)
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updater User?   @relation("aiu_user", fields: [updatedBy], references: [id], onDelete: SetNull)
+
+  @@map("aiu_configs")
+}
+
+// =============================================================================
+// IMPUESTOS
+// =============================================================================
+enum TaxType {
+  IVA
+  RETENCION_FUENTE
+  RETENCION_IVA
+  RETENCION_ICA
+  ESTAMPILLAS
+  OTROS
+}
+
+enum TaxAppliesTo {
+  VENTAS
+  COMPRAS
+  AMBOS
+}
+
+model TaxConfig {
+  id         String       @id @default(uuid()) @db.VarChar(36)
+  projectId  String?      @map("project_id") @db.VarChar(36)
+  name       String       @db.VarChar(180)
+  type       TaxType
+  rate       Decimal      @db.Decimal(5, 2)
+  appliesTo  TaxAppliesTo @default(AMBOS) @map("applies_to")
+  isActive   Boolean      @default(true) @map("is_active")
+  notes      String?      @db.Text
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("tax_configs")
+  @@index([projectId])
+  @@index([isActive])
+}
+
+// =============================================================================
+// CORTES DE OBRA
+// =============================================================================
+enum WorkCutStatus {
+  DRAFT
+  SUBMITTED
+  VALIDATED
+  APPROVED
+  REJECTED
+  PAID
+}
+
+model WorkCut {
+  id                String         @id @db.VarChar(36)
+  cutNumber         String         @unique @map("cut_number") @db.VarChar(40)
+  projectId         String         @map("project_id") @db.VarChar(36)
+  providerId        String         @map("provider_id") @db.VarChar(36)
+  description       String         @db.VarChar(500)
+  periodStart       DateTime       @map("period_start") @db.Date
+  periodEnd         DateTime       @map("period_end") @db.Date
+  grossValue        Decimal        @default(0) @map("gross_value") @db.Decimal(15, 2)
+  retentionPercent  Decimal        @default(0) @map("retention_percent") @db.Decimal(5, 2)
+  retentionValue    Decimal        @default(0) @map("retention_value") @db.Decimal(15, 2)
+  advanceDeduction  Decimal        @default(0) @map("advance_deduction") @db.Decimal(15, 2)
+  netValue          Decimal        @default(0) @map("net_value") @db.Decimal(15, 2)
+  status            WorkCutStatus  @default(DRAFT)
+  submittedAt       DateTime?      @map("submitted_at")
+  validatedAt       DateTime?      @map("validated_at")
+  approvedAt        DateTime?      @map("approved_at")
+  paidAt            DateTime?      @map("paid_at")
+  rejectionReason   String?        @map("rejection_reason") @db.Text
+  createdBy         String         @map("created_by") @db.VarChar(36)
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+
+  project    Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  provider   Provider           @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  creator    User               @relation("wcut_creator", fields: [createdBy], references: [id], onDelete: Restrict)
+  items      WorkCutItem[]
+  documents  WorkCutDocument[]
+  approvals  WorkCutApproval[]
+  payment    PaymentRequest?
+
+  @@map("work_cuts")
+  @@index([projectId])
+  @@index([providerId])
+  @@index([status])
+  @@index([periodStart, periodEnd])
+}
+
+model WorkCutItem {
+  id               String  @id @default(uuid()) @db.VarChar(36)
+  workCutId        String  @map("work_cut_id") @db.VarChar(36)
+  description      String  @db.VarChar(500)
+  unit             String  @db.VarChar(20)
+  quantity         Decimal @db.Decimal(15, 3)
+  unitPrice        Decimal @map("unit_price") @db.Decimal(15, 2)
+  totalPrice       Decimal @map("total_price") @db.Decimal(15, 2)
+  budgetItemCode   String? @map("budget_item_code") @db.VarChar(40)
+  memoryText       String? @map("memory_text") @db.Text
+  memoryFormula    String? @map("memory_formula") @db.VarChar(255)
+
+  cut   WorkCut              @relation(fields: [workCutId], references: [id], onDelete: Cascade)
+  photos WorkCutItemPhoto[]
+
+  @@map("work_cut_items")
+  @@index([workCutId])
+}
+
+model WorkCutItemPhoto {
+  id             String   @id @default(uuid()) @db.VarChar(36)
+  workCutItemId  String   @map("work_cut_item_id") @db.VarChar(36)
+  fileName       String   @map("file_name") @db.VarChar(255)
+  fileUrl        String?  @map("file_url") @db.VarChar(500)
+  caption        String?  @db.VarChar(255)
+  uploadedAt     DateTime @default(now()) @map("uploaded_at")
+
+  item WorkCutItem @relation(fields: [workCutItemId], references: [id], onDelete: Cascade)
+
+  @@map("work_cut_item_photos")
+  @@index([workCutItemId])
+}
+
+enum WorkCutDocumentType {
+  ACTA
+  FACTURA
+  SOPORTE
+  OTROS
+}
+
+model WorkCutDocument {
+  id          String              @id @default(uuid()) @db.VarChar(36)
+  workCutId   String              @map("work_cut_id") @db.VarChar(36)
+  type        WorkCutDocumentType
+  fileName    String              @map("file_name") @db.VarChar(255)
+  fileUrl     String?             @map("file_url") @db.VarChar(500)
+  uploadedAt  DateTime            @default(now()) @map("uploaded_at")
+
+  cut WorkCut @relation(fields: [workCutId], references: [id], onDelete: Cascade)
+
+  @@map("work_cut_documents")
+  @@index([workCutId])
+}
+
+enum ApprovalAction {
+  SUBMIT
+  VALIDATE
+  APPROVE
+  REJECT
+  PAY
+}
+
+model WorkCutApproval {
+  id        String          @id @default(uuid()) @db.VarChar(36)
+  workCutId String          @map("work_cut_id") @db.VarChar(36)
+  action    ApprovalAction
+  userId    String          @map("user_id") @db.VarChar(36)
+  userName  String          @map("user_name") @db.VarChar(180)
+  userRole  String          @map("user_role") @db.VarChar(40)
+  comments  String?         @db.Text
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  cut WorkCut @relation(fields: [workCutId], references: [id], onDelete: Cascade)
+  user User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@map("work_cut_approvals")
+  @@index([workCutId, createdAt])
+}
+
+// =============================================================================
+// REGISTRO DE GASTOS — 13 tipos documentales
+// =============================================================================
+enum ExpenseType {
+  CONTRATO_OBRA_CIVIL_POLIZAS
+  CONTRATO_OBRA_CIVIL_SIN_POLIZAS
+  PRESTACION_SERVICIOS
+  LABORAL_OBRA
+  LABORAL_TERMINO_INDEFINIDO
+  LABORAL_TERMINO_DEFINIDO
+  ORDEN_SERVICIO_POLIZAS
+  ORDEN_SERVICIO_SIN_POLIZAS
+  ORDEN_COMPRA_POLIZAS
+  ORDEN_COMPRA_SIN_POLIZAS
+  SOLICITUD_RECURSO
+  SOLICITUD_REINTEGRO
+  LEGALIZACION_GASTO
+}
+
+enum ExpenseStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  PAID
+}
+
+model Expense {
+  id                    String        @id @db.VarChar(36)
+  expenseNumber        String        @unique @map("expense_number") @db.VarChar(40)
+  projectId            String        @map("project_id") @db.VarChar(36)
+  providerId           String        @map("provider_id") @db.VarChar(36)
+  type                 ExpenseType
+  description          String        @db.VarChar(500)
+  amount               Decimal       @default(0) @db.Decimal(15, 2)
+  date                 DateTime      @db.Date
+  status               ExpenseStatus @default(DRAFT)
+  advancePercent       Decimal?      @map("advance_percent") @db.Decimal(5, 2)
+  hasPolizas           Boolean?      @map("has_polizas")
+  polizasVigenciaDesde DateTime?     @map("polizas_vigencia_desde") @db.Date
+  polizasVigenciaHasta DateTime?     @map("polizas_vigencia_hasta") @db.Date
+  cotizacionAprobada   Boolean?      @map("cotizacion_aprobada")
+  approvedBy           String?       @map("approved_by") @db.VarChar(36)
+  approvedByName       String?       @map("approved_by_name") @db.VarChar(180)
+  approvedAt           DateTime?     @map("approved_at")
+  rejectedReason       String?       @map("rejected_reason") @db.Text
+  createdBy            String?       @map("created_by") @db.VarChar(36)
+  createdByName        String?       @map("created_by_name") @db.VarChar(180)
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+
+  project  Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  provider Provider      @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  creator  User?         @relation("exp_creator", fields: [createdBy], references: [id], onDelete: SetNull)
+  approver User?         @relation("exp_approver", fields: [approvedBy], references: [id], onDelete: SetNull)
+  items    ExpenseItem[]
+
+  @@map("expenses")
+  @@index([projectId])
+  @@index([providerId])
+  @@index([status])
+  @@index([type])
+  @@index([date])
+}
+
+model ExpenseItem {
+  id          String  @id @default(uuid()) @db.VarChar(36)
+  expenseId   String  @map("expense_id") @db.VarChar(36)
+  description String  @db.VarChar(500)
+  quantity    Decimal @db.Decimal(15, 3)
+  unit        String  @db.VarChar(20)
+  unitPrice   Decimal @map("unit_price") @db.Decimal(15, 2)
+  totalPrice  Decimal @map("total_price") @db.Decimal(15, 2)
+  position    Int     @default(0)
+
+  expense     Expense                @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  attachments ExpenseItemAttachment[]
+
+  @@map("expense_items")
+  @@index([expenseId])
+}
+
+model ExpenseItemAttachment {
+  id            String   @id @default(uuid()) @db.VarChar(36)
+  expenseItemId String   @map("expense_item_id") @db.VarChar(36)
+  fileName      String   @map("file_name") @db.VarChar(255)
+  fileUrl       String?  @map("file_url") @db.VarChar(500)
+  uploadedAt    DateTime @default(now()) @map("uploaded_at")
+
+  item ExpenseItem @relation(fields: [expenseItemId], references: [id], onDelete: Cascade)
+
+  @@map("expense_item_attachments")
+  @@index([expenseItemId])
+}
+
+// =============================================================================
+// BITÁCORA DIARIA
+// =============================================================================
+enum WeatherCondition {
+  SOLEADO
+  NUBLADO
+  LLUVIOSO
+  TORMENTA
+  VIENTO
+  NIEBLA
+  OTRO
+}
+
+model WorkLog {
+  id             String          @id @default(uuid()) @db.VarChar(36)
+  projectId      String          @map("project_id") @db.VarChar(36)
+  date           DateTime        @db.Date
+  weather        WeatherCondition
+  temperature    Decimal?        @db.Decimal(4, 1)
+  workersCount   Int             @default(0) @map("workers_count")
+  activities     String          @db.Text
+  incidents      String?         @db.Text
+  materials      String?         @db.Text
+  observations   String?         @db.Text
+  createdBy      String          @map("created_by") @db.VarChar(36)
+  createdByName  String          @map("created_by_name") @db.VarChar(180)
+  createdAt      DateTime        @default(now()) @map("created_at")
+
+  project Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  creator User          @relation("wlog_creator", fields: [createdBy], references: [id], onDelete: Restrict)
+  photos  WorkLogPhoto[]
+
+  @@unique([projectId, date])
+  @@map("work_logs")
+  @@index([projectId])
+  @@index([date])
+}
+
+model WorkLogPhoto {
+  id         String   @id @default(uuid()) @db.VarChar(36)
+  workLogId  String   @map("work_log_id") @db.VarChar(36)
+  fileName   String   @map("file_name") @db.VarChar(255)
+  fileUrl    String?  @map("file_url") @db.VarChar(500)
+  caption    String?  @db.VarChar(255)
+  uploadedAt DateTime @default(now()) @map("uploaded_at")
+
+  log WorkLog @relation(fields: [workLogId], references: [id], onDelete: Cascade)
+
+  @@map("work_log_photos")
+  @@index([workLogId])
+}
+
+// =============================================================================
+// EMPLEADOS (RRHH)
+// =============================================================================
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+  ON_LEAVE
+  TERMINATED
+}
+
+enum EmployeeDepartment {
+  GERENCIA
+  OPERACIONES
+  CONTABILIDAD
+  TESORERIA
+  HSEQ
+  COMERCIAL
+  ADMINISTRATIVO
+}
+
+enum EmployeeContractType {
+  INDEFINIDO
+  FIJO
+  OBRA_LABOR
+  PRESTACION
+  APRENDIZAJE
+}
+
+enum EmployeeDocumentType {
+  CEDULA
+  CONTRATO
+  AFILIACION_EPS
+  AFILIACION_PENSION
+  AFILIACION_ARL
+  EXAMEN_INGRESO
+  EXAMEN_PERIODICO
+  CERTIFICACION_ALTURAS
+  LICENCIA_CONDUCIR
+  CURSO_SST
+  OTROS
+}
+
+model Employee {
+  id              String                @id @default(uuid()) @db.VarChar(36)
+  employeeNumber  String                @unique @map("employee_number") @db.VarChar(40)
+  fullName        String                @map("full_name") @db.VarChar(255)
+  documentId      String                @unique @map("document_id") @db.VarChar(40)
+  position        String                @db.VarChar(120)
+  department      EmployeeDepartment
+  contractType    EmployeeContractType  @map("contract_type")
+  startDate       DateTime              @map("start_date") @db.Date
+  endDate         DateTime?             @map("end_date") @db.Date
+  salary          Decimal?              @db.Decimal(15, 2)
+  eps             String?               @db.VarChar(120)
+  pensionFund     String?               @map("pension_fund") @db.VarChar(120)
+  arl             String?               @db.VarChar(120)
+  riskLevel       Int?                  @map("risk_level") @db.TinyInt
+  bankName        String?               @map("bank_name") @db.VarChar(120)
+  accountType     String?               @map("account_type") @db.VarChar(20)
+  accountNumber   String?               @map("account_number") @db.VarChar(60)
+  email           String?               @db.VarChar(180)
+  phone           String?               @db.VarChar(60)
+  status          EmployeeStatus        @default(ACTIVE)
+  userId          String?               @map("user_id") @db.VarChar(36)
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+
+  user      User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  documents EmployeeDocument[]
+
+  @@map("employees")
+  @@index([documentId])
+  @@index([status])
+  @@index([department])
+}
+
+model EmployeeDocument {
+  id             String              @id @default(uuid()) @db.VarChar(36)
+  employeeId     String              @map("employee_id") @db.VarChar(36)
+  type           EmployeeDocumentType
+  fileName       String              @map("file_name") @db.VarChar(255)
+  fileUrl        String?             @map("file_url") @db.VarChar(500)
+  uploadedAt     DateTime            @default(now()) @map("uploaded_at")
+  expirationDate DateTime?           @map("expiration_date") @db.Date
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("employee_documents")
+  @@index([employeeId])
+}
+
+// =============================================================================
+// CLIENTES (CRM)
+// =============================================================================
+enum ClientStatus {
+  PROSPECT
+  CONTACTED
+  QUALIFIED
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum ClientSource {
+  REFERIDO
+  WEB
+  REDES_SOCIALES
+  FERIA
+  LLAMADA_FRIA
+  OTROS
+}
+
+model Client {
+  id            String       @id @default(uuid()) @db.VarChar(36)
+  clientNumber  String       @unique @map("client_number") @db.VarChar(40)
+  companyName   String       @map("company_name") @db.VarChar(255)
+  nit           String?      @db.VarChar(40)
+  contactName   String       @map("contact_name") @db.VarChar(180)
+  email         String       @db.VarChar(180)
+  phone         String       @db.VarChar(60)
+  city          String       @db.VarChar(120)
+  sector        String?      @db.VarChar(120)
+  source        ClientSource
+  status        ClientStatus @default(PROSPECT)
+  notes         String?      @db.Text
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  quotations Quotation[]
+
+  @@map("clients")
+  @@index([status])
+  @@index([companyName])
+}
+
+// =============================================================================
+// COTIZACIONES
+// =============================================================================
+enum QuotationStatus {
+  DRAFT
+  SENT
+  VIEWED
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CANCELLED
+}
+
+model Quotation {
+  id                    String         @id @default(uuid()) @db.VarChar(36)
+  quotationNumber      String         @unique @map("quotation_number") @db.VarChar(40)
+  clientId             String         @map("client_id") @db.VarChar(36)
+  title                String         @db.VarChar(255)
+  description          String?        @db.Text
+  status               QuotationStatus @default(DRAFT)
+  subtotal             Decimal        @default(0) @db.Decimal(15, 2)
+  discountPercent      Decimal        @default(0) @map("discount_percent") @db.Decimal(5, 2)
+  discountAmount       Decimal        @default(0) @map("discount_amount") @db.Decimal(15, 2)
+  ivaPercent           Decimal        @default(0) @map("iva_percent") @db.Decimal(5, 2)
+  ivaAmount            Decimal        @default(0) @map("iva_amount") @db.Decimal(15, 2)
+  total                Decimal        @default(0) @db.Decimal(15, 2)
+  validUntil           DateTime       @map("valid_until") @db.Date
+  paymentTerms         String?        @map("payment_terms") @db.Text
+  deliveryTerms        String?        @map("delivery_terms") @db.Text
+  warranty             String?        @db.Text
+  observations         String?        @db.Text
+  sentAt               DateTime?      @map("sent_at")
+  viewedAt             DateTime?      @map("viewed_at")
+  respondedAt          DateTime?      @map("responded_at")
+  convertedToProjectId String?        @map("converted_to_project_id") @db.VarChar(36)
+  createdBy            String?        @map("created_by") @db.VarChar(36)
+  createdAt            DateTime       @default(now()) @map("created_at")
+  updatedAt            DateTime       @updatedAt @map("updated_at")
+
+  client  Client       @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  project Project?     @relation(fields: [convertedToProjectId], references: [id], onDelete: SetNull)
+  creator User?        @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  items   QuotationItem[]
+
+  @@map("quotations")
+  @@index([clientId])
+  @@index([status])
+  @@index([validUntil])
+}
+
+model QuotationItem {
+  id          String  @id @default(uuid()) @db.VarChar(36)
+  quotationId String  @map("quotation_id") @db.VarChar(36)
+  description String  @db.VarChar(500)
+  unit        String  @db.VarChar(20)
+  quantity    Decimal @db.Decimal(15, 3)
+  unitPrice   Decimal @map("unit_price") @db.Decimal(15, 2)
+  totalPrice  Decimal @map("total_price") @db.Decimal(15, 2)
+  position    Int     @default(0)
+
+  quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  @@map("quotation_items")
+  @@index([quotationId])
+}
+
+// =============================================================================
+// PAGOS (Tesorería)
+// =============================================================================
+enum PaymentType {
+  CORTE_OBRA
+  ANTICIPO
+  RETENCION
+  SUMINISTRO
+  SERVICIOS
+  HONORARIOS
+  OTROS
+}
+
+enum PaymentPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED_LEVEL_1
+  APPROVED_LEVEL_2
+  APPROVED
+  REJECTED
+  PAID
+  CANCELLED
+}
+
+enum PaymentAction {
+  APPROVE_L1
+  APPROVE_L2
+  PAY
+  REJECT
+  CANCEL
+}
+
+model PaymentRequest {
+  id                      String         @id @default(uuid()) @db.VarChar(36)
+  requestNumber          String         @unique @map("request_number") @db.VarChar(40)
+  projectId              String         @map("project_id") @db.VarChar(36)
+  providerId             String?        @map("provider_id") @db.VarChar(36)
+  workCutId              String?        @unique @map("work_cut_id") @db.VarChar(36)
+  type                   PaymentType
+  amount                 Decimal        @db.Decimal(15, 2)
+  priority               PaymentPriority @default(NORMAL)
+  status                 PaymentStatus   @default(PENDING)
+  currentApprovalLevel   Int            @default(0) @map("current_approval_level")
+  requiredApprovalLevel  Int            @default(1) @map("required_approval_level")
+  beneficiaryName        String         @map("beneficiary_name") @db.VarChar(255)
+  beneficiaryNit         String         @map("beneficiary_nit") @db.VarChar(40)
+  bankName               String         @map("bank_name") @db.VarChar(120)
+  accountType            String         @map("account_type") @db.VarChar(20)
+  accountNumber          String         @map("account_number") @db.VarChar(60)
+  dueDate                DateTime?      @map("due_date") @db.Date
+  description            String?        @db.Text
+  paidAt                 DateTime?      @map("paid_at")
+  paidReference          String?        @map("paid_reference") @db.VarChar(255)
+  paidMethod             String?        @map("paid_method") @db.VarChar(20)
+  rejectionReason        String?        @map("rejection_reason") @db.Text
+  createdBy              String         @map("created_by") @db.VarChar(36)
+  createdAt              DateTime       @default(now()) @map("created_at")
+  updatedAt              DateTime       @updatedAt @map("updated_at")
+
+  project   Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  provider  Provider?         @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  cut       WorkCut?          @relation(fields: [workCutId], references: [id], onDelete: SetNull)
+  creator   User              @relation("pay_creator", fields: [createdBy], references: [id], onDelete: Restrict)
+  approvals PaymentApproval[]
+
+  @@map("payment_requests")
+  @@index([projectId])
+  @@index([providerId])
+  @@index([cut])
+  @@index([status])
+}
+
+model PaymentApproval {
+  id                String         @id @default(uuid()) @db.VarChar(36)
+  paymentId        String         @map("payment_id") @db.VarChar(36)
+  action            PaymentAction
+  level             Int?           @db.TinyInt
+  userId            String         @map("user_id") @db.VarChar(36)
+  userName          String         @map("user_name") @db.VarChar(180)
+  userRole          String         @map("user_role") @db.VarChar(40)
+  comments          String?        @db.Text
+  paymentReference  String?        @map("payment_reference") @db.VarChar(255)
+  paymentMethod     String?        @map("payment_method") @db.VarChar(20)
+  createdAt         DateTime       @default(now()) @map("created_at")
+
+  payment PaymentRequest @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  user    User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@map("payment_approvals")
+  @@index([paymentId, createdAt])
+}
+
+// =============================================================================
+// AUDITORÍA
+// =============================================================================
+model AuditEvent {
+  id          BigInt   @id @default(autoincrement())
+  occurredAt  DateTime @default(now()) @map("occurred_at")
+  actorId     String?  @map("actor_id") @db.VarChar(36)
+  actorName   String?  @map("actor_name") @db.VarChar(180)
+  action      String   @db.VarChar(80)
+  entityType  String   @map("entity_type") @db.VarChar(60)
+  entityId    String?  @map("entity_id") @db.VarChar(36)
+  projectId   String?  @map("project_id") @db.VarChar(36)
+  metadata    Json?
+
+  @@map("audit_events")
+  @@index([entityType, entityId])
+  @@index([projectId])
+  @@index([actorId])
+  @@index([occurredAt])
+}
