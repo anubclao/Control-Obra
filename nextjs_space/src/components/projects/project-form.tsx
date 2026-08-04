@@ -1,6 +1,6 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useEffect } from "react";
@@ -29,10 +29,9 @@ const projectSchema = z.object({
   description: z.string().max(500).optional(),
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const projectResolver: any = zodResolver(projectSchema);
-
 type ProjectFormData = z.infer<typeof projectSchema>;
+
+const projectResolver = zodResolver(projectSchema) as Resolver<ProjectFormData>;
 
 interface ProjectFormProps {
   project?: Project;
@@ -76,16 +75,17 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
   });
 
   useEffect(() => {
-    if (project) reset({
-      name: project.name,
-      client: project.client,
-      location: project.location,
-      startDate: project.startDate,
-      estimatedEndDate: project.estimatedEndDate,
-      totalBudget: project.totalBudget,
-      status: project.status,
-      description: project.description ?? "",
-    });
+    if (project)
+      reset({
+        name: project.name,
+        client: project.client,
+        location: project.location,
+        startDate: project.startDate,
+        estimatedEndDate: project.estimatedEndDate,
+        totalBudget: project.totalBudget,
+        status: project.status,
+        description: project.description ?? "",
+      });
   }, [project, reset]);
 
   const status = watch("status");
@@ -107,33 +107,63 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5 sm:col-span-2">
           <Label htmlFor="name">Nombre del proyecto *</Label>
-          <Input id="name" {...register("name")} placeholder="Ej: Edificio Residencial Mirador" />
-          {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+          <Input
+            id="name"
+            {...register("name")}
+            placeholder="Ej: Edificio Residencial Mirador"
+          />
+          {errors.name && (
+            <p className="text-xs text-destructive">{errors.name.message}</p>
+          )}
         </div>
 
         <div className="space-y-1.5">
           <Label htmlFor="client">Cliente *</Label>
-          <Input id="client" {...register("client")} placeholder="Razón social" />
-          {errors.client && <p className="text-xs text-destructive">{errors.client.message}</p>}
+          <Input
+            id="client"
+            {...register("client")}
+            placeholder="Razón social"
+          />
+          {errors.client && (
+            <p className="text-xs text-destructive">{errors.client.message}</p>
+          )}
         </div>
 
         <div className="space-y-1.5">
           <Label htmlFor="location">Ubicación *</Label>
-          <Input id="location" {...register("location")} placeholder="Ciudad, Colombia" />
-          {errors.location && <p className="text-xs text-destructive">{errors.location.message}</p>}
+          <Input
+            id="location"
+            {...register("location")}
+            placeholder="Ciudad, Colombia"
+          />
+          {errors.location && (
+            <p className="text-xs text-destructive">
+              {errors.location.message}
+            </p>
+          )}
         </div>
 
         <div className="space-y-1.5">
           <Label htmlFor="startDate">Fecha de inicio *</Label>
           <Input id="startDate" type="date" {...register("startDate")} />
-          {errors.startDate && <p className="text-xs text-destructive">{errors.startDate.message}</p>}
+          {errors.startDate && (
+            <p className="text-xs text-destructive">
+              {errors.startDate.message}
+            </p>
+          )}
         </div>
 
         <div className="space-y-1.5">
           <Label htmlFor="estimatedEndDate">Fecha estimada de fin *</Label>
-          <Input id="estimatedEndDate" type="date" {...register("estimatedEndDate")} />
+          <Input
+            id="estimatedEndDate"
+            type="date"
+            {...register("estimatedEndDate")}
+          />
           {errors.estimatedEndDate && (
-            <p className="text-xs text-destructive">{errors.estimatedEndDate.message}</p>
+            <p className="text-xs text-destructive">
+              {errors.estimatedEndDate.message}
+            </p>
           )}
         </div>
 
@@ -147,7 +177,9 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
             {...register("totalBudget")}
           />
           {errors.totalBudget && (
-            <p className="text-xs text-destructive">{errors.totalBudget.message}</p>
+            <p className="text-xs text-destructive">
+              {errors.totalBudget.message}
+            </p>
           )}
         </div>
 
@@ -183,7 +215,9 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
             rows={3}
           />
           {errors.description && (
-            <p className="text-xs text-destructive">{errors.description.message}</p>
+            <p className="text-xs text-destructive">
+              {errors.description.message}
+            </p>
           )}
         </div>
       </div>

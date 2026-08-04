@@ -5,7 +5,13 @@ import { useRouter } from "next/navigation";
 import { Building2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { useAuthStore } from "@/lib/auth-store";
 import { MOCK_USERS } from "@/lib/auth-mock";
 import { cn } from "@/lib/utils";
@@ -26,6 +32,24 @@ export default function LoginPage() {
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    // FIX Bug #13: validar email en el paso 1 antes de mostrar OTP
+    const trimmed = email.trim();
+    if (!trimmed) {
+      setError("Ingresa un correo electrónico");
+      return;
+    }
+    const isValidFormat = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+    if (!isValidFormat) {
+      setError("Correo electrónico no válido");
+      return;
+    }
+    const found = MOCK_USERS.find(
+      (u) => u.email.toLowerCase() === trimmed.toLowerCase(),
+    );
+    if (!found) {
+      setError("Usuario no encontrado. Usa uno de los correos de prueba.");
+      return;
+    }
     setLoading(true);
     // MOCK: simula envío de OTP
     await new Promise((r) => setTimeout(r, 500));
@@ -53,9 +77,12 @@ export default function LoginPage() {
       return;
     }
 
-    const found = MOCK_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase());
-    // Forzar reload para que el store se hidrate antes de la redirección
-    window.location.href = `/${found!.area}`;
+    // FIX Bug #12: usar router.push en lugar de window.location.href
+    // (mantiene el cliente de Next y evita recarga completa)
+    const found = MOCK_USERS.find(
+      (u) => u.email.toLowerCase() === email.trim().toLowerCase(),
+    );
+    router.push(`/${found?.area ?? "administrativo"}`);
   }
 
   return (
@@ -66,7 +93,9 @@ export default function LoginPage() {
             <Building2 className="h-6 w-6" />
           </div>
           <h1 className="text-2xl font-semibold">Control de Obra Pro</h1>
-          <p className="text-sm text-muted-foreground">Sistema de gestión de proyectos</p>
+          <p className="text-sm text-muted-foreground">
+            Sistema de gestión de proyectos
+          </p>
         </div>
 
         <Card>
@@ -84,7 +113,9 @@ export default function LoginPage() {
             {step === "email" ? (
               <form onSubmit={handleEmailSubmit} className="space-y-4">
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium">Correo electrónico</label>
+                  <label className="mb-1.5 block text-sm font-medium">
+                    Correo electrónico
+                  </label>
                   <Input
                     type="email"
                     placeholder="tu@correo.com"
@@ -103,7 +134,9 @@ export default function LoginPage() {
             ) : (
               <form onSubmit={handleOtpSubmit} className="space-y-4">
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium">Código OTP</label>
+                  <label className="mb-1.5 block text-sm font-medium">
+                    Código OTP
+                  </label>
                   <Input
                     type="text"
                     inputMode="numeric"
@@ -134,7 +167,9 @@ export default function LoginPage() {
                     Atrás
                   </Button>
                   <Button type="submit" className="flex-1" disabled={loading}>
-                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {loading && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
                     Ingresar
                   </Button>
                 </div>
@@ -154,7 +189,7 @@ export default function LoginPage() {
                 onClick={() => setEmail(u.email)}
                 className={cn(
                   "flex w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-left text-sm transition-colors hover:bg-accent",
-                  email === u.email && "border-primary"
+                  email === u.email && "border-primary",
                 )}
               >
                 <div>

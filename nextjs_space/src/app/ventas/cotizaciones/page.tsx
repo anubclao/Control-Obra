@@ -10,6 +10,7 @@ import {
   XCircle,
   Clock,
   Eye,
+  Pencil,
   MoreVertical,
   Trash2,
   X,
@@ -34,7 +35,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useQuotationsStore, QUOTATION_STATUS_LABELS, QUOTATION_STATUS_VARIANTS } from "@/lib/quotations-store";
+import {
+  useQuotationsStore,
+  QUOTATION_STATUS_LABELS,
+  QUOTATION_STATUS_VARIANTS,
+} from "@/lib/quotations-store";
 import { useClientsStore } from "@/lib/clients-store";
 import { useAuthStore } from "@/lib/auth-store";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
@@ -45,9 +50,12 @@ export default function CotizacionesPage() {
   const { getClient } = useClientsStore();
   const { user } = useAuthStore();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | QuotationStatus>("ALL");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | QuotationStatus>(
+    "ALL",
+  );
   const [createOpen, setCreateOpen] = useState(false);
   const [viewing, setViewing] = useState<Quotation | null>(null);
+  const [editing, setEditing] = useState<Quotation | null>(null);
 
   const filtered = useMemo(() => {
     return quotations.filter((q) => {
@@ -56,14 +64,17 @@ export default function CotizacionesPage() {
         !search ||
         q.quotationNumber.toLowerCase().includes(search.toLowerCase()) ||
         q.title.toLowerCase().includes(search.toLowerCase()) ||
-        (client?.companyName.toLowerCase().includes(search.toLowerCase()) ?? false);
+        (client?.companyName.toLowerCase().includes(search.toLowerCase()) ??
+          false);
       const matchStatus = statusFilter === "ALL" || q.status === statusFilter;
       return matchSearch && matchStatus;
     });
   }, [quotations, search, statusFilter, getClient]);
 
   const stats = useMemo(() => {
-    const open = quotations.filter((q) => ["DRAFT", "SENT", "VIEWED"].includes(q.status));
+    const open = quotations.filter((q) =>
+      ["DRAFT", "SENT", "VIEWED"].includes(q.status),
+    );
     const accepted = quotations.filter((q) => q.status === "ACCEPTED");
     const rejected = quotations.filter((q) => q.status === "REJECTED");
     const totalValue = quotations.reduce((s, q) => s + q.total, 0);
@@ -84,9 +95,12 @@ export default function CotizacionesPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Cotizaciones</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">
+            Cotizaciones
+          </h1>
           <p className="text-sm text-muted-foreground">
-            {stats.total} cotizaciones · {stats.open} abiertas · {formatCurrency(stats.totalValue)} en total
+            {stats.total} cotizaciones · {stats.open} abiertas ·{" "}
+            {formatCurrency(stats.totalValue)} en total
           </p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -99,7 +113,9 @@ export default function CotizacionesPage() {
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Crear cotización</DialogTitle>
-              <DialogDescription>Detalla los ítems, descuentos e impuestos</DialogDescription>
+              <DialogDescription>
+                Detalla los ítems, descuentos e impuestos
+              </DialogDescription>
             </DialogHeader>
             <QuotationForm
               onSuccess={() => setCreateOpen(false)}
@@ -110,10 +126,30 @@ export default function CotizacionesPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Kpi label="Abiertas" value={stats.open} icon={Clock} color="text-blue-600" />
-        <Kpi label="Aceptadas" value={stats.accepted} icon={CheckCircle2} color="text-emerald-600" />
-        <Kpi label="Rechazadas" value={stats.rejected} icon={XCircle} color="text-red-600" />
-        <Kpi label="Total emitido" value={formatCurrency(stats.totalValue)} icon={FileSpreadsheet} color="text-violet-600" />
+        <Kpi
+          label="Abiertas"
+          value={stats.open}
+          icon={Clock}
+          color="text-blue-600"
+        />
+        <Kpi
+          label="Aceptadas"
+          value={stats.accepted}
+          icon={CheckCircle2}
+          color="text-emerald-600"
+        />
+        <Kpi
+          label="Rechazadas"
+          value={stats.rejected}
+          icon={XCircle}
+          color="text-red-600"
+        />
+        <Kpi
+          label="Total emitido"
+          value={formatCurrency(stats.totalValue)}
+          icon={FileSpreadsheet}
+          color="text-violet-600"
+        />
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row">
@@ -126,14 +162,19 @@ export default function CotizacionesPage() {
             className="pl-9"
           />
         </div>
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
+        <Select
+          value={statusFilter}
+          onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}
+        >
           <SelectTrigger className="w-full sm:w-[200px]">
             <SelectValue placeholder="Estado" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">Todos</SelectItem>
             {Object.entries(QUOTATION_STATUS_LABELS).map(([k, v]) => (
-              <SelectItem key={k} value={k}>{v}</SelectItem>
+              <SelectItem key={k} value={k}>
+                {v}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -154,6 +195,7 @@ export default function CotizacionesPage() {
                 quotation={q}
                 clientName={client?.companyName}
                 onView={() => setViewing(q)}
+                onEdit={() => setEditing(q)}
                 onDelete={() => deleteQuotation(q.id)}
                 onSend={() => setStatus(q.id, "SENT")}
               />
@@ -169,6 +211,23 @@ export default function CotizacionesPage() {
             <QuotationDetail
               quotation={viewing}
               onClose={() => setViewing(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal editar */}
+      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar cotización</DialogTitle>
+            <DialogDescription>{editing?.quotationNumber}</DialogDescription>
+          </DialogHeader>
+          {editing && (
+            <QuotationForm
+              quotation={editing}
+              onSuccess={() => setEditing(null)}
+              createdBy={user?.id ?? "unknown"}
             />
           )}
         </DialogContent>
@@ -203,42 +262,63 @@ function QuotationRow({
   quotation: q,
   clientName,
   onView,
+  onEdit,
   onDelete,
   onSend,
 }: {
   quotation: Quotation;
   clientName?: string;
   onView: () => void;
+  onEdit: () => void;
   onDelete: () => void;
   onSend: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const variant = QUOTATION_STATUS_VARIANTS[q.status];
-  const isExpired = new Date(q.validUntil) < new Date() && q.status !== "ACCEPTED" && q.status !== "CANCELLED" && q.status !== "REJECTED";
+  const isExpired =
+    new Date(q.validUntil) < new Date() &&
+    q.status !== "ACCEPTED" &&
+    q.status !== "CANCELLED" &&
+    q.status !== "REJECTED";
 
   return (
-    <div className={cn("rounded-lg border bg-card p-4 transition-shadow hover:shadow-sm", isExpired && "border-amber-300 bg-amber-50/30")}>
+    <div
+      className={cn(
+        "rounded-lg border bg-card p-4 transition-shadow hover:shadow-sm",
+        isExpired && "border-amber-300 bg-amber-50/30",
+      )}
+    >
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
           <FileSpreadsheet className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="font-mono text-xs text-muted-foreground">{q.quotationNumber}</p>
+            <p className="font-mono text-xs text-muted-foreground">
+              {q.quotationNumber}
+            </p>
             <Badge variant={variant}>{QUOTATION_STATUS_LABELS[q.status]}</Badge>
             {isExpired && <Badge variant="warning">Vencida</Badge>}
           </div>
           <p className="mt-0.5 text-sm font-medium">{q.title}</p>
           <p className="text-xs text-muted-foreground">
-            {clientName ? `${clientName} · ` : ""}Vence {formatDate(q.validUntil)}
+            {clientName ? `${clientName} · ` : ""}Vence{" "}
+            {formatDate(q.validUntil)}
           </p>
         </div>
         <div className="text-right">
           <p className="text-lg font-semibold">{formatCurrency(q.total)}</p>
-          <p className="text-xs text-muted-foreground">{q.items.length} ítems</p>
+          <p className="text-xs text-muted-foreground">
+            {q.items.length} ítems
+          </p>
         </div>
         <div className="relative">
-          <Button variant="ghost" size="icon" onClick={() => setMenuOpen(!menuOpen)} className="h-8 w-8">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="h-8 w-8"
+          >
             <MoreVertical className="h-4 w-4" />
           </Button>
           {menuOpen && (
@@ -247,21 +327,39 @@ function QuotationRow({
               onMouseLeave={() => setMenuOpen(false)}
             >
               <button
-                onClick={() => { setMenuOpen(false); onView(); }}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onView();
+                }}
                 className="flex w-full items-center gap-2 rounded-t-md px-3 py-2 text-sm hover:bg-accent"
               >
                 <Eye className="h-4 w-4" /> Ver detalle
               </button>
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  onEdit();
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent"
+              >
+                <Pencil className="h-4 w-4" /> Editar
+              </button>
               {q.status === "DRAFT" && (
                 <button
-                  onClick={() => { setMenuOpen(false); onSend(); }}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onSend();
+                  }}
                   className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent"
                 >
                   <Send className="h-4 w-4" /> Enviar
                 </button>
               )}
               <button
-                onClick={() => { setMenuOpen(false); onDelete(); }}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onDelete();
+                }}
                 className="flex w-full items-center gap-2 rounded-b-md px-3 py-2 text-sm text-destructive hover:bg-accent"
               >
                 <Trash2 className="h-4 w-4" /> Eliminar
@@ -291,18 +389,40 @@ function QuotationForm({
   const [title, setTitle] = useState(quotation?.title ?? "");
   const [description, setDescription] = useState(quotation?.description ?? "");
   const [validUntil, setValidUntil] = useState(
-    quotation?.validUntil ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    quotation?.validUntil ??
+      new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .slice(0, 10),
   );
   const [items, setItems] = useState<QuotationItem[]>(
-    quotation?.items ?? [{ id: "new1", description: "", unit: "M2", quantity: 0, unitPrice: 0, totalPrice: 0 }]
+    quotation?.items ?? [
+      {
+        id: "new1",
+        description: "",
+        unit: "M2",
+        quantity: 0,
+        unitPrice: 0,
+        totalPrice: 0,
+      },
+    ],
   );
-  const [discountPercent, setDiscountPercent] = useState(quotation?.discountPercent ?? 0);
+  const [discountPercent, setDiscountPercent] = useState(
+    quotation?.discountPercent ?? 0,
+  );
   const [ivaPercent, setIvaPercent] = useState(quotation?.ivaPercent ?? 19);
-  const [paymentTerms, setPaymentTerms] = useState(quotation?.paymentTerms ?? "");
-  const [deliveryTerms, setDeliveryTerms] = useState(quotation?.deliveryTerms ?? "");
+  const [paymentTerms, setPaymentTerms] = useState(
+    quotation?.paymentTerms ?? "",
+  );
+  const [deliveryTerms, setDeliveryTerms] = useState(
+    quotation?.deliveryTerms ?? "",
+  );
   const [warranty, setWarranty] = useState(quotation?.warranty ?? "");
-  const [observations, setObservations] = useState(quotation?.observations ?? "");
-  const [status, setStatus] = useState<QuotationStatus>(quotation?.status ?? "DRAFT");
+  const [observations, setObservations] = useState(
+    quotation?.observations ?? "",
+  );
+  const [status, setStatus] = useState<QuotationStatus>(
+    quotation?.status ?? "DRAFT",
+  );
 
   const subtotal = items.reduce((s, it) => s + it.totalPrice, 0);
   const discountAmount = Math.round(subtotal * (discountPercent / 100));
@@ -313,24 +433,32 @@ function QuotationForm({
   function updateItem(
     idx: number,
     field: keyof QuotationItem,
-    value: string | number
+    value: string | number,
   ) {
     setItems((prev) =>
       prev.map((it, i) => {
         if (i !== idx) return it;
         const updated = { ...it, [field]: value };
         if (field === "quantity" || field === "unitPrice") {
-          updated.totalPrice = Number(updated.quantity || 0) * Number(updated.unitPrice || 0);
+          updated.totalPrice =
+            Number(updated.quantity || 0) * Number(updated.unitPrice || 0);
         }
         return updated;
-      })
+      }),
     );
   }
 
   function addItem() {
     setItems((prev) => [
       ...prev,
-      { id: `new${Date.now()}`, description: "", unit: "GL", quantity: 0, unitPrice: 0, totalPrice: 0 },
+      {
+        id: `new${Date.now()}`,
+        description: "",
+        unit: "GL",
+        quantity: 0,
+        unitPrice: 0,
+        totalPrice: 0,
+      },
     ]);
   }
 
@@ -385,15 +513,28 @@ function QuotationForm({
         </div>
         <div>
           <Label className="mb-1.5 block">Válida hasta *</Label>
-          <Input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} required />
+          <Input
+            type="date"
+            value={validUntil}
+            onChange={(e) => setValidUntil(e.target.value)}
+            required
+          />
         </div>
         <div className="sm:col-span-2">
           <Label className="mb-1.5 block">Título *</Label>
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} required />
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+          />
         </div>
         <div className="sm:col-span-2">
           <Label className="mb-1.5 block">Descripción</Label>
-          <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+          <Textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={2}
+          />
         </div>
       </div>
 
@@ -412,7 +553,9 @@ function QuotationForm({
                 <div className="col-span-12 sm:col-span-5">
                   <Input
                     value={it.description}
-                    onChange={(e) => updateItem(idx, "description", e.target.value)}
+                    onChange={(e) =>
+                      updateItem(idx, "description", e.target.value)
+                    }
                     placeholder="Descripción"
                   />
                 </div>
@@ -429,7 +572,13 @@ function QuotationForm({
                     min="0"
                     step="0.01"
                     value={it.quantity}
-                    onChange={(e) => updateItem(idx, "quantity", parseFloat(e.target.value) || 0)}
+                    onChange={(e) =>
+                      updateItem(
+                        idx,
+                        "quantity",
+                        parseFloat(e.target.value) || 0,
+                      )
+                    }
                     placeholder="Cant."
                   />
                 </div>
@@ -439,13 +588,21 @@ function QuotationForm({
                     min="0"
                     step="1"
                     value={it.unitPrice}
-                    onChange={(e) => updateItem(idx, "unitPrice", parseFloat(e.target.value) || 0)}
+                    onChange={(e) =>
+                      updateItem(
+                        idx,
+                        "unitPrice",
+                        parseFloat(e.target.value) || 0,
+                      )
+                    }
                     placeholder="P. Unit."
                   />
                 </div>
                 <div className="col-span-9 col-start-1 flex items-center justify-between rounded border bg-background px-3 py-1.5 text-sm sm:col-span-2 sm:col-start-auto">
                   <span className="text-muted-foreground">Total:</span>
-                  <span className="font-semibold">{formatCurrency(it.totalPrice)}</span>
+                  <span className="font-semibold">
+                    {formatCurrency(it.totalPrice)}
+                  </span>
                 </div>
                 {items.length > 1 && (
                   <Button
@@ -474,7 +631,9 @@ function QuotationForm({
             max="100"
             step="0.1"
             value={discountPercent}
-            onChange={(e) => setDiscountPercent(parseFloat(e.target.value) || 0)}
+            onChange={(e) =>
+              setDiscountPercent(parseFloat(e.target.value) || 0)
+            }
           />
         </div>
         <div>
@@ -498,16 +657,24 @@ function QuotationForm({
             <span className="font-semibold">{formatCurrency(subtotal)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Descuento ({discountPercent}%)</span>
-            <span className="font-semibold text-red-600">−{formatCurrency(discountAmount)}</span>
+            <span className="text-muted-foreground">
+              Descuento ({discountPercent}%)
+            </span>
+            <span className="font-semibold text-red-600">
+              −{formatCurrency(discountAmount)}
+            </span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">IVA ({ivaPercent}%)</span>
-            <span className="font-semibold text-red-600">+{formatCurrency(ivaAmount)}</span>
+            <span className="font-semibold text-red-600">
+              +{formatCurrency(ivaAmount)}
+            </span>
           </div>
           <div className="flex justify-between border-t pt-1.5 text-lg">
             <span className="font-semibold">Total</span>
-            <span className="font-bold text-emerald-600">{formatCurrency(total)}</span>
+            <span className="font-bold text-emerald-600">
+              {formatCurrency(total)}
+            </span>
           </div>
         </div>
       </div>
@@ -515,36 +682,61 @@ function QuotationForm({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <Label className="mb-1.5 block">Condiciones de pago</Label>
-          <Input value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} placeholder="30% anticipo, 40% avance, 30% entrega" />
+          <Input
+            value={paymentTerms}
+            onChange={(e) => setPaymentTerms(e.target.value)}
+            placeholder="30% anticipo, 40% avance, 30% entrega"
+          />
         </div>
         <div>
           <Label className="mb-1.5 block">Plazo de entrega</Label>
-          <Input value={deliveryTerms} onChange={(e) => setDeliveryTerms(e.target.value)} placeholder="18 meses" />
+          <Input
+            value={deliveryTerms}
+            onChange={(e) => setDeliveryTerms(e.target.value)}
+            placeholder="18 meses"
+          />
         </div>
         <div className="sm:col-span-2">
           <Label className="mb-1.5 block">Garantía</Label>
-          <Input value={warranty} onChange={(e) => setWarranty(e.target.value)} placeholder="5 años estructura, 1 año acabados" />
+          <Input
+            value={warranty}
+            onChange={(e) => setWarranty(e.target.value)}
+            placeholder="5 años estructura, 1 año acabados"
+          />
         </div>
         <div className="sm:col-span-2">
           <Label className="mb-1.5 block">Observaciones</Label>
-          <Textarea value={observations} onChange={(e) => setObservations(e.target.value)} rows={2} />
+          <Textarea
+            value={observations}
+            onChange={(e) => setObservations(e.target.value)}
+            rows={2}
+          />
         </div>
       </div>
 
       <div className="flex justify-between gap-2 border-t pt-4">
-        <Select value={status} onValueChange={(v) => setStatus(v as QuotationStatus)}>
+        <Select
+          value={status}
+          onValueChange={(v) => setStatus(v as QuotationStatus)}
+        >
           <SelectTrigger className="w-[200px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {Object.entries(QUOTATION_STATUS_LABELS).map(([k, v]) => (
-              <SelectItem key={k} value={k}>{v}</SelectItem>
+              <SelectItem key={k} value={k}>
+                {v}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
         <div className="flex gap-2">
-          <Button type="button" variant="outline" onClick={onSuccess}>Cancelar</Button>
-          <Button type="submit">{isEditing ? "Guardar" : "Crear cotización"}</Button>
+          <Button type="button" variant="outline" onClick={onSuccess}>
+            Cancelar
+          </Button>
+          <Button type="submit">
+            {isEditing ? "Guardar" : "Crear cotización"}
+          </Button>
         </div>
       </div>
     </form>
@@ -576,13 +768,16 @@ function QuotationDetail({
       <DialogHeader>
         <DialogTitle>{q.title}</DialogTitle>
         <DialogDescription>
-          {q.quotationNumber} · {client?.companyName} · Vence {formatDate(q.validUntil)}
+          {q.quotationNumber} · {client?.companyName} · Vence{" "}
+          {formatDate(q.validUntil)}
         </DialogDescription>
       </DialogHeader>
 
       <div className="space-y-4">
         {q.description && (
-          <p className="rounded-md bg-secondary/40 p-3 text-sm">{q.description}</p>
+          <p className="rounded-md bg-secondary/40 p-3 text-sm">
+            {q.description}
+          </p>
         )}
 
         {/* Tabla de items */}
@@ -601,10 +796,18 @@ function QuotationDetail({
               {q.items.map((it) => (
                 <tr key={it.id} className="border-b last:border-0">
                   <td className="px-3 py-2">{it.description}</td>
-                  <td className="px-3 py-2 text-center font-mono text-xs">{it.unit}</td>
-                  <td className="px-3 py-2 text-right">{it.quantity.toLocaleString("es-CO")}</td>
-                  <td className="px-3 py-2 text-right">{formatCurrency(it.unitPrice)}</td>
-                  <td className="px-3 py-2 text-right font-semibold">{formatCurrency(it.totalPrice)}</td>
+                  <td className="px-3 py-2 text-center font-mono text-xs">
+                    {it.unit}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    {it.quantity.toLocaleString("es-CO")}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    {formatCurrency(it.unitPrice)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-semibold">
+                    {formatCurrency(it.totalPrice)}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -614,14 +817,33 @@ function QuotationDetail({
         {/* Totales */}
         <div className="rounded-md border bg-secondary/40 p-3">
           <div className="space-y-1 text-sm">
-            <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>{formatCurrency(q.subtotal)}</span></div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Subtotal</span>
+              <span>{formatCurrency(q.subtotal)}</span>
+            </div>
             {q.discountPercent > 0 && (
-              <div className="flex justify-between"><span className="text-muted-foreground">Descuento ({q.discountPercent}%)</span><span className="text-red-600">−{formatCurrency(q.discountAmount)}</span></div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">
+                  Descuento ({q.discountPercent}%)
+                </span>
+                <span className="text-red-600">
+                  −{formatCurrency(q.discountAmount)}
+                </span>
+              </div>
             )}
-            <div className="flex justify-between"><span className="text-muted-foreground">IVA ({q.ivaPercent}%)</span><span className="text-red-600">+{formatCurrency(q.ivaAmount)}</span></div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">
+                IVA ({q.ivaPercent}%)
+              </span>
+              <span className="text-red-600">
+                +{formatCurrency(q.ivaAmount)}
+              </span>
+            </div>
             <div className="flex justify-between border-t pt-1 text-lg">
               <span className="font-semibold">Total</span>
-              <span className="font-bold text-emerald-600">{formatCurrency(q.total)}</span>
+              <span className="font-bold text-emerald-600">
+                {formatCurrency(q.total)}
+              </span>
             </div>
           </div>
         </div>
@@ -629,9 +851,24 @@ function QuotationDetail({
         {/* Condiciones */}
         {(q.paymentTerms || q.deliveryTerms || q.warranty) && (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 text-sm">
-            {q.paymentTerms && <div><p className="text-xs text-muted-foreground">Pago</p><p>{q.paymentTerms}</p></div>}
-            {q.deliveryTerms && <div><p className="text-xs text-muted-foreground">Entrega</p><p>{q.deliveryTerms}</p></div>}
-            {q.warranty && <div><p className="text-xs text-muted-foreground">Garantía</p><p>{q.warranty}</p></div>}
+            {q.paymentTerms && (
+              <div>
+                <p className="text-xs text-muted-foreground">Pago</p>
+                <p>{q.paymentTerms}</p>
+              </div>
+            )}
+            {q.deliveryTerms && (
+              <div>
+                <p className="text-xs text-muted-foreground">Entrega</p>
+                <p>{q.deliveryTerms}</p>
+              </div>
+            )}
+            {q.warranty && (
+              <div>
+                <p className="text-xs text-muted-foreground">Garantía</p>
+                <p>{q.warranty}</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -642,7 +879,9 @@ function QuotationDetail({
         )}
 
         {/* Acciones de estado */}
-        {(q.status === "DRAFT" || q.status === "SENT" || q.status === "VIEWED") && (
+        {(q.status === "DRAFT" ||
+          q.status === "SENT" ||
+          q.status === "VIEWED") && (
           <div className="flex justify-end gap-2 border-t pt-3">
             <Button variant="destructive" onClick={handleReject}>
               <XCircle className="mr-2 h-4 w-4" />

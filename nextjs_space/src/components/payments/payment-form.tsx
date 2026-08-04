@@ -1,6 +1,6 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useEffect } from "react";
@@ -29,7 +29,15 @@ const paymentSchema = z.object({
   projectId: z.string().min(1, "Selecciona un proyecto"),
   providerId: z.string().optional(),
   workCutId: z.string().optional(),
-  type: z.enum(["CORTE_OBRA", "ANTICIPO", "RETENCION", "SUMINISTRO", "SERVICIOS", "HONORARIOS", "OTROS"]),
+  type: z.enum([
+    "CORTE_OBRA",
+    "ANTICIPO",
+    "RETENCION",
+    "SUMINISTRO",
+    "SERVICIOS",
+    "HONORARIOS",
+    "OTROS",
+  ]),
   amount: z.coerce.number().min(1, "Monto debe ser mayor a 0"),
   priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]),
   requiredApprovalLevel: z.coerce.number().min(1).max(3),
@@ -44,8 +52,7 @@ const paymentSchema = z.object({
 
 type FormData = z.infer<typeof paymentSchema>;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const resolver: any = zodResolver(paymentSchema);
+const resolver = zodResolver(paymentSchema) as Resolver<FormData>;
 
 interface Props {
   payment?: PaymentRequest;
@@ -159,7 +166,15 @@ export function PaymentForm({ payment, onSuccess }: Props) {
       addPayment({
         ...payload,
         createdBy: user?.id ?? "unknown",
-      } as Omit<PaymentRequest, "id" | "requestNumber" | "approvals" | "status" | "currentApprovalLevel" | "createdAt">);
+      } as Omit<
+        PaymentRequest,
+        | "id"
+        | "requestNumber"
+        | "approvals"
+        | "status"
+        | "currentApprovalLevel"
+        | "createdAt"
+      >);
     }
     onSuccess();
   }
@@ -178,7 +193,8 @@ export function PaymentForm({ payment, onSuccess }: Props) {
 
   // Cortes aprobados del proyecto
   const approvedCuts = cuts.filter(
-    (c) => c.status === "APPROVED" && (projectId ? c.projectId === projectId : true)
+    (c) =>
+      c.status === "APPROVED" && (projectId ? c.projectId === projectId : true),
   );
 
   return (
@@ -200,7 +216,8 @@ export function PaymentForm({ payment, onSuccess }: Props) {
                 const contractor = getProvider(c.providerId);
                 return (
                   <SelectItem key={c.id} value={c.id}>
-                    {c.cutNumber} — {contractor?.name.slice(0, 30)} ({formatCurrency(c.netValue)})
+                    {c.cutNumber} — {contractor?.name.slice(0, 30)} (
+                    {formatCurrency(c.netValue)})
                     {project ? ` — ${project.code}` : ""}
                   </SelectItem>
                 );
@@ -213,7 +230,12 @@ export function PaymentForm({ payment, onSuccess }: Props) {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <Label className="mb-1.5 block">Proyecto *</Label>
-          <Select value={projectId} onValueChange={(v) => setValue("projectId", v, { shouldValidate: true })}>
+          <Select
+            value={projectId}
+            onValueChange={(v) =>
+              setValue("projectId", v, { shouldValidate: true })
+            }
+          >
             <SelectTrigger>
               <SelectValue placeholder="Selecciona proyecto" />
             </SelectTrigger>
@@ -225,7 +247,11 @@ export function PaymentForm({ payment, onSuccess }: Props) {
               ))}
             </SelectContent>
           </Select>
-          {errors.projectId && <p className="mt-1 text-xs text-destructive">{errors.projectId.message}</p>}
+          {errors.projectId && (
+            <p className="mt-1 text-xs text-destructive">
+              {errors.projectId.message}
+            </p>
+          )}
         </div>
 
         <div>
@@ -247,7 +273,12 @@ export function PaymentForm({ payment, onSuccess }: Props) {
 
         <div>
           <Label className="mb-1.5 block">Tipo *</Label>
-          <Select value={type} onValueChange={(v) => setValue("type", v as PaymentType, { shouldValidate: true })}>
+          <Select
+            value={type}
+            onValueChange={(v) =>
+              setValue("type", v as PaymentType, { shouldValidate: true })
+            }
+          >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -272,12 +303,19 @@ export function PaymentForm({ payment, onSuccess }: Props) {
         <div>
           <Label className="mb-1.5 block">Monto (COP) *</Label>
           <Input type="number" min="0" step="1000" {...register("amount")} />
-          {errors.amount && <p className="mt-1 text-xs text-destructive">{errors.amount.message}</p>}
+          {errors.amount && (
+            <p className="mt-1 text-xs text-destructive">
+              {errors.amount.message}
+            </p>
+          )}
         </div>
 
         <div>
           <Label className="mb-1.5 block">Prioridad</Label>
-          <Select value={watch("priority")} onValueChange={(v) => setValue("priority", v as PaymentPriority)}>
+          <Select
+            value={watch("priority")}
+            onValueChange={(v) => setValue("priority", v as PaymentPriority)}
+          >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -292,14 +330,21 @@ export function PaymentForm({ payment, onSuccess }: Props) {
 
         <div>
           <Label className="mb-1.5 block">Niveles de aprobación</Label>
-          <Select value={String(watch("requiredApprovalLevel"))} onValueChange={(v) => setValue("requiredApprovalLevel", Number(v) as 1 | 2 | 3)}>
+          <Select
+            value={String(watch("requiredApprovalLevel"))}
+            onValueChange={(v) =>
+              setValue("requiredApprovalLevel", Number(v) as 1 | 2 | 3)
+            }
+          >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="1">1 nivel (Director)</SelectItem>
               <SelectItem value="2">2 niveles (Director + Gerente)</SelectItem>
-              <SelectItem value="3">3 niveles (Director + Gerente + Admin)</SelectItem>
+              <SelectItem value="3">
+                3 niveles (Director + Gerente + Admin)
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -314,27 +359,52 @@ export function PaymentForm({ payment, onSuccess }: Props) {
       <div>
         <div className="mb-2 flex items-center gap-2">
           <Building2 className="h-4 w-4 text-muted-foreground" />
-          <h3 className="text-sm font-semibold">Datos bancarios del beneficiario</h3>
+          <h3 className="text-sm font-semibold">
+            Datos bancarios del beneficiario
+          </h3>
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <Label className="mb-1.5 block">Nombre del beneficiario *</Label>
-            <Input {...register("beneficiaryName")} placeholder="Razón social" />
-            {errors.beneficiaryName && <p className="mt-1 text-xs text-destructive">{errors.beneficiaryName.message}</p>}
+            <Input
+              {...register("beneficiaryName")}
+              placeholder="Razón social"
+            />
+            {errors.beneficiaryName && (
+              <p className="mt-1 text-xs text-destructive">
+                {errors.beneficiaryName.message}
+              </p>
+            )}
           </div>
           <div>
             <Label className="mb-1.5 block">NIT / Cédula *</Label>
-            <Input {...register("beneficiaryNit")} placeholder="900.123.456-7" />
-            {errors.beneficiaryNit && <p className="mt-1 text-xs text-destructive">{errors.beneficiaryNit.message}</p>}
+            <Input
+              {...register("beneficiaryNit")}
+              placeholder="900.123.456-7"
+            />
+            {errors.beneficiaryNit && (
+              <p className="mt-1 text-xs text-destructive">
+                {errors.beneficiaryNit.message}
+              </p>
+            )}
           </div>
           <div>
             <Label className="mb-1.5 block">Banco *</Label>
             <Input {...register("bankName")} placeholder="Bancolombia" />
-            {errors.bankName && <p className="mt-1 text-xs text-destructive">{errors.bankName.message}</p>}
+            {errors.bankName && (
+              <p className="mt-1 text-xs text-destructive">
+                {errors.bankName.message}
+              </p>
+            )}
           </div>
           <div>
             <Label className="mb-1.5 block">Tipo de cuenta</Label>
-            <Select value={watch("accountType")} onValueChange={(v) => setValue("accountType", v as "SAVINGS" | "CHECKING")}>
+            <Select
+              value={watch("accountType")}
+              onValueChange={(v) =>
+                setValue("accountType", v as "SAVINGS" | "CHECKING")
+              }
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -347,14 +417,22 @@ export function PaymentForm({ payment, onSuccess }: Props) {
           <div className="sm:col-span-2">
             <Label className="mb-1.5 block">Número de cuenta *</Label>
             <Input {...register("accountNumber")} placeholder="123-456789-00" />
-            {errors.accountNumber && <p className="mt-1 text-xs text-destructive">{errors.accountNumber.message}</p>}
+            {errors.accountNumber && (
+              <p className="mt-1 text-xs text-destructive">
+                {errors.accountNumber.message}
+              </p>
+            )}
           </div>
         </div>
       </div>
 
       <div>
         <Label className="mb-1.5 block">Descripción / notas</Label>
-        <Textarea {...register("description")} placeholder="Detalle del pago, contexto, motivo…" rows={2} />
+        <Textarea
+          {...register("description")}
+          placeholder="Detalle del pago, contexto, motivo…"
+          rows={2}
+        />
       </div>
 
       <div className="flex justify-end gap-2 border-t pt-4">

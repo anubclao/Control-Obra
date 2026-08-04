@@ -1,14 +1,15 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useEffect } from "react";
-import { Plus, Trash2, Star } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Plus, Trash2, Star, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Select,
   SelectContent,
@@ -52,7 +53,11 @@ const providerSchema = z
     // Representante legal — solo JURIDICA (validamos en superRefine)
     legalRepName: z.string().optional(),
     legalRepCedula: z.string().optional(),
-    legalRepEmail: z.string().email("Email inválido").optional().or(z.literal("")),
+    legalRepEmail: z
+      .string()
+      .email("Email inválido")
+      .optional()
+      .or(z.literal("")),
     legalRepPhone: z.string().optional(),
     reportedIncome: z.coerce.number().min(0).optional().or(z.literal("")),
     incomeYear: z.coerce.number().optional().or(z.literal("")),
@@ -72,8 +77,7 @@ const providerSchema = z
 
 type FormData = z.infer<typeof providerSchema>;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const resolver: any = zodResolver(providerSchema);
+const resolver = zodResolver(providerSchema) as Resolver<FormData>;
 
 interface Props {
   provider?: Provider;
@@ -83,69 +87,76 @@ interface Props {
 export function ProviderForm({ provider, onSuccess }: Props) {
   const { addProvider, updateProvider } = useProvidersStore();
   const isEditing = !!provider;
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } =
-    useForm<FormData>({
-      resolver,
-      defaultValues: provider
-        ? {
-            personType: provider.personType,
-            name: provider.name,
-            nit: provider.nit,
-            contact: provider.contact,
-            email: provider.email,
-            email2: provider.email2 ?? "",
-            phone: provider.phone,
-            phone2: provider.phone2 ?? "",
-            website: provider.website ?? "",
-            address: provider.address ?? "",
-            city: provider.city ?? "",
-            department: provider.department ?? "",
-            postalCode: provider.postalCode ?? "",
-            category: provider.category,
-            subcategory: provider.subcategory ?? "",
-            subcategoryOther: provider.subcategoryOther ?? "",
-            legalRepName: provider.legalRepName ?? "",
-            legalRepCedula: provider.legalRepCedula ?? "",
-            legalRepEmail: provider.legalRepEmail ?? "",
-            legalRepPhone: provider.legalRepPhone ?? "",
-            reportedIncome: provider.reportedIncome ?? "",
-            incomeYear: provider.incomeYear ?? "",
-            rating: provider.rating ?? 0,
-            references:
-              provider.references.length > 0
-                ? provider.references
-                : [{ name: "", company: "", phone: "", email: "" }],
-            notes: provider.notes ?? "",
-          }
-        : {
-            personType: "JURIDICA",
-            name: "",
-            nit: "",
-            contact: "",
-            email: "",
-            email2: "",
-            phone: "",
-            phone2: "",
-            website: "",
-            address: "",
-            city: "",
-            department: "",
-            postalCode: "",
-            category: undefined,
-            subcategory: "",
-            subcategoryOther: "",
-            legalRepName: "",
-            legalRepCedula: "",
-            legalRepEmail: "",
-            legalRepPhone: "",
-            reportedIncome: "",
-            incomeYear: "",
-            rating: 0,
-            references: [{ name: "", company: "", phone: "", email: "" }],
-            notes: "",
-          },
-    });
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<FormData>({
+    resolver,
+    defaultValues: provider
+      ? {
+          personType: provider.personType,
+          name: provider.name,
+          nit: provider.nit,
+          contact: provider.contact,
+          email: provider.email,
+          email2: provider.email2 ?? "",
+          phone: provider.phone,
+          phone2: provider.phone2 ?? "",
+          website: provider.website ?? "",
+          address: provider.address ?? "",
+          city: provider.city ?? "",
+          department: provider.department ?? "",
+          postalCode: provider.postalCode ?? "",
+          category: provider.category,
+          subcategory: provider.subcategory ?? "",
+          subcategoryOther: provider.subcategoryOther ?? "",
+          legalRepName: provider.legalRepName ?? "",
+          legalRepCedula: provider.legalRepCedula ?? "",
+          legalRepEmail: provider.legalRepEmail ?? "",
+          legalRepPhone: provider.legalRepPhone ?? "",
+          reportedIncome: provider.reportedIncome ?? "",
+          incomeYear: provider.incomeYear ?? "",
+          rating: provider.rating ?? 0,
+          references:
+            provider.references.length > 0
+              ? provider.references
+              : [{ name: "", company: "", phone: "", email: "" }],
+          notes: provider.notes ?? "",
+        }
+      : {
+          personType: "JURIDICA",
+          name: "",
+          nit: "",
+          contact: "",
+          email: "",
+          email2: "",
+          phone: "",
+          phone2: "",
+          website: "",
+          address: "",
+          city: "",
+          department: "",
+          postalCode: "",
+          category: undefined,
+          subcategory: "",
+          subcategoryOther: "",
+          legalRepName: "",
+          legalRepCedula: "",
+          legalRepEmail: "",
+          legalRepPhone: "",
+          reportedIncome: "",
+          incomeYear: "",
+          rating: 0,
+          references: [{ name: "", company: "", phone: "", email: "" }],
+          notes: "",
+        },
+  });
 
   useEffect(() => {
     if (provider) reset(provider as unknown as FormData);
@@ -159,13 +170,16 @@ export function ProviderForm({ provider, onSuccess }: Props) {
 
   function addRef() {
     if (references.length >= 3) return;
-    setValue("references", [...references, { name: "", company: "", phone: "", email: "" }]);
+    setValue("references", [
+      ...references,
+      { name: "", company: "", phone: "", email: "" },
+    ]);
   }
 
   function removeRef(idx: number) {
     setValue(
       "references",
-      references.filter((_, i) => i !== idx)
+      references.filter((_, i) => i !== idx),
     );
   }
 
@@ -190,12 +204,16 @@ export function ProviderForm({ provider, onSuccess }: Props) {
       postalCode: data.postalCode || undefined,
       category: data.category,
       subcategory: data.subcategory || undefined,
-      subcategoryOther: data.subcategory === "OTROS" ? data.subcategoryOther || undefined : undefined,
+      subcategoryOther:
+        data.subcategory === "OTROS"
+          ? data.subcategoryOther || undefined
+          : undefined,
       legalRepName: data.legalRepName || undefined,
       legalRepCedula: data.legalRepCedula || undefined,
       legalRepEmail: data.legalRepEmail || undefined,
       legalRepPhone: data.legalRepPhone || undefined,
-      reportedIncome: data.reportedIncome === "" ? undefined : Number(data.reportedIncome),
+      reportedIncome:
+        data.reportedIncome === "" ? undefined : Number(data.reportedIncome),
       incomeYear: data.incomeYear === "" ? undefined : Number(data.incomeYear),
       rating: data.rating || undefined,
       references: cleanRefs,
@@ -205,8 +223,13 @@ export function ProviderForm({ provider, onSuccess }: Props) {
     if (provider) {
       updateProvider(provider.id, payload as Partial<Provider>);
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      addProvider(payload as any);
+      const result = addProvider(
+        payload as Omit<Provider, "id" | "status" | "createdAt" | "documents">,
+      );
+      if (!result.ok) {
+        setSubmitError(result.error);
+        return;
+      }
     }
     onSuccess();
   }
@@ -219,13 +242,16 @@ export function ProviderForm({ provider, onSuccess }: Props) {
     category === "PRODUCTO"
       ? PROVIDER_PRODUCT_SUBCATEGORIES
       : category === "SERVICIO"
-      ? PROVIDER_SERVICE_SUBCATEGORIES
-      : [];
+        ? PROVIDER_SERVICE_SUBCATEGORIES
+        : [];
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       {/* 1. Tipo de persona */}
-      <Section title="Tipo de persona" desc="Define los campos y documentos requeridos">
+      <Section
+        title="Tipo de persona"
+        desc="Define los campos y documentos requeridos"
+      >
         <div className="flex gap-3">
           {(["NATURAL", "JURIDICA"] as PersonType[]).map((pt) => (
             <button
@@ -243,17 +269,24 @@ export function ProviderForm({ provider, onSuccess }: Props) {
           ))}
         </div>
         {errors.personType && (
-          <p className="mt-1 text-xs text-destructive">{errors.personType.message}</p>
+          <p className="mt-1 text-xs text-destructive">
+            {errors.personType.message}
+          </p>
         )}
       </Section>
 
       {/* 2. Información básica */}
-      <Section title="Información básica" desc="Datos principales del proveedor">
+      <Section
+        title="Información básica"
+        desc="Datos principales del proveedor"
+      >
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label={nameLabel} error={errors.name?.message}>
             <Input
               {...register("name")}
-              placeholder={isJuridica ? "Estructuras del Norte S.A.S" : "Juan Pérez"}
+              placeholder={
+                isJuridica ? "Estructuras del Norte S.A.S" : "Juan Pérez"
+              }
             />
           </Field>
           <Field label={docLabel} error={errors.nit?.message}>
@@ -263,10 +296,18 @@ export function ProviderForm({ provider, onSuccess }: Props) {
             <Input {...register("contact")} placeholder="Nombre del contacto" />
           </Field>
           <Field label="Email principal *" error={errors.email?.message}>
-            <Input type="email" {...register("email")} placeholder="contacto@empresa.com" />
+            <Input
+              type="email"
+              {...register("email")}
+              placeholder="contacto@empresa.com"
+            />
           </Field>
           <Field label="Email 2 (opcional)" error={errors.email2?.message}>
-            <Input type="email" {...register("email2")} placeholder="alternativo@empresa.com" />
+            <Input
+              type="email"
+              {...register("email2")}
+              placeholder="alternativo@empresa.com"
+            />
           </Field>
           <Field label="Teléfono 1 *" error={errors.phone?.message}>
             <Input {...register("phone")} placeholder="+57 310 555 0000" />
@@ -308,20 +349,32 @@ export function ProviderForm({ provider, onSuccess }: Props) {
               disabled={!category}
             >
               <SelectTrigger>
-                <SelectValue placeholder={category ? "Selecciona" : "Elige categoría primero"} />
+                <SelectValue
+                  placeholder={
+                    category ? "Selecciona" : "Elige categoría primero"
+                  }
+                />
               </SelectTrigger>
               <SelectContent>
                 {subcategoryOptions.map((sc) => (
                   <SelectItem key={sc} value={sc}>
-                    {sc === "OTROS" ? "Otros" : sc.replace(/_/g, " ").toLowerCase()}
+                    {sc === "OTROS"
+                      ? "Otros"
+                      : sc.replace(/_/g, " ").toLowerCase()}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </Field>
           {subcategory === "OTROS" && (
-            <Field label="Especificar otra subcategoría" className="sm:col-span-2">
-              <Input {...register("subcategoryOther")} placeholder="Escribe la subcategoría" />
+            <Field
+              label="Especificar otra subcategoría"
+              className="sm:col-span-2"
+            >
+              <Input
+                {...register("subcategoryOther")}
+                placeholder="Escribe la subcategoría"
+              />
             </Field>
           )}
         </div>
@@ -347,9 +400,15 @@ export function ProviderForm({ provider, onSuccess }: Props) {
 
       {/* 5. Representante legal — solo JURIDICA */}
       {isJuridica && (
-        <Section title="Representante legal" desc="Obligatorio para persona jurídica">
+        <Section
+          title="Representante legal"
+          desc="Obligatorio para persona jurídica"
+        >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field label="Nombre completo *" error={errors.legalRepName?.message}>
+            <Field
+              label="Nombre completo *"
+              error={errors.legalRepName?.message}
+            >
               <Input {...register("legalRepName")} />
             </Field>
             <Field label="Cédula">
@@ -366,13 +425,27 @@ export function ProviderForm({ provider, onSuccess }: Props) {
       )}
 
       {/* 6. Información financiera + rating */}
-      <Section title="Información financiera" desc="Renta reportada y calificación">
+      <Section
+        title="Información financiera"
+        desc="Renta reportada y calificación"
+      >
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Field label="Renta reportada (COP)">
-            <Input type="number" min="0" step="1000000" {...register("reportedIncome")} />
+            <Input
+              type="number"
+              min="0"
+              step="1000000"
+              {...register("reportedIncome")}
+            />
           </Field>
           <Field label="Año gravable">
-            <Input type="number" min="2000" max="2100" {...register("incomeYear")} placeholder="2025" />
+            <Input
+              type="number"
+              min="2000"
+              max="2100"
+              {...register("incomeYear")}
+              placeholder="2025"
+            />
           </Field>
           <Field label="Calificación">
             <div className="flex items-center gap-1">
@@ -385,7 +458,9 @@ export function ProviderForm({ provider, onSuccess }: Props) {
                 >
                   <Star
                     className={`h-5 w-5 ${
-                      n <= (rating ?? 0) ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30"
+                      n <= (rating ?? 0)
+                        ? "fill-amber-400 text-amber-400"
+                        : "text-muted-foreground/30"
                     }`}
                   />
                 </button>
@@ -397,14 +472,23 @@ export function ProviderForm({ provider, onSuccess }: Props) {
       </Section>
 
       {/* 7. Referencias comerciales */}
-      <Section title="Referencias comerciales" desc="Hasta 3 referencias (opcional)">
+      <Section
+        title="Referencias comerciales"
+        desc="Hasta 3 referencias (opcional)"
+      >
         <div className="space-y-3">
           {references.map((_, idx) => (
             <div key={idx} className="rounded-md border bg-secondary/30 p-3">
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-sm font-medium">Referencia {idx + 1}</p>
                 {references.length > 1 && (
-                  <Button type="button" variant="ghost" size="icon" onClick={() => removeRef(idx)} className="h-7 w-7">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeRef(idx)}
+                    className="h-7 w-7"
+                  >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 )}
@@ -420,7 +504,10 @@ export function ProviderForm({ provider, onSuccess }: Props) {
                   <Input {...register(`references.${idx}.phone`)} />
                 </Field>
                 <Field label="Email">
-                  <Input type="email" {...register(`references.${idx}.email`)} />
+                  <Input
+                    type="email"
+                    {...register(`references.${idx}.email`)}
+                  />
                 </Field>
               </div>
             </div>
@@ -435,8 +522,20 @@ export function ProviderForm({ provider, onSuccess }: Props) {
       </Section>
 
       <Section title="Notas" desc="Observaciones internas (opcional)">
-        <Textarea {...register("notes")} placeholder="Comentarios, historial, alertas…" rows={2} />
+        <Textarea
+          {...register("notes")}
+          placeholder="Comentarios, historial, alertas…"
+          rows={2}
+        />
       </Section>
+
+      {submitError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>No se pudo guardar</AlertTitle>
+          <AlertDescription>{submitError}</AlertDescription>
+        </Alert>
+      )}
 
       <div className="flex justify-end gap-2 border-t pt-4">
         <Button type="button" variant="outline" onClick={onSuccess}>

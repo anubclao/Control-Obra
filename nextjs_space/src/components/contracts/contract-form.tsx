@@ -1,6 +1,6 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useEffect } from "react";
@@ -37,8 +37,7 @@ const contractSchema = z.object({
 
 type FormData = z.infer<typeof contractSchema>;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const resolver: any = zodResolver(contractSchema);
+const resolver = zodResolver(contractSchema) as Resolver<FormData>;
 
 interface Props {
   contract?: Contract;
@@ -121,7 +120,12 @@ export function ContractForm({ contract, onSuccess }: Props) {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <Label className="mb-1.5 block">Proyecto *</Label>
-          <Select value={watch("projectId")} onValueChange={(v) => setValue("projectId", v, { shouldValidate: true })}>
+          <Select
+            value={watch("projectId")}
+            onValueChange={(v) =>
+              setValue("projectId", v, { shouldValidate: true })
+            }
+          >
             <SelectTrigger>
               <SelectValue placeholder="Selecciona proyecto" />
             </SelectTrigger>
@@ -133,12 +137,21 @@ export function ContractForm({ contract, onSuccess }: Props) {
               ))}
             </SelectContent>
           </Select>
-          {errors.projectId && <p className="mt-1 text-xs text-destructive">{errors.projectId.message}</p>}
+          {errors.projectId && (
+            <p className="mt-1 text-xs text-destructive">
+              {errors.projectId.message}
+            </p>
+          )}
         </div>
 
         <div>
           <Label className="mb-1.5 block">Contratista *</Label>
-          <Select value={watch("providerId")} onValueChange={(v) => setValue("providerId", v, { shouldValidate: true })}>
+          <Select
+            value={watch("providerId")}
+            onValueChange={(v) =>
+              setValue("providerId", v, { shouldValidate: true })
+            }
+          >
             <SelectTrigger>
               <SelectValue placeholder="Selecciona contratista" />
             </SelectTrigger>
@@ -150,12 +163,21 @@ export function ContractForm({ contract, onSuccess }: Props) {
               ))}
             </SelectContent>
           </Select>
-          {errors.providerId && <p className="mt-1 text-xs text-destructive">{errors.providerId.message}</p>}
+          {errors.providerId && (
+            <p className="mt-1 text-xs text-destructive">
+              {errors.providerId.message}
+            </p>
+          )}
         </div>
 
         <div>
           <Label className="mb-1.5 block">Tipo *</Label>
-          <Select value={watch("type")} onValueChange={(v) => setValue("type", v as ContractType, { shouldValidate: true })}>
+          <Select
+            value={watch("type")}
+            onValueChange={(v) =>
+              setValue("type", v as ContractType, { shouldValidate: true })
+            }
+          >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -171,7 +193,14 @@ export function ContractForm({ contract, onSuccess }: Props) {
 
         <div>
           <Label className="mb-1.5 block">Estado *</Label>
-          <Select value={watch("status")} onValueChange={(v) => setValue("status", v as Contract["status"], { shouldValidate: true })}>
+          <Select
+            value={watch("status")}
+            onValueChange={(v) =>
+              setValue("status", v as Contract["status"], {
+                shouldValidate: true,
+              })
+            }
+          >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -188,35 +217,67 @@ export function ContractForm({ contract, onSuccess }: Props) {
         <div>
           <Label className="mb-1.5 block">Valor del contrato (COP) *</Label>
           <Input type="number" min="0" step="1000000" {...register("value")} />
-          {errors.value && <p className="mt-1 text-xs text-destructive">{errors.value.message}</p>}
+          {errors.value && (
+            <p className="mt-1 text-xs text-destructive">
+              {errors.value.message}
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-2">
           <div>
             <Label className="mb-1.5 block">Inicio *</Label>
             <Input type="date" {...register("startDate")} />
-            {errors.startDate && <p className="mt-1 text-xs text-destructive">{errors.startDate.message}</p>}
+            {errors.startDate && (
+              <p className="mt-1 text-xs text-destructive">
+                {errors.startDate.message}
+              </p>
+            )}
           </div>
           <div>
             <Label className="mb-1.5 block">Fin *</Label>
             <Input type="date" {...register("endDate")} />
-            {errors.endDate && <p className="mt-1 text-xs text-destructive">{errors.endDate.message}</p>}
+            {errors.endDate && (
+              <p className="mt-1 text-xs text-destructive">
+                {errors.endDate.message}
+              </p>
+            )}
           </div>
         </div>
 
         <div>
           <Label className="mb-1.5 block">Retención (%)</Label>
-          <Input type="number" min="0" max="100" step="0.1" {...register("retentionPercent")} />
+          <Input
+            type="number"
+            min="0"
+            max="100"
+            step="0.1"
+            {...register("retentionPercent")}
+          />
           <p className="mt-1 text-xs text-muted-foreground">
-            {new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(retentionAmount)}
+            {new Intl.NumberFormat("es-CO", {
+              style: "currency",
+              currency: "COP",
+              maximumFractionDigits: 0,
+            }).format(retentionAmount)}
           </p>
         </div>
 
         <div>
           <Label className="mb-1.5 block">Anticipo (%)</Label>
-          <Input type="number" min="0" max="100" step="0.1" {...register("advancePercent")} />
+          <Input
+            type="number"
+            min="0"
+            max="100"
+            step="0.1"
+            {...register("advancePercent")}
+          />
           <p className="mt-1 text-xs text-muted-foreground">
-            {new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(advanceAmount)}
+            {new Intl.NumberFormat("es-CO", {
+              style: "currency",
+              currency: "COP",
+              maximumFractionDigits: 0,
+            }).format(advanceAmount)}
           </p>
         </div>
 
@@ -227,7 +288,11 @@ export function ContractForm({ contract, onSuccess }: Props) {
             placeholder="Detalla el alcance, entregables, condiciones especiales…"
             rows={3}
           />
-          {errors.scopeOfWork && <p className="mt-1 text-xs text-destructive">{errors.scopeOfWork.message}</p>}
+          {errors.scopeOfWork && (
+            <p className="mt-1 text-xs text-destructive">
+              {errors.scopeOfWork.message}
+            </p>
+          )}
         </div>
 
         <div className="sm:col-span-2">

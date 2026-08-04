@@ -12,16 +12,25 @@ import { MOCK_EMPLOYEES } from "@/mocks";
 
 interface EmployeesStore {
   employees: Employee[];
-  addEmployee: (data: Omit<Employee, "id" | "employeeNumber" | "documents" | "createdAt">) => Employee;
+  addEmployee: (
+    data: Omit<Employee, "id" | "employeeNumber" | "documents" | "createdAt">,
+  ) => Employee;
   updateEmployee: (id: string, updates: Partial<Employee>) => void;
   deleteEmployee: (id: string) => void;
   getEmployee: (id: string) => Employee | undefined;
-  addDocument: (empId: string, doc: Omit<EmployeeDocument, "id" | "uploadedAt">) => void;
+  addDocument: (
+    empId: string,
+    doc: Omit<EmployeeDocument, "id" | "uploadedAt">,
+  ) => void;
   removeDocument: (empId: string, docId: string) => void;
 }
 
 function nextId(): string {
   return `emp${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+}
+
+function nextDocId(): string {
+  return `empd${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
 }
 
 function nextEmployeeNumber(employees: Employee[]): string {
@@ -49,7 +58,11 @@ export const useEmployeesStore = create<EmployeesStore>()(
         return emp;
       },
       updateEmployee: (id, updates) => {
-        set({ employees: get().employees.map((e) => (e.id === id ? { ...e, ...updates } : e)) });
+        set({
+          employees: get().employees.map((e) =>
+            e.id === id ? { ...e, ...updates } : e,
+          ),
+        });
       },
       deleteEmployee: (id) => {
         set({ employees: get().employees.filter((e) => e.id !== id) });
@@ -64,22 +77,28 @@ export const useEmployeesStore = create<EmployeesStore>()(
                   ...e,
                   documents: [
                     ...e.documents,
-                    { ...doc, id: nextId() + "d", uploadedAt: new Date().toISOString().slice(0, 10) },
+                    {
+                      ...doc,
+                      id: nextDocId(),
+                      uploadedAt: new Date().toISOString().slice(0, 10),
+                    },
                   ],
-                }
+                },
           ),
         });
       },
       removeDocument: (empId, docId) => {
         set({
           employees: get().employees.map((e) =>
-            e.id !== empId ? e : { ...e, documents: e.documents.filter((d) => d.id !== docId) }
+            e.id !== empId
+              ? e
+              : { ...e, documents: e.documents.filter((d) => d.id !== docId) },
           ),
         });
       },
     }),
-    { name: "controlobra-employees" }
-  )
+    { name: "controlobra-employees" },
+  ),
 );
 
 export const EMPLOYEE_STATUS_LABELS: Record<EmployeeStatus, string> = {
@@ -89,7 +108,10 @@ export const EMPLOYEE_STATUS_LABELS: Record<EmployeeStatus, string> = {
   TERMINATED: "Terminado",
 };
 
-export const EMPLOYEE_STATUS_VARIANTS: Record<EmployeeStatus, "default" | "success" | "warning" | "destructive"> = {
+export const EMPLOYEE_STATUS_VARIANTS: Record<
+  EmployeeStatus,
+  "default" | "success" | "warning" | "destructive"
+> = {
   ACTIVE: "success",
   INACTIVE: "default",
   ON_LEAVE: "warning",

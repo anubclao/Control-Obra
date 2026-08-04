@@ -1,14 +1,15 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useEffect, useState } from "react";
-import { Camera, X, Plus } from "lucide-react";
+import { Camera, X, Plus, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Select,
   SelectContent,
@@ -24,7 +25,15 @@ import type { WorkLog, WeatherCondition } from "@/types";
 const logSchema = z.object({
   projectId: z.string().min(1, "Selecciona un proyecto"),
   date: z.string().min(1, "Selecciona una fecha"),
-  weather: z.enum(["SOLEADO", "NUBLADO", "LLUVIOSO", "TORMENTA", "VIENTO", "NIEBLA", "OTRO"]),
+  weather: z.enum([
+    "SOLEADO",
+    "NUBLADO",
+    "LLUVIOSO",
+    "TORMENTA",
+    "VIENTO",
+    "NIEBLA",
+    "OTRO",
+  ]),
   temperature: z.coerce.number().min(-10).max(50).optional().or(z.literal("")),
   workersCount: z.coerce.number().min(0),
   activities: z.string().min(3, "Describe al menos una actividad"),
@@ -35,8 +44,7 @@ const logSchema = z.object({
 
 type FormData = z.infer<typeof logSchema>;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const resolver: any = zodResolver(logSchema);
+const resolver = zodResolver(logSchema) as Resolver<FormData>;
 
 interface Props {
   log?: WorkLog;
@@ -92,12 +100,15 @@ export function LogForm({ log, onSuccess }: Props) {
 
   const [photoInput, setPhotoInput] = useState("");
   const [photoCaption, setPhotoCaption] = useState("");
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   function onSubmit(data: FormData) {
+    setSubmitError(null);
     if (log) {
       updateLog(log.id, {
         ...data,
-        temperature: data.temperature === "" ? undefined : Number(data.temperature),
+        temperature:
+          data.temperature === "" ? undefined : Number(data.temperature),
       });
       onSuccess();
       return;
@@ -107,7 +118,8 @@ export function LogForm({ log, onSuccess }: Props) {
       projectId: data.projectId,
       date: data.date,
       weather: data.weather,
-      temperature: data.temperature === "" ? undefined : Number(data.temperature),
+      temperature:
+        data.temperature === "" ? undefined : Number(data.temperature),
       workersCount: data.workersCount,
       activities: data.activities,
       incidents: data.incidents || undefined,
@@ -117,7 +129,8 @@ export function LogForm({ log, onSuccess }: Props) {
       createdByName: user?.name ?? "Usuario",
     });
     if (!result.ok) {
-      alert(result.error);
+      // FIX Bug #16: usar Alert component en vez de alert() nativo
+      setSubmitError(result.error ?? "Error al guardar la bitácora");
       return;
     }
     onSuccess();
@@ -128,7 +141,12 @@ export function LogForm({ log, onSuccess }: Props) {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <Label className="mb-1.5 block">Proyecto *</Label>
-          <Select value={projectId} onValueChange={(v) => setValue("projectId", v, { shouldValidate: true })}>
+          <Select
+            value={projectId}
+            onValueChange={(v) =>
+              setValue("projectId", v, { shouldValidate: true })
+            }
+          >
             <SelectTrigger>
               <SelectValue placeholder="Selecciona proyecto" />
             </SelectTrigger>
@@ -140,13 +158,21 @@ export function LogForm({ log, onSuccess }: Props) {
               ))}
             </SelectContent>
           </Select>
-          {errors.projectId && <p className="mt-1 text-xs text-destructive">{errors.projectId.message}</p>}
+          {errors.projectId && (
+            <p className="mt-1 text-xs text-destructive">
+              {errors.projectId.message}
+            </p>
+          )}
         </div>
 
         <div>
           <Label className="mb-1.5 block">Fecha *</Label>
           <Input type="date" {...register("date")} />
-          {errors.date && <p className="mt-1 text-xs text-destructive">{errors.date.message}</p>}
+          {errors.date && (
+            <p className="mt-1 text-xs text-destructive">
+              {errors.date.message}
+            </p>
+          )}
           <p className="mt-1 text-xs text-muted-foreground">
             Una sola bitácora por proyecto por día
           </p>
@@ -154,7 +180,14 @@ export function LogForm({ log, onSuccess }: Props) {
 
         <div>
           <Label className="mb-1.5 block">Clima *</Label>
-          <Select value={weather} onValueChange={(v) => setValue("weather", v as WeatherCondition, { shouldValidate: true })}>
+          <Select
+            value={weather}
+            onValueChange={(v) =>
+              setValue("weather", v as WeatherCondition, {
+                shouldValidate: true,
+              })
+            }
+          >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -170,13 +203,29 @@ export function LogForm({ log, onSuccess }: Props) {
 
         <div>
           <Label className="mb-1.5 block">Temperatura (°C)</Label>
-          <Input type="number" step="0.1" min="-10" max="50" {...register("temperature")} placeholder="24" />
+          <Input
+            type="number"
+            step="0.1"
+            min="-10"
+            max="50"
+            {...register("temperature")}
+            placeholder="24"
+          />
         </div>
 
         <div>
           <Label className="mb-1.5 block">Trabajadores en obra *</Label>
-          <Input type="number" min="0" {...register("workersCount")} placeholder="0" />
-          {errors.workersCount && <p className="mt-1 text-xs text-destructive">{errors.workersCount.message}</p>}
+          <Input
+            type="number"
+            min="0"
+            {...register("workersCount")}
+            placeholder="0"
+          />
+          {errors.workersCount && (
+            <p className="mt-1 text-xs text-destructive">
+              {errors.workersCount.message}
+            </p>
+          )}
         </div>
       </div>
 
@@ -187,7 +236,11 @@ export function LogForm({ log, onSuccess }: Props) {
           placeholder="Detalla las actividades realizadas, avance de obra, equipos usados…"
           rows={3}
         />
-        {errors.activities && <p className="mt-1 text-xs text-destructive">{errors.activities.message}</p>}
+        {errors.activities && (
+          <p className="mt-1 text-xs text-destructive">
+            {errors.activities.message}
+          </p>
+        )}
       </div>
 
       <div>
@@ -200,7 +253,9 @@ export function LogForm({ log, onSuccess }: Props) {
       </div>
 
       <div>
-        <Label className="mb-1.5 block">Materiales recibidos / consumidos</Label>
+        <Label className="mb-1.5 block">
+          Materiales recibidos / consumidos
+        </Label>
         <Textarea
           {...register("materials")}
           placeholder="Ingresos, consumos, stock relevante…"
@@ -224,7 +279,10 @@ export function LogForm({ log, onSuccess }: Props) {
           {log.photos.length > 0 && (
             <div className="mb-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
               {log.photos.map((p) => (
-                <div key={p.id} className="group relative aspect-square overflow-hidden rounded-md border bg-secondary/30">
+                <div
+                  key={p.id}
+                  className="group relative aspect-square overflow-hidden rounded-md border bg-secondary/30"
+                >
                   <div className="flex h-full items-center justify-center">
                     <Camera className="h-6 w-6 text-muted-foreground" />
                   </div>
@@ -263,7 +321,10 @@ export function LogForm({ log, onSuccess }: Props) {
                 variant="outline"
                 onClick={() => {
                   if (photoInput.trim()) {
-                    addPhoto(log.id, { fileName: photoInput.trim(), caption: photoCaption.trim() || undefined });
+                    addPhoto(log.id, {
+                      fileName: photoInput.trim(),
+                      caption: photoCaption.trim() || undefined,
+                    });
                     setPhotoInput("");
                     setPhotoCaption("");
                   }
@@ -273,9 +334,19 @@ export function LogForm({ log, onSuccess }: Props) {
                 Agregar
               </Button>
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">(Mock: la carga real se conectará después)</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              (Mock: la carga real se conectará después)
+            </p>
           </div>
         </div>
+      )}
+
+      {submitError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>No se pudo guardar</AlertTitle>
+          <AlertDescription>{submitError}</AlertDescription>
+        </Alert>
       )}
 
       <div className="flex justify-end gap-2 border-t pt-4">

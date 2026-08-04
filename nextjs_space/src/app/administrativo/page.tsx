@@ -12,14 +12,28 @@ import {
   AlertCircle,
   XCircle,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MOCK_PAYMENTS, MOCK_PROJECTS, getDashboardStats } from "@/mocks";
+import { MOCK_PAYMENTS, MOCK_PROJECTS } from "@/mocks";
+import { usePaymentsStore } from "@/lib/payments-store";
+import { useDashboardStats } from "@/lib/dashboard-stats";
 import { formatCurrency } from "@/lib/utils";
 import type { PaymentStatus } from "@/types";
 
-const paymentStatusConfig: Record<PaymentStatus, { label: string; variant: "default" | "info" | "warning" | "success" | "destructive" }> = {
+const paymentStatusConfig: Record<
+  PaymentStatus,
+  {
+    label: string;
+    variant: "default" | "info" | "warning" | "success" | "destructive";
+  }
+> = {
   PENDING: { label: "Pendiente", variant: "warning" },
   APPROVED_LEVEL_1: { label: "Aprobado N1", variant: "info" },
   APPROVED_LEVEL_2: { label: "Aprobado N2", variant: "info" },
@@ -40,12 +54,11 @@ const paymentStatusIcon: Record<PaymentStatus, React.ReactNode> = {
 };
 
 export default function AdministrativoDashboard() {
-  const stats = getDashboardStats();
-  const recentPayments = MOCK_PAYMENTS.slice(0, 6);
-  const totalPendingAmount = MOCK_PAYMENTS
-    .filter((p) => ["PENDING", "APPROVED_LEVEL_1", "APPROVED_LEVEL_2"].includes(p.status))
-    .reduce((sum, p) => sum + p.amount, 0);
-  const totalExecuted = stats.totalExecuted;
+  const stats = useDashboardStats();
+  const payments = usePaymentsStore((s) => s.payments);
+  const recentPayments = payments.slice(0, 6);
+  const totalPendingAmount = stats.pendingAmount;
+  const totalExecuted = stats.totalExecutedAdmin;
   const totalBudget = stats.totalBudget;
   const retention = totalExecuted * 0.1; // simulado 10%
   const taxes = totalExecuted * 0.19; // simulado IVA 19%
@@ -54,7 +67,9 @@ export default function AdministrativoDashboard() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Dashboard Administrativo</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">
+          Dashboard Administrativo
+        </h1>
         <p className="text-sm text-muted-foreground">
           Flujo de pagos, reportes financieros y operaciones administrativas
         </p>
@@ -68,19 +83,29 @@ export default function AdministrativoDashboard() {
             <Wallet className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold">{formatCurrency(totalPendingAmount)}</div>
-            <p className="text-xs text-muted-foreground">{stats.pendingPayments} solicitudes activas</p>
+            <div className="text-2xl font-semibold">
+              {formatCurrency(totalPendingAmount)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {stats.pendingPayments} solicitudes activas
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total ejecutado</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Total ejecutado
+            </CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold">{formatCurrency(totalExecuted)}</div>
-            <p className="text-xs text-muted-foreground">de {formatCurrency(totalBudget)}</p>
+            <div className="text-2xl font-semibold">
+              {formatCurrency(totalExecuted)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              de {formatCurrency(totalBudget)}
+            </p>
           </CardContent>
         </Card>
 
@@ -90,7 +115,9 @@ export default function AdministrativoDashboard() {
             <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold">{formatCurrency(retention)}</div>
+            <div className="text-2xl font-semibold">
+              {formatCurrency(retention)}
+            </div>
             <p className="text-xs text-muted-foreground">10% sobre ejecutado</p>
           </CardContent>
         </Card>
@@ -101,7 +128,9 @@ export default function AdministrativoDashboard() {
             <ListChecks className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold">{formatCurrency(taxes)}</div>
+            <div className="text-2xl font-semibold">
+              {formatCurrency(taxes)}
+            </div>
             <p className="text-xs text-muted-foreground">IVA 19% calculado</p>
           </CardContent>
         </Card>
@@ -137,19 +166,28 @@ export default function AdministrativoDashboard() {
               </thead>
               <tbody>
                 {recentPayments.map((payment) => {
-                  const project = MOCK_PROJECTS.find((p) => p.id === payment.projectId);
+                  const project = MOCK_PROJECTS.find(
+                    (p) => p.id === payment.projectId,
+                  );
                   const config = paymentStatusConfig[payment.status];
                   return (
                     <tr key={payment.id} className="border-b last:border-0">
-                      <td className="py-3 font-mono text-xs">{payment.requestNumber}</td>
+                      <td className="py-3 font-mono text-xs">
+                        {payment.requestNumber}
+                      </td>
                       <td className="py-3 text-xs">{project?.name}</td>
                       <td className="py-3">{payment.beneficiaryName}</td>
-                      <td className="py-3 text-xs text-muted-foreground">{payment.type}</td>
+                      <td className="py-3 text-xs text-muted-foreground">
+                        {payment.type}
+                      </td>
                       <td className="py-3 text-right font-medium">
                         {formatCurrency(payment.amount)}
                       </td>
                       <td className="py-3">
-                        <Badge variant={config.variant} className="flex w-fit items-center gap-1">
+                        <Badge
+                          variant={config.variant}
+                          className="flex w-fit items-center gap-1"
+                        >
                           {paymentStatusIcon[payment.status]}
                           {config.label}
                         </Badge>
@@ -172,10 +210,30 @@ export default function AdministrativoDashboard() {
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-3">
             {[
-              { href: "/administrativo/tesoreria", icon: Wallet, title: "Tesorería", desc: "Flujo de caja" },
-              { href: "/administrativo/pagos", icon: ListChecks, title: "Pagos", desc: "Aprobaciones" },
-              { href: "/administrativo/reportes/financiero", icon: FileSpreadsheet, title: "Reportes", desc: "Financiero" },
-              { href: "/administrativo/impuestos", icon: FileSpreadsheet, title: "Impuestos", desc: "Configuración" },
+              {
+                href: "/administrativo/tesoreria",
+                icon: Wallet,
+                title: "Tesorería",
+                desc: "Flujo de caja",
+              },
+              {
+                href: "/administrativo/pagos",
+                icon: ListChecks,
+                title: "Pagos",
+                desc: "Aprobaciones",
+              },
+              {
+                href: "/administrativo/reportes/financiero",
+                icon: FileSpreadsheet,
+                title: "Reportes",
+                desc: "Financiero",
+              },
+              {
+                href: "/administrativo/impuestos",
+                icon: FileSpreadsheet,
+                title: "Impuestos",
+                desc: "Configuración",
+              },
             ].map((item) => {
               const Icon = item.icon;
               return (
@@ -204,8 +262,18 @@ export default function AdministrativoDashboard() {
           </CardHeader>
           <CardContent className="space-y-3">
             {[
-              { num: "PAG-2026-00002", amount: 522_000_000, level: "Director + Gerente", project: "Plaza Andina" },
-              { num: "PAG-2026-00003", amount: 45_800_000, level: "Gerente", project: "Mirador del Norte" },
+              {
+                num: "PAG-2026-00002",
+                amount: 522_000_000,
+                level: "Director + Gerente",
+                project: "Plaza Andina",
+              },
+              {
+                num: "PAG-2026-00003",
+                amount: 45_800_000,
+                level: "Gerente",
+                project: "Mirador del Norte",
+              },
             ].map((item) => (
               <div key={item.num} className="rounded-lg border p-3">
                 <div className="flex items-center justify-between">
@@ -213,8 +281,12 @@ export default function AdministrativoDashboard() {
                   <Badge variant="warning">Pendiente</Badge>
                 </div>
                 <p className="mt-1 text-sm">{item.project}</p>
-                <p className="text-xs text-muted-foreground">Aprobación: {item.level}</p>
-                <p className="mt-2 text-base font-semibold">{formatCurrency(item.amount)}</p>
+                <p className="text-xs text-muted-foreground">
+                  Aprobación: {item.level}
+                </p>
+                <p className="mt-2 text-base font-semibold">
+                  {formatCurrency(item.amount)}
+                </p>
               </div>
             ))}
           </CardContent>

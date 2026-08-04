@@ -46,7 +46,9 @@ export default function BitacoraPage() {
   const { projects, getProject } = useProjectsStore();
   const [search, setSearch] = useState("");
   const [projectFilter, setProjectFilter] = useState<string>("ALL");
-  const [weatherFilter, setWeatherFilter] = useState<"ALL" | WeatherCondition>("ALL");
+  const [weatherFilter, setWeatherFilter] = useState<"ALL" | WeatherCondition>(
+    "ALL",
+  );
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<WorkLog | null>(null);
   const [deleting, setDeleting] = useState<WorkLog | null>(null);
@@ -60,19 +62,32 @@ export default function BitacoraPage() {
           !search ||
           l.activities.toLowerCase().includes(search.toLowerCase()) ||
           (project?.name.toLowerCase().includes(search.toLowerCase()) ?? false);
-        const matchProject = projectFilter === "ALL" || l.projectId === projectFilter;
-        const matchWeather = weatherFilter === "ALL" || l.weather === weatherFilter;
+        const matchProject =
+          projectFilter === "ALL" || l.projectId === projectFilter;
+        const matchWeather =
+          weatherFilter === "ALL" || l.weather === weatherFilter;
         return matchSearch && matchProject && matchWeather;
       });
   }, [logs, search, projectFilter, weatherFilter, getProject]);
 
   const stats = useMemo(() => {
     const last7Days = logs.filter((l) => {
-      const days = (Date.now() - new Date(l.date).getTime()) / (1000 * 60 * 60 * 24);
-      return days <= 7;
+      // FIX Bug #25: tratar l.date como fecha local (no UTC).
+      // new Date("2026-06-12") = 2026-06-12T00:00:00 UTC, lo que en zonas UTC+
+      // puede dar un día de más.
+      const [y, m, d] = l.date.split("-").map(Number);
+      const logDate = new Date(y, m - 1, d);
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const diffDays = Math.round(
+        (today.getTime() - logDate.getTime()) / (1000 * 60 * 60 * 24),
+      );
+      return diffDays <= 7;
     });
     const totalWorkers = logs.reduce((s, l) => s + l.workersCount, 0);
-    const withIncidents = logs.filter((l) => l.incidents && l.incidents.trim()).length;
+    const withIncidents = logs.filter(
+      (l) => l.incidents && l.incidents.trim(),
+    ).length;
     const totalPhotos = logs.reduce((s, l) => s + l.photos.length, 0);
     return {
       total: logs.length,
@@ -97,9 +112,12 @@ export default function BitacoraPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Bitácora de Obra</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">
+            Bitácora de Obra
+          </h1>
           <p className="text-sm text-muted-foreground">
-            {stats.total} registros · {stats.last7Days} esta semana · {stats.avgWorkers} trabajadores promedio
+            {stats.total} registros · {stats.last7Days} esta semana ·{" "}
+            {stats.avgWorkers} trabajadores promedio
           </p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -123,10 +141,30 @@ export default function BitacoraPage() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <KpiMini label="Total registros" value={stats.total} icon={BookOpen} color="text-blue-600" />
-        <KpiMini label="Esta semana" value={stats.last7Days} icon={CalendarIcon} color="text-emerald-600" />
-        <KpiMini label="Con incidentes" value={stats.withIncidents} icon={AlertTriangle} color="text-amber-600" />
-        <KpiMini label="Fotos totales" value={stats.totalPhotos} icon={Camera} color="text-violet-600" />
+        <KpiMini
+          label="Total registros"
+          value={stats.total}
+          icon={BookOpen}
+          color="text-blue-600"
+        />
+        <KpiMini
+          label="Esta semana"
+          value={stats.last7Days}
+          icon={CalendarIcon}
+          color="text-emerald-600"
+        />
+        <KpiMini
+          label="Con incidentes"
+          value={stats.withIncidents}
+          icon={AlertTriangle}
+          color="text-amber-600"
+        />
+        <KpiMini
+          label="Fotos totales"
+          value={stats.totalPhotos}
+          icon={Camera}
+          color="text-violet-600"
+        />
       </div>
 
       {/* Filters */}
@@ -153,7 +191,10 @@ export default function BitacoraPage() {
             ))}
           </SelectContent>
         </Select>
-        <Select value={weatherFilter} onValueChange={(v) => setWeatherFilter(v as typeof weatherFilter)}>
+        <Select
+          value={weatherFilter}
+          onValueChange={(v) => setWeatherFilter(v as typeof weatherFilter)}
+        >
           <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue placeholder="Clima" />
           </SelectTrigger>
@@ -188,7 +229,9 @@ export default function BitacoraPage() {
                 <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
                   {formatDate(date)}
                 </h2>
-                <span className="text-xs text-muted-foreground">({dayLogs.length} entradas)</span>
+                <span className="text-xs text-muted-foreground">
+                  ({dayLogs.length} entradas)
+                </span>
               </div>
               <div className="space-y-2">
                 {dayLogs.map((log) => {
@@ -219,7 +262,9 @@ export default function BitacoraPage() {
               {editing && formatDate(editing.date)}
             </DialogDescription>
           </DialogHeader>
-          {editing && <LogForm log={editing} onSuccess={() => setEditing(null)} />}
+          {editing && (
+            <LogForm log={editing} onSuccess={() => setEditing(null)} />
+          )}
         </DialogContent>
       </Dialog>
 
@@ -229,7 +274,8 @@ export default function BitacoraPage() {
           <DialogHeader>
             <DialogTitle>¿Eliminar entrada?</DialogTitle>
             <DialogDescription>
-              Se eliminará la bitácora de {deleting && formatDate(deleting.date)} y todas sus fotos.
+              Se eliminará la bitácora de{" "}
+              {deleting && formatDate(deleting.date)} y todas sus fotos.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -300,14 +346,18 @@ function LogCard({
         <div className="flex h-12 w-12 flex-shrink-0 flex-col items-center justify-center rounded-md bg-primary/10 text-primary">
           <span className="text-lg leading-none">{weatherEmoji}</span>
           {log.temperature !== undefined && (
-            <span className="text-[10px] text-muted-foreground">{log.temperature}°</span>
+            <span className="text-[10px] text-muted-foreground">
+              {log.temperature}°
+            </span>
           )}
         </div>
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             {projectCode && (
-              <p className="font-mono text-xs text-muted-foreground">{projectCode}</p>
+              <p className="font-mono text-xs text-muted-foreground">
+                {projectCode}
+              </p>
             )}
             <Badge variant="outline">{WEATHER_LABELS[log.weather]}</Badge>
             <span className="text-xs text-muted-foreground flex items-center gap-1">
@@ -321,7 +371,9 @@ function LogCard({
               </span>
             )}
             {hasIncidents && (
-              <Badge variant="warning" className="text-[10px]">Incidentes</Badge>
+              <Badge variant="warning" className="text-[10px]">
+                Incidentes
+              </Badge>
             )}
           </div>
           {projectName && (
@@ -336,7 +388,12 @@ function LogCard({
         </div>
 
         <div className="relative">
-          <Button variant="ghost" size="icon" onClick={() => setMenuOpen(!menuOpen)} className="h-8 w-8">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="h-8 w-8"
+          >
             <MoreVertical className="h-4 w-4" />
           </Button>
           {menuOpen && (

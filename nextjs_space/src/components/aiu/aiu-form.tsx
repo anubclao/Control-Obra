@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useAiuStore, validateAiu } from "@/lib/aiu-store";
 import { useProjectsStore } from "@/lib/projects-store";
+import { useAuthStore } from "@/lib/auth-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,10 +21,15 @@ interface AiuFormProps {
 export function AiuForm({ projectId, existing, onSuccess }: AiuFormProps) {
   const { upsertConfig } = useAiuStore();
   const { getProject } = useProjectsStore();
+  const user = useAuthStore((s) => s.user);
   const project = getProject(projectId);
 
-  const [administration, setAdministration] = useState<number>(existing?.administration ?? 10);
-  const [imprevistos, setImprevistos] = useState<number>(existing?.imprevistos ?? 5);
+  const [administration, setAdministration] = useState<number>(
+    existing?.administration ?? 10,
+  );
+  const [imprevistos, setImprevistos] = useState<number>(
+    existing?.imprevistos ?? 5,
+  );
   const [utilidad, setUtilidad] = useState<number>(existing?.utilidad ?? 5);
   const [notes, setNotes] = useState<string>(existing?.notes ?? "");
 
@@ -45,7 +51,8 @@ export function AiuForm({ projectId, existing, onSuccess }: AiuFormProps) {
       imprevistos,
       utilidad,
       notes: notes || undefined,
-      updatedBy: "current-user",
+      // FIX Bug #15: usar el usuario autenticado, no un string hardcoded
+      updatedBy: user?.id ?? user?.email ?? "unknown",
     });
     onSuccess?.();
   }
@@ -60,7 +67,12 @@ export function AiuForm({ projectId, existing, onSuccess }: AiuFormProps) {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <p className="text-sm text-muted-foreground">
-          {project?.code} · {project?.name} · Presupuesto: {new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(totalBudget)}
+          {project?.code} · {project?.name} · Presupuesto:{" "}
+          {new Intl.NumberFormat("es-CO", {
+            style: "currency",
+            currency: "COP",
+            maximumFractionDigits: 0,
+          }).format(totalBudget)}
         </p>
       </div>
 
@@ -68,7 +80,9 @@ export function AiuForm({ projectId, existing, onSuccess }: AiuFormProps) {
         <div>
           <div className="mb-1.5 flex items-center justify-between">
             <Label>Administración (A)</Label>
-            <span className="text-sm font-semibold text-blue-600">{administration}%</span>
+            <span className="text-sm font-semibold text-blue-600">
+              {administration}%
+            </span>
           </div>
           <Input
             type="number"
@@ -79,14 +93,20 @@ export function AiuForm({ projectId, existing, onSuccess }: AiuFormProps) {
             onChange={(e) => setAdministration(parseFloat(e.target.value) || 0)}
           />
           <p className="mt-1 text-xs text-muted-foreground">
-            {new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(adminValue)}
+            {new Intl.NumberFormat("es-CO", {
+              style: "currency",
+              currency: "COP",
+              maximumFractionDigits: 0,
+            }).format(adminValue)}
           </p>
         </div>
 
         <div>
           <div className="mb-1.5 flex items-center justify-between">
             <Label>Imprevistos (I)</Label>
-            <span className="text-sm font-semibold text-amber-600">{imprevistos}%</span>
+            <span className="text-sm font-semibold text-amber-600">
+              {imprevistos}%
+            </span>
           </div>
           <Input
             type="number"
@@ -97,14 +117,20 @@ export function AiuForm({ projectId, existing, onSuccess }: AiuFormProps) {
             onChange={(e) => setImprevistos(parseFloat(e.target.value) || 0)}
           />
           <p className="mt-1 text-xs text-muted-foreground">
-            {new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(imprevValue)}
+            {new Intl.NumberFormat("es-CO", {
+              style: "currency",
+              currency: "COP",
+              maximumFractionDigits: 0,
+            }).format(imprevValue)}
           </p>
         </div>
 
         <div>
           <div className="mb-1.5 flex items-center justify-between">
             <Label>Utilidad (U)</Label>
-            <span className="text-sm font-semibold text-emerald-600">{utilidad}%</span>
+            <span className="text-sm font-semibold text-emerald-600">
+              {utilidad}%
+            </span>
           </div>
           <Input
             type="number"
@@ -115,7 +141,11 @@ export function AiuForm({ projectId, existing, onSuccess }: AiuFormProps) {
             onChange={(e) => setUtilidad(parseFloat(e.target.value) || 0)}
           />
           <p className="mt-1 text-xs text-muted-foreground">
-            {new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(utilValue)}
+            {new Intl.NumberFormat("es-CO", {
+              style: "currency",
+              currency: "COP",
+              maximumFractionDigits: 0,
+            }).format(utilValue)}
           </p>
         </div>
       </div>
@@ -133,14 +163,25 @@ export function AiuForm({ projectId, existing, onSuccess }: AiuFormProps) {
       <div className="rounded-md border bg-secondary/40 p-3">
         <div className="mb-2 flex items-center justify-between text-sm">
           <span className="font-medium">Total AIU</span>
-          <span className={`font-bold ${validation.ok ? "text-emerald-600" : "text-red-600"}`}>
+          <span
+            className={`font-bold ${validation.ok ? "text-emerald-600" : "text-red-600"}`}
+          >
             {total.toFixed(2)}%
           </span>
         </div>
         <div className="h-3 overflow-hidden rounded-full bg-background flex">
-          <div className="bg-blue-500 h-full" style={{ width: `${(administration / 100) * 100}%` }} />
-          <div className="bg-amber-500 h-full" style={{ width: `${(imprevistos / 100) * 100}%` }} />
-          <div className="bg-emerald-500 h-full" style={{ width: `${(utilidad / 100) * 100}%` }} />
+          <div
+            className="bg-blue-500 h-full"
+            style={{ width: `${(administration / 100) * 100}%` }}
+          />
+          <div
+            className="bg-amber-500 h-full"
+            style={{ width: `${(imprevistos / 100) * 100}%` }}
+          />
+          <div
+            className="bg-emerald-500 h-full"
+            style={{ width: `${(utilidad / 100) * 100}%` }}
+          />
         </div>
         <div className="mt-2 flex justify-between text-xs text-muted-foreground">
           <span>A: {administration.toFixed(2)}%</span>
@@ -161,7 +202,9 @@ export function AiuForm({ projectId, existing, onSuccess }: AiuFormProps) {
         <Alert>
           <CheckCircle2 className="h-4 w-4" />
           <AlertTitle>Configuración válida</AlertTitle>
-          <AlertDescription>La suma de AIU es exactamente 100%.</AlertDescription>
+          <AlertDescription>
+            La suma de AIU es exactamente 100%.
+          </AlertDescription>
         </Alert>
       )}
 

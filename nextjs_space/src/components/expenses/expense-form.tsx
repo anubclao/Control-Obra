@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Plus, Trash2 } from "lucide-react";
@@ -16,7 +16,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useExpensesStore, EXPENSE_TYPE_LABELS, categoryFor } from "@/lib/expenses-store";
+import {
+  useExpensesStore,
+  EXPENSE_TYPE_LABELS,
+  categoryFor,
+} from "@/lib/expenses-store";
 import { useProvidersStore } from "@/lib/providers-store";
 import { useProjectsStore } from "@/lib/projects-store";
 import { useCurrentUser } from "@/lib/permissions";
@@ -62,8 +66,7 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const resolver: any = zodResolver(schema);
+const resolver = zodResolver(schema) as Resolver<FormData>;
 
 interface Props {
   onSuccess: () => void;
@@ -74,7 +77,9 @@ export function ExpenseForm({ onSuccess }: Props) {
   const { providers } = useProvidersStore();
   const { projects } = useProjectsStore();
   const user = useCurrentUser();
-  const [showCotizacionWarning, setShowCotizacionWarning] = useState(true);
+  // FIX Bug #20: derivar el flag de "cotización aprobada" del form state,
+  // no usar un state separado que se desincroniza.
+  // (Eliminado `showCotizacionWarning` y `setShowCotizacionWarning`.)
 
   const {
     register,
@@ -107,14 +112,19 @@ export function ExpenseForm({ onSuccess }: Props) {
   const hasPolizas = watch("hasPolizas");
   const cat = categoryFor(type as ExpenseType);
 
-  const computedAmount = items.reduce((s, it) => s + (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0), 0);
+  const computedAmount = items.reduce(
+    (s, it) => s + (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0),
+    0,
+  );
 
   function onSubmit(data: FormData) {
     addExpense({
       ...data,
       amount: computedAmount,
-      items: data.items.map((it, i) => ({
-        id: `ni${i}`,
+      // FIX Bug #14: usar IDs únicos estables en lugar de `ni${i}`
+      // (el índice colisiona al agregar/eliminar items)
+      items: data.items.map((it) => ({
+        id: `ei${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
         description: it.description,
         quantity: Number(it.quantity),
         unit: it.unit,
@@ -141,7 +151,9 @@ export function ExpenseForm({ onSuccess }: Props) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {(Object.entries(EXPENSE_TYPE_LABELS) as [ExpenseType, string][]).map(([k, v]) => (
+              {(
+                Object.entries(EXPENSE_TYPE_LABELS) as [ExpenseType, string][]
+              ).map(([k, v]) => (
                 <SelectItem key={k} value={k}>
                   {v}
                 </SelectItem>
@@ -162,7 +174,10 @@ export function ExpenseForm({ onSuccess }: Props) {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <Label>Proyecto *</Label>
-          <Select value={watch("projectId")} onValueChange={(v) => setValue("projectId", v)}>
+          <Select
+            value={watch("projectId")}
+            onValueChange={(v) => setValue("projectId", v)}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Selecciona" />
             </SelectTrigger>
@@ -174,11 +189,18 @@ export function ExpenseForm({ onSuccess }: Props) {
               ))}
             </SelectContent>
           </Select>
-          {errors.projectId && <p className="mt-1 text-xs text-destructive">{errors.projectId.message}</p>}
+          {errors.projectId && (
+            <p className="mt-1 text-xs text-destructive">
+              {errors.projectId.message}
+            </p>
+          )}
         </div>
         <div>
           <Label>Proveedor *</Label>
-          <Select value={watch("providerId")} onValueChange={(v) => setValue("providerId", v)}>
+          <Select
+            value={watch("providerId")}
+            onValueChange={(v) => setValue("providerId", v)}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Selecciona" />
             </SelectTrigger>
@@ -190,18 +212,31 @@ export function ExpenseForm({ onSuccess }: Props) {
               ))}
             </SelectContent>
           </Select>
-          {errors.providerId && <p className="mt-1 text-xs text-destructive">{errors.providerId.message}</p>}
+          {errors.providerId && (
+            <p className="mt-1 text-xs text-destructive">
+              {errors.providerId.message}
+            </p>
+          )}
         </div>
       </div>
 
       <div>
         <Label>Descripción *</Label>
-        <Input {...register("description")} placeholder="Ej: Estructura pisos 7-12" />
-        {errors.description && <p className="mt-1 text-xs text-destructive">{errors.description.message}</p>}
+        <Input
+          {...register("description")}
+          placeholder="Ej: Estructura pisos 7-12"
+        />
+        {errors.description && (
+          <p className="mt-1 text-xs text-destructive">
+            {errors.description.message}
+          </p>
+        )}
       </div>
 
       {/* 3. Campos específicos según tipo (PDF p.8-9) */}
-      {(cat === "contrato" || cat === "orden_servicio" || cat === "orden_compra") && (
+      {(cat === "contrato" ||
+        cat === "orden_servicio" ||
+        cat === "orden_compra") && (
         <div className="space-y-3 rounded-md border bg-secondary/20 p-3">
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Configuración del documento
@@ -247,15 +282,15 @@ export function ExpenseForm({ onSuccess }: Props) {
               checked={!!watch("cotizacionAprobada")}
               onChange={(e) => {
                 setValue("cotizacionAprobada", e.target.checked);
-                setShowCotizacionWarning(!e.target.checked);
               }}
               className="h-4 w-4 rounded border-gray-300"
             />
             <Label htmlFor="cotiz">Cotización aprobada</Label>
           </div>
-          {showCotizacionWarning && !watch("cotizacionAprobada") && (
+          {!watch("cotizacionAprobada") && (
             <p className="text-xs text-amber-700">
-              ⚠️ Sin cotización aprobada el documento no debería enviarse a aprobación.
+              ⚠️ Sin cotización aprobada el documento no debería enviarse a
+              aprobación.
             </p>
           )}
         </div>
@@ -269,7 +304,9 @@ export function ExpenseForm({ onSuccess }: Props) {
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => append({ description: "", quantity: 1, unit: "GL", unitPrice: 0 })}
+            onClick={() =>
+              append({ description: "", quantity: 1, unit: "GL", unitPrice: 0 })
+            }
           >
             <Plus className="mr-1 h-3.5 w-3.5" />
             Agregar ítem
@@ -294,7 +331,10 @@ export function ExpenseForm({ onSuccess }: Props) {
               </div>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-12">
                 <div className="sm:col-span-5">
-                  <Input {...register(`items.${idx}.description`)} placeholder="Descripción" />
+                  <Input
+                    {...register(`items.${idx}.description`)}
+                    placeholder="Descripción"
+                  />
                 </div>
                 <div className="sm:col-span-2">
                   <Input {...register(`items.${idx}.unit`)} placeholder="UN" />
@@ -320,14 +360,19 @@ export function ExpenseForm({ onSuccess }: Props) {
           ))}
         </div>
         <div className="mt-2 flex justify-end rounded-md border bg-secondary/40 p-2 text-sm">
-          Total: <strong className="ml-2">{formatCurrency(computedAmount)}</strong>
+          Total:{" "}
+          <strong className="ml-2">{formatCurrency(computedAmount)}</strong>
         </div>
       </div>
 
       {/* 5. Notas */}
       <div>
         <Label>Notas</Label>
-        <Textarea {...register("notes")} placeholder="Observaciones internas…" rows={2} />
+        <Textarea
+          {...register("notes")}
+          placeholder="Observaciones internas…"
+          rows={2}
+        />
       </div>
 
       <div className="flex justify-end gap-2 border-t pt-4">

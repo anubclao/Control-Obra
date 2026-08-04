@@ -34,7 +34,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { usePaymentsStore, PAYMENT_STATUS_LABELS, PAYMENT_STATUS_VARIANTS, PAYMENT_TYPE_LABELS } from "@/lib/payments-store";
+import {
+  usePaymentsStore,
+  PAYMENT_STATUS_LABELS,
+  PAYMENT_STATUS_VARIANTS,
+  PAYMENT_TYPE_LABELS,
+} from "@/lib/payments-store";
 import { useProjectsStore } from "@/lib/projects-store";
 import { useProvidersStore } from "@/lib/providers-store";
 import { useAuthStore } from "@/lib/auth-store";
@@ -47,10 +52,14 @@ export default function TesoreriaPage() {
   const { getProvider } = useProvidersStore();
   const { user } = useAuthStore();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | PaymentStatus>("ALL");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | PaymentStatus>(
+    "ALL",
+  );
   const [payDialog, setPayDialog] = useState<PaymentRequest | null>(null);
   const [payRef, setPayRef] = useState("");
-  const [payMethod, setPayMethod] = useState<"TRANSFER" | "CHECK" | "CASH">("TRANSFER");
+  const [payMethod, setPayMethod] = useState<"TRANSFER" | "CHECK" | "CASH">(
+    "TRANSFER",
+  );
   const [payComments, setPayComments] = useState("");
   const [payError, setPayError] = useState<string | null>(null);
 
@@ -58,8 +67,8 @@ export default function TesoreriaPage() {
   const summary = useMemo(() => {
     const approved = payments.filter((p) => p.status === "APPROVED");
     const paid = payments.filter((p) => p.status === "PAID");
-    const pending = payments.filter(
-      (p) => ["PENDING", "APPROVED_LEVEL_1", "APPROVED_LEVEL_2"].includes(p.status)
+    const pending = payments.filter((p) =>
+      ["PENDING", "APPROVED_LEVEL_1", "APPROVED_LEVEL_2"].includes(p.status),
     );
     const approvedAmount = approved.reduce((s, p) => s + p.amount, 0);
     const paidAmount = paid.reduce((s, p) => s + p.amount, 0);
@@ -78,9 +87,13 @@ export default function TesoreriaPage() {
   // Cola de pagos (todo lo pendiente de ejecución)
   const cola = useMemo(() => {
     return payments
-      .filter(
-        (p) =>
-          ["PENDING", "APPROVED_LEVEL_1", "APPROVED_LEVEL_2", "APPROVED"].includes(p.status)
+      .filter((p) =>
+        [
+          "PENDING",
+          "APPROVED_LEVEL_1",
+          "APPROVED_LEVEL_2",
+          "APPROVED",
+        ].includes(p.status),
       )
       .filter((p) => {
         const project = getProject(p.projectId);
@@ -94,10 +107,20 @@ export default function TesoreriaPage() {
       })
       .sort((a, b) => {
         // APPROVED primero, luego por prioridad
-        const order: Record<string, number> = { APPROVED: 0, APPROVED_LEVEL_2: 1, APPROVED_LEVEL_1: 2, PENDING: 3 };
+        const order: Record<string, number> = {
+          APPROVED: 0,
+          APPROVED_LEVEL_2: 1,
+          APPROVED_LEVEL_1: 2,
+          PENDING: 3,
+        };
         const orderDiff = (order[a.status] ?? 99) - (order[b.status] ?? 99);
         if (orderDiff !== 0) return orderDiff;
-        const prioOrder: Record<string, number> = { URGENT: 0, HIGH: 1, NORMAL: 2, LOW: 3 };
+        const prioOrder: Record<string, number> = {
+          URGENT: 0,
+          HIGH: 1,
+          NORMAL: 2,
+          LOW: 3,
+        };
         return (prioOrder[a.priority] ?? 99) - (prioOrder[b.priority] ?? 99);
       });
   }, [payments, search, statusFilter, getProject]);
@@ -120,15 +143,18 @@ export default function TesoreriaPage() {
         paymentReference: payRef,
         paymentMethod: payMethod,
         comments: payComments || undefined,
-      }
+      },
     );
     if (!result.ok) {
       setPayError(result.error || "Error al registrar el pago");
       return;
     }
+    // FIX Bug #17: resetear TODO el estado del dialog al cerrar
     setPayDialog(null);
     setPayRef("");
     setPayComments("");
+    setPayMethod("TRANSFER");
+    setPayError(null);
   }
 
   return (
@@ -144,7 +170,9 @@ export default function TesoreriaPage() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-medium text-muted-foreground">Por ejecutar</CardTitle>
+            <CardTitle className="text-xs font-medium text-muted-foreground">
+              Por ejecutar
+            </CardTitle>
             <Clock className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
@@ -156,7 +184,9 @@ export default function TesoreriaPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-medium text-muted-foreground">En aprobación</CardTitle>
+            <CardTitle className="text-xs font-medium text-muted-foreground">
+              En aprobación
+            </CardTitle>
             <AlertCircle className="h-4 w-4 text-amber-600" />
           </CardHeader>
           <CardContent>
@@ -168,7 +198,9 @@ export default function TesoreriaPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-medium text-muted-foreground">Pagado</CardTitle>
+            <CardTitle className="text-xs font-medium text-muted-foreground">
+              Pagado
+            </CardTitle>
             <CheckCircle2 className="h-4 w-4 text-emerald-600" />
           </CardHeader>
           <CardContent>
@@ -204,7 +236,10 @@ export default function TesoreriaPage() {
                 className="pl-9"
               />
             </div>
-            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
+            <Select
+              value={statusFilter}
+              onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}
+            >
               <SelectTrigger className="w-full sm:w-[200px]">
                 <SelectValue placeholder="Estado" />
               </SelectTrigger>
@@ -230,14 +265,16 @@ export default function TesoreriaPage() {
             <div className="space-y-2">
               {cola.map((p) => {
                 const project = getProject(p.projectId);
-                const provider = p.providerId ? getProvider(p.providerId) : undefined;
+                const provider = p.providerId
+                  ? getProvider(p.providerId)
+                  : undefined;
                 const isReady = p.status === "APPROVED";
                 return (
                   <div
                     key={p.id}
                     className={cn(
                       "rounded-lg border bg-card p-4 transition-shadow hover:shadow-sm",
-                      isReady && "border-emerald-300 bg-emerald-50/30"
+                      isReady && "border-emerald-300 bg-emerald-50/30",
                     )}
                   >
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -246,7 +283,9 @@ export default function TesoreriaPage() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-mono text-xs text-muted-foreground">{p.requestNumber}</p>
+                          <p className="font-mono text-xs text-muted-foreground">
+                            {p.requestNumber}
+                          </p>
                           <Badge variant={PAYMENT_STATUS_VARIANTS[p.status]}>
                             {PAYMENT_STATUS_LABELS[p.status]}
                           </Badge>
@@ -254,13 +293,21 @@ export default function TesoreriaPage() {
                             {PAYMENT_TYPE_LABELS[p.type]}
                           </span>
                           <Badge
-                            variant={p.priority === "URGENT" ? "destructive" : p.priority === "HIGH" ? "warning" : "outline"}
+                            variant={
+                              p.priority === "URGENT"
+                                ? "destructive"
+                                : p.priority === "HIGH"
+                                  ? "warning"
+                                  : "outline"
+                            }
                             className="text-[10px]"
                           >
                             {p.priority}
                           </Badge>
                         </div>
-                        <p className="mt-1 text-sm font-medium">{p.beneficiaryName}</p>
+                        <p className="mt-1 text-sm font-medium">
+                          {p.beneficiaryName}
+                        </p>
                         <p className="text-xs text-muted-foreground">
                           {project?.code} · {project?.name}
                           {provider ? ` · ${provider.name}` : ""}
@@ -268,7 +315,9 @@ export default function TesoreriaPage() {
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-lg font-semibold">{formatCurrency(p.amount)}</p>
+                        <p className="text-lg font-semibold">
+                          {formatCurrency(p.amount)}
+                        </p>
                         <div className="mt-1 flex justify-end gap-1.5">
                           <Button asChild variant="ghost" size="sm">
                             <Link href={`/administrativo/pagos/${p.id}`}>
@@ -296,8 +345,12 @@ export default function TesoreriaPage() {
           {historico.length === 0 ? (
             <div className="rounded-lg border border-dashed p-12 text-center">
               <Receipt className="mx-auto h-12 w-12 text-muted-foreground" />
-              <h3 className="mt-4 text-lg font-semibold">Sin pagos ejecutados</h3>
-              <p className="mt-1 text-sm text-muted-foreground">Aún no se ha ejecutado ningún pago</p>
+              <h3 className="mt-4 text-lg font-semibold">
+                Sin pagos ejecutados
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Aún no se ha ejecutado ningún pago
+              </p>
             </div>
           ) : (
             historico.map((p) => {
@@ -310,7 +363,9 @@ export default function TesoreriaPage() {
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="font-mono text-xs text-muted-foreground">{p.requestNumber}</p>
+                        <p className="font-mono text-xs text-muted-foreground">
+                          {p.requestNumber}
+                        </p>
                         <Badge variant="success">Pagado</Badge>
                         {p.paidMethod && (
                           <span className="text-xs text-muted-foreground">
@@ -326,10 +381,12 @@ export default function TesoreriaPage() {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold text-emerald-700">{formatCurrency(p.amount)}</p>
+                      <p className="font-semibold text-emerald-700">
+                        {formatCurrency(p.amount)}
+                      </p>
                       {p.paidAt && (
                         <p className="text-xs text-muted-foreground">
-                          {new Date(p.paidAt).toLocaleDateString("es-CO")}
+                          {formatDate(p.paidAt)}
                         </p>
                       )}
                       {p.paidReference && (
@@ -361,9 +418,15 @@ export default function TesoreriaPage() {
               <div className="rounded-md border bg-secondary/40 p-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-mono text-xs text-muted-foreground">{payDialog.requestNumber}</p>
-                    <p className="text-sm font-medium">{payDialog.beneficiaryName}</p>
-                    <p className="text-xs text-muted-foreground">{payDialog.beneficiaryNit}</p>
+                    <p className="font-mono text-xs text-muted-foreground">
+                      {payDialog.requestNumber}
+                    </p>
+                    <p className="text-sm font-medium">
+                      {payDialog.beneficiaryName}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {payDialog.beneficiaryNit}
+                    </p>
                   </div>
                   <p className="text-xl font-bold text-emerald-600">
                     {formatCurrency(payDialog.amount)}
@@ -389,12 +452,19 @@ export default function TesoreriaPage() {
 
               <div>
                 <Label className="mb-1.5 block">Método de pago</Label>
-                <Select value={payMethod} onValueChange={(v) => setPayMethod(v as "TRANSFER" | "CHECK" | "CASH")}>
+                <Select
+                  value={payMethod}
+                  onValueChange={(v) =>
+                    setPayMethod(v as "TRANSFER" | "CHECK" | "CASH")
+                  }
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="TRANSFER">Transferencia bancaria</SelectItem>
+                    <SelectItem value="TRANSFER">
+                      Transferencia bancaria
+                    </SelectItem>
                     <SelectItem value="CHECK">Cheque</SelectItem>
                     <SelectItem value="CASH">Efectivo</SelectItem>
                   </SelectContent>
@@ -402,7 +472,9 @@ export default function TesoreriaPage() {
               </div>
 
               <div>
-                <Label className="mb-1.5 block">Referencia / comprobante *</Label>
+                <Label className="mb-1.5 block">
+                  Referencia / comprobante *
+                </Label>
                 <Input
                   value={payRef}
                   onChange={(e) => setPayRef(e.target.value)}

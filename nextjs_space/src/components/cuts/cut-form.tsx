@@ -1,6 +1,11 @@
 "use client";
 
-import { useForm, useFieldArray, useWatch } from "react-hook-form";
+import {
+  useForm,
+  useFieldArray,
+  useWatch,
+  type Resolver,
+} from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useEffect, useMemo } from "react";
@@ -45,8 +50,7 @@ const cutSchema = z.object({
 
 type CutFormData = z.infer<typeof cutSchema>;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const resolver: any = zodResolver(cutSchema);
+const resolver = zodResolver(cutSchema) as Resolver<CutFormData>;
 
 interface Props {
   cut?: WorkCut;
@@ -59,7 +63,8 @@ export function CutForm({ cut, onSuccess }: Props) {
   const { providers } = useProvidersStore();
   const { user } = useAuthStore();
   const isEditing = !!cut;
-  const isEditable = !cut || cut.status === "DRAFT" || cut.status === "REJECTED";
+  const isEditable =
+    !cut || cut.status === "DRAFT" || cut.status === "REJECTED";
 
   const {
     register,
@@ -93,7 +98,15 @@ export function CutForm({ cut, onSuccess }: Props) {
           description: "",
           periodStart: new Date().toISOString().slice(0, 10),
           periodEnd: new Date().toISOString().slice(0, 10),
-          items: [{ description: "", unit: "M2", quantity: 0, unitPrice: 0, budgetItemCode: "" }],
+          items: [
+            {
+              description: "",
+              unit: "M2",
+              quantity: 0,
+              unitPrice: 0,
+              budgetItemCode: "",
+            },
+          ],
           retentionPercent: 10,
           advanceDeduction: 0,
         },
@@ -107,10 +120,18 @@ export function CutForm({ cut, onSuccess }: Props) {
   const items = useWatch({ control, name: "items" });
   const retentionPercent = useWatch({ control, name: "retentionPercent" });
   const advanceDeduction = useWatch({ control, name: "advanceDeduction" });
+  const projectIdValue = useWatch({ control, name: "projectId" });
+  const providerIdValue = useWatch({ control, name: "providerId" });
 
   const totals = useMemo(() => {
-    const itemsArr = (items ?? []) as Array<{ quantity: number; unitPrice: number }>;
-    const gross = itemsArr.reduce((sum, it) => sum + (it.quantity || 0) * (it.unitPrice || 0), 0);
+    const itemsArr = (items ?? []) as Array<{
+      quantity: number;
+      unitPrice: number;
+    }>;
+    const gross = itemsArr.reduce(
+      (sum, it) => sum + (it.quantity || 0) * (it.unitPrice || 0),
+      0,
+    );
     const retentionValue = Math.round(gross * ((retentionPercent || 0) / 100));
     const net = gross - retentionValue - (Number(advanceDeduction) || 0);
     return { gross, retentionValue, net };
@@ -144,25 +165,24 @@ export function CutForm({ cut, onSuccess }: Props) {
         netValue: totals.net,
       });
     } else {
-      addCut({
-        projectId: data.projectId,
-        providerId: data.providerId,
-        description: data.description,
-        periodStart: data.periodStart,
-        periodEnd: data.periodEnd,
-        items: computedItems,
-        grossValue: totals.gross,
-        retentionPercent: data.retentionPercent,
-        retentionValue: totals.retentionValue,
-        advanceDeduction: data.advanceDeduction,
-        netValue: totals.net,
-        status: "DRAFT",
-        createdBy: user?.id ?? "unknown",
-        // helper interno
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        _projectCode: project?.code ?? "PRY-NEW",
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any);
+      addCut(
+        {
+          projectId: data.projectId,
+          providerId: data.providerId,
+          description: data.description,
+          periodStart: data.periodStart,
+          periodEnd: data.periodEnd,
+          items: computedItems,
+          grossValue: totals.gross,
+          retentionPercent: data.retentionPercent,
+          retentionValue: totals.retentionValue,
+          advanceDeduction: data.advanceDeduction,
+          netValue: totals.net,
+          status: "DRAFT",
+          createdBy: user?.id ?? "unknown",
+        },
+        project?.code ?? "PRY-NEW",
+      );
     }
     onSuccess();
   }
@@ -184,7 +204,12 @@ export function CutForm({ cut, onSuccess }: Props) {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <Label className="mb-1.5 block">Proyecto *</Label>
-          <Select value={watched(control, "projectId")} onValueChange={(v) => setValue("projectId", v, { shouldValidate: true })}>
+          <Select
+            value={projectIdValue}
+            onValueChange={(v) =>
+              setValue("projectId", v, { shouldValidate: true })
+            }
+          >
             <SelectTrigger>
               <SelectValue placeholder="Selecciona proyecto" />
             </SelectTrigger>
@@ -196,12 +221,21 @@ export function CutForm({ cut, onSuccess }: Props) {
               ))}
             </SelectContent>
           </Select>
-          {errors.projectId && <p className="mt-1 text-xs text-destructive">{errors.projectId.message}</p>}
+          {errors.projectId && (
+            <p className="mt-1 text-xs text-destructive">
+              {errors.projectId.message}
+            </p>
+          )}
         </div>
 
         <div>
           <Label className="mb-1.5 block">Proveedor *</Label>
-          <Select value={watched(control, "providerId")} onValueChange={(v) => setValue("providerId", v, { shouldValidate: true })}>
+          <Select
+            value={providerIdValue}
+            onValueChange={(v) =>
+              setValue("providerId", v, { shouldValidate: true })
+            }
+          >
             <SelectTrigger>
               <SelectValue placeholder="Selecciona contratista" />
             </SelectTrigger>
@@ -213,24 +247,44 @@ export function CutForm({ cut, onSuccess }: Props) {
               ))}
             </SelectContent>
           </Select>
-          {errors.providerId && <p className="mt-1 text-xs text-destructive">{errors.providerId.message}</p>}
+          {errors.providerId && (
+            <p className="mt-1 text-xs text-destructive">
+              {errors.providerId.message}
+            </p>
+          )}
         </div>
 
         <div className="sm:col-span-2">
           <Label className="mb-1.5 block">Descripción *</Label>
-          <Textarea {...register("description")} placeholder="Resumen del avance ejecutado en este período" rows={2} />
-          {errors.description && <p className="mt-1 text-xs text-destructive">{errors.description.message}</p>}
+          <Textarea
+            {...register("description")}
+            placeholder="Resumen del avance ejecutado en este período"
+            rows={2}
+          />
+          {errors.description && (
+            <p className="mt-1 text-xs text-destructive">
+              {errors.description.message}
+            </p>
+          )}
         </div>
 
         <div>
           <Label className="mb-1.5 block">Período desde *</Label>
           <Input type="date" {...register("periodStart")} />
-          {errors.periodStart && <p className="mt-1 text-xs text-destructive">{errors.periodStart.message}</p>}
+          {errors.periodStart && (
+            <p className="mt-1 text-xs text-destructive">
+              {errors.periodStart.message}
+            </p>
+          )}
         </div>
         <div>
           <Label className="mb-1.5 block">Período hasta *</Label>
           <Input type="date" {...register("periodEnd")} />
-          {errors.periodEnd && <p className="mt-1 text-xs text-destructive">{errors.periodEnd.message}</p>}
+          {errors.periodEnd && (
+            <p className="mt-1 text-xs text-destructive">
+              {errors.periodEnd.message}
+            </p>
+          )}
         </div>
       </div>
 
@@ -239,9 +293,24 @@ export function CutForm({ cut, onSuccess }: Props) {
         <div className="mb-2 flex items-center justify-between">
           <div>
             <h3 className="text-sm font-semibold">Ítems ejecutados</h3>
-            <p className="text-xs text-muted-foreground">Detalla cada ítem con cantidad, unidad y precio unitario</p>
+            <p className="text-xs text-muted-foreground">
+              Detalla cada ítem con cantidad, unidad y precio unitario
+            </p>
           </div>
-          <Button type="button" variant="outline" size="sm" onClick={() => append({ description: "", unit: "M2", quantity: 0, unitPrice: 0, budgetItemCode: "" })}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              append({
+                description: "",
+                unit: "M2",
+                quantity: 0,
+                unitPrice: 0,
+                budgetItemCode: "",
+              })
+            }
+          >
             <Plus className="mr-1 h-3.5 w-3.5" />
             Ítem
           </Button>
@@ -256,26 +325,54 @@ export function CutForm({ cut, onSuccess }: Props) {
               <div key={f.id} className="rounded-md border bg-secondary/30 p-3">
                 <div className="grid grid-cols-12 gap-2">
                   <div className="col-span-12 sm:col-span-5">
-                    <Input {...register(`items.${idx}.description`)} placeholder="Descripción del ítem" />
+                    <Input
+                      {...register(`items.${idx}.description`)}
+                      placeholder="Descripción del ítem"
+                    />
                     {errors.items?.[idx]?.description && (
-                      <p className="mt-1 text-xs text-destructive">{errors.items[idx]?.description?.message}</p>
+                      <p className="mt-1 text-xs text-destructive">
+                        {errors.items[idx]?.description?.message}
+                      </p>
                     )}
                   </div>
                   <div className="col-span-3 sm:col-span-1">
-                    <Input {...register(`items.${idx}.unit`)} placeholder="M2" />
+                    <Input
+                      {...register(`items.${idx}.unit`)}
+                      placeholder="M2"
+                    />
                   </div>
                   <div className="col-span-4 sm:col-span-2">
-                    <Input type="number" step="0.01" min="0" {...register(`items.${idx}.quantity`)} placeholder="0" />
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      {...register(`items.${idx}.quantity`)}
+                      placeholder="0"
+                    />
                   </div>
                   <div className="col-span-5 sm:col-span-2">
-                    <Input type="number" step="1" min="0" {...register(`items.${idx}.unitPrice`)} placeholder="0" />
+                    <Input
+                      type="number"
+                      step="1"
+                      min="0"
+                      {...register(`items.${idx}.unitPrice`)}
+                      placeholder="0"
+                    />
                   </div>
                   <div className="col-span-7 col-start-1 flex items-center justify-between rounded border bg-background px-3 py-1.5 text-sm sm:col-span-2 sm:col-start-auto">
                     <span className="text-muted-foreground">Total:</span>
-                    <span className="font-semibold">{formatCurrency(total)}</span>
+                    <span className="font-semibold">
+                      {formatCurrency(total)}
+                    </span>
                   </div>
                   {fields.length > 1 && (
-                    <Button type="button" variant="ghost" size="icon" onClick={() => remove(idx)} className="col-span-12 h-9 w-full sm:col-span-1 sm:w-9">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => remove(idx)}
+                      className="col-span-12 h-9 w-full sm:col-span-1 sm:w-9"
+                    >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   )}
@@ -284,20 +381,35 @@ export function CutForm({ cut, onSuccess }: Props) {
             );
           })}
         </div>
-        {errors.items && typeof errors.items === "object" && "message" in errors.items && (
-          <p className="mt-1 text-xs text-destructive">{errors.items.message}</p>
-        )}
+        {errors.items &&
+          typeof errors.items === "object" &&
+          "message" in errors.items && (
+            <p className="mt-1 text-xs text-destructive">
+              {errors.items.message}
+            </p>
+          )}
       </div>
 
       {/* Descuentos */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <Label className="mb-1.5 block">Retención (%)</Label>
-          <Input type="number" min="0" max="100" step="0.1" {...register("retentionPercent")} />
+          <Input
+            type="number"
+            min="0"
+            max="100"
+            step="0.1"
+            {...register("retentionPercent")}
+          />
         </div>
         <div>
           <Label className="mb-1.5 block">Deducción anticipo (COP)</Label>
-          <Input type="number" min="0" step="1000" {...register("advanceDeduction")} />
+          <Input
+            type="number"
+            min="0"
+            step="1000"
+            {...register("advanceDeduction")}
+          />
         </div>
       </div>
 
@@ -310,7 +422,9 @@ export function CutForm({ cut, onSuccess }: Props) {
         <div className="space-y-1.5 text-sm">
           <div className="flex justify-between">
             <span className="text-muted-foreground">Valor bruto</span>
-            <span className="font-semibold">{formatCurrency(totals.gross)}</span>
+            <span className="font-semibold">
+              {formatCurrency(totals.gross)}
+            </span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">
@@ -321,16 +435,16 @@ export function CutForm({ cut, onSuccess }: Props) {
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-muted-foreground">
-              (-) Anticipo
-            </span>
+            <span className="text-muted-foreground">(-) Anticipo</span>
             <span className="font-semibold text-red-600">
               −{formatCurrency(Number(advanceDeduction) || 0)}
             </span>
           </div>
           <div className="flex justify-between border-t pt-1.5 text-base">
             <span className="font-semibold">Valor neto a pagar</span>
-            <span className="font-bold text-emerald-600">{formatCurrency(totals.net)}</span>
+            <span className="font-bold text-emerald-600">
+              {formatCurrency(totals.net)}
+            </span>
           </div>
         </div>
       </div>
@@ -345,11 +459,4 @@ export function CutForm({ cut, onSuccess }: Props) {
       </div>
     </form>
   );
-}
-
-// helper para leer el valor actual de un campo del form
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function watched<T>(control: any, name: any): T {
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  return useWatch({ control, name }) as T;
 }

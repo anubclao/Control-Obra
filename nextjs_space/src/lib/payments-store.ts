@@ -13,7 +13,15 @@ import { MOCK_PAYMENTS } from "@/mocks";
 interface PaymentsStore {
   payments: PaymentRequest[];
   addPayment: (
-    data: Omit<PaymentRequest, "id" | "requestNumber" | "approvals" | "status" | "currentApprovalLevel" | "createdAt">
+    data: Omit<
+      PaymentRequest,
+      | "id"
+      | "requestNumber"
+      | "approvals"
+      | "status"
+      | "currentApprovalLevel"
+      | "createdAt"
+    >,
   ) => PaymentRequest;
   updatePayment: (id: string, updates: Partial<PaymentRequest>) => void;
   deletePayment: (id: string) => void;
@@ -22,7 +30,12 @@ interface PaymentsStore {
     id: string,
     action: PaymentAction,
     actor: { id: string; name: string; role: string },
-    payload?: { comments?: string; rejectionReason?: string; paymentReference?: string; paymentMethod?: "TRANSFER" | "CHECK" | "CASH" }
+    payload?: {
+      comments?: string;
+      rejectionReason?: string;
+      paymentReference?: string;
+      paymentMethod?: "TRANSFER" | "CHECK" | "CASH";
+    },
   ) => { ok: boolean; error?: string };
 }
 
@@ -32,7 +45,9 @@ function nextId(): string {
 
 function nextRequestNumber(payments: PaymentRequest[]): string {
   const year = new Date().getFullYear();
-  const sameYear = payments.filter((p) => p.requestNumber.startsWith(`PAG-${year}`));
+  const sameYear = payments.filter((p) =>
+    p.requestNumber.startsWith(`PAG-${year}`),
+  );
   const next = sameYear.length + 1;
   return `PAG-${year}-${String(next).padStart(5, "0")}`;
 }
@@ -90,7 +105,9 @@ export const usePaymentsStore = create<PaymentsStore>()(
 
       updatePayment: (id, updates) => {
         set({
-          payments: get().payments.map((p) => (p.id === id ? { ...p, ...updates } : p)),
+          payments: get().payments.map((p) =>
+            p.id === id ? { ...p, ...updates } : p,
+          ),
         });
       },
 
@@ -104,13 +121,22 @@ export const usePaymentsStore = create<PaymentsStore>()(
         const payment = get().getPayment(id);
         if (!payment) return { ok: false, error: "Solicitud no encontrada" };
 
-        if (!ACTION_ROLES[action].includes(actor.role) && actor.role !== "ADMIN") {
-          return { ok: false, error: `Tu rol (${actor.role}) no puede ${action.toLowerCase()}` };
+        if (
+          !ACTION_ROLES[action].includes(actor.role) &&
+          actor.role !== "ADMIN"
+        ) {
+          return {
+            ok: false,
+            error: `Tu rol (${actor.role}) no puede ${action.toLowerCase()}`,
+          };
         }
 
         const target = ACTION_STATUS_TARGET[action];
         if (!ACTION_TRANSITIONS[payment.status].includes(target)) {
-          return { ok: false, error: `No se puede pasar de ${payment.status} a ${target}` };
+          return {
+            ok: false,
+            error: `No se puede pasar de ${payment.status} a ${target}`,
+          };
         }
 
         // Reglas especiales:
@@ -120,7 +146,10 @@ export const usePaymentsStore = create<PaymentsStore>()(
           return { ok: false, error: "Esta solicitud ya pasó el nivel 1" };
         }
         if (action === "APPROVE_L2" && payment.currentApprovalLevel !== 1) {
-          return { ok: false, error: "Esta solicitud aún no tiene aprobación nivel 1" };
+          return {
+            ok: false,
+            error: "Esta solicitud aún no tiene aprobación nivel 1",
+          };
         }
         if (action === "PAY" && payment.status !== "APPROVED") {
           return { ok: false, error: "Solo se pagan solicitudes aprobadas" };
@@ -146,6 +175,10 @@ export const usePaymentsStore = create<PaymentsStore>()(
 
         if (action === "APPROVE_L1") {
           updates.currentApprovalLevel = 1;
+          // FIX Bug #2: si solo requiere 1 nivel, va directo a APPROVED
+          if (payment.requiredApprovalLevel === 1) {
+            updates.status = "APPROVED";
+          }
         }
         if (action === "APPROVE_L2") {
           updates.currentApprovalLevel = 2;
@@ -163,12 +196,16 @@ export const usePaymentsStore = create<PaymentsStore>()(
           updates.rejectionReason = payload.rejectionReason;
         }
 
-        set({ payments: get().payments.map((p) => (p.id === id ? { ...p, ...updates } : p)) });
+        set({
+          payments: get().payments.map((p) =>
+            p.id === id ? { ...p, ...updates } : p,
+          ),
+        });
         return { ok: true };
       },
     }),
-    { name: "controlobra-payments" }
-  )
+    { name: "controlobra-payments" },
+  ),
 );
 
 export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
@@ -181,7 +218,10 @@ export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
   CANCELLED: "Cancelado",
 };
 
-export const PAYMENT_STATUS_VARIANTS: Record<PaymentStatus, "default" | "warning" | "info" | "success" | "destructive"> = {
+export const PAYMENT_STATUS_VARIANTS: Record<
+  PaymentStatus,
+  "default" | "warning" | "info" | "success" | "destructive"
+> = {
   PENDING: "warning",
   APPROVED_LEVEL_1: "info",
   APPROVED_LEVEL_2: "info",
@@ -208,7 +248,10 @@ export const PAYMENT_PRIORITY_LABELS: Record<string, string> = {
   URGENT: "Urgente",
 };
 
-export const PAYMENT_PRIORITY_VARIANTS: Record<string, "default" | "info" | "warning" | "destructive"> = {
+export const PAYMENT_PRIORITY_VARIANTS: Record<
+  string,
+  "default" | "info" | "warning" | "destructive"
+> = {
   LOW: "default",
   NORMAL: "info",
   HIGH: "warning",
@@ -231,29 +274,55 @@ export interface PaymentActionButton {
 
 export function getAvailablePaymentActions(
   payment: PaymentRequest,
-  userRole: string
+  userRole: string,
 ): PaymentActionButton[] {
   const buttons: PaymentActionButton[] = [];
 
   if (payment.status === "PENDING" && userRole === "DIRECTOR") {
-    buttons.push({ action: "APPROVE_L1", label: "Aprobar nivel 1", variant: "default" });
-    buttons.push({ action: "REJECT", label: "Rechazar", variant: "destructive" });
+    buttons.push({
+      action: "APPROVE_L1",
+      label: "Aprobar nivel 1",
+      variant: "default",
+    });
+    buttons.push({
+      action: "REJECT",
+      label: "Rechazar",
+      variant: "destructive",
+    });
   }
 
   if (payment.status === "APPROVED_LEVEL_1" && userRole === "GERENTE") {
-    buttons.push({ action: "APPROVE_L2", label: "Aprobar nivel 2", variant: "default" });
-    buttons.push({ action: "REJECT", label: "Rechazar", variant: "destructive" });
+    buttons.push({
+      action: "APPROVE_L2",
+      label: "Aprobar nivel 2",
+      variant: "default",
+    });
+    buttons.push({
+      action: "REJECT",
+      label: "Rechazar",
+      variant: "destructive",
+    });
   }
 
   if (payment.status === "APPROVED" && userRole === "TESORERIA") {
-    buttons.push({ action: "PAY", label: "Marcar como pagado", variant: "default" });
+    buttons.push({
+      action: "PAY",
+      label: "Marcar como pagado",
+      variant: "default",
+    });
   }
 
   if (
-    (payment.status === "PENDING" || payment.status === "APPROVED_LEVEL_1" || payment.status === "APPROVED_LEVEL_2") &&
+    (payment.status === "PENDING" ||
+      payment.status === "APPROVED_LEVEL_1" ||
+      payment.status === "APPROVED_LEVEL_2") &&
     (userRole === "GERENTE" || userRole === "ADMIN")
   ) {
-    buttons.push({ action: "CANCEL", label: "Cancelar", variant: "destructive" });
+    buttons.push({
+      action: "CANCEL",
+      label: "Cancelar",
+      variant: "destructive",
+    });
   }
 
   return buttons;

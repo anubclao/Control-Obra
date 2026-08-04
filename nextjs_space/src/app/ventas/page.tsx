@@ -8,10 +8,18 @@ import {
   UserPlus,
   ArrowRight,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MOCK_CLIENTS, MOCK_QUOTATIONS } from "@/mocks";
+import { useClientsStore } from "@/lib/clients-store";
+import { useQuotationsStore } from "@/lib/quotations-store";
+import { useDashboardStats } from "@/lib/dashboard-stats";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { ClientStatus } from "@/types";
 
@@ -26,27 +34,38 @@ const stageConfig: Record<ClientStatus, { label: string; color: string }> = {
 };
 
 const funnelOrder: ClientStatus[] = [
-  "PROSPECT", "CONTACTED", "QUALIFIED", "PROPOSAL", "NEGOTIATION", "WON",
+  "PROSPECT",
+  "CONTACTED",
+  "QUALIFIED",
+  "PROPOSAL",
+  "NEGOTIATION",
+  "WON",
 ];
 
 export default function VentasDashboard() {
-  const clientsByStage = funnelOrder.reduce((acc, stage) => {
-    acc[stage] = MOCK_CLIENTS.filter((c) => c.status === stage);
-    return acc;
-  }, {} as Record<ClientStatus, typeof MOCK_CLIENTS>);
+  const stats = useDashboardStats();
+  const clients = useClientsStore((s) => s.clients);
+  const quotations = useQuotationsStore((s) => s.quotations);
 
-  const totalOpenValue = MOCK_QUOTATIONS
-    .filter((q) => ["SENT", "VIEWED", "DRAFT"].includes(q.status))
-    .reduce((sum, q) => sum + q.total, 0);
+  const clientsByStage = funnelOrder.reduce(
+    (acc, stage) => {
+      acc[stage] = clients.filter((c) => c.status === stage);
+      return acc;
+    },
+    {} as Record<ClientStatus, typeof clients>,
+  );
 
-  const totalWon = MOCK_CLIENTS.filter((c) => c.status === "WON").length;
-  const totalActive = MOCK_CLIENTS.length;
+  const totalOpenValue = stats.totalOpenValue;
+  const totalWon = stats.activeClients;
+  const totalActive = clients.length;
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Dashboard Comercial</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">
+          Dashboard Comercial
+        </h1>
         <p className="text-sm text-muted-foreground">
           Pipeline de ventas, clientes y cotizaciones
         </p>
@@ -56,7 +75,9 @@ export default function VentasDashboard() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Clientes totales</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Clientes totales
+            </CardTitle>
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -67,38 +88,47 @@ export default function VentasDashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Clientes ganados</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Clientes ganados
+            </CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-semibold">{totalWon}</div>
             <p className="text-xs text-muted-foreground">
-              {totalActive > 0 ? Math.round((totalWon / totalActive) * 100) : 0}% conversión
+              {totalActive > 0 ? Math.round((totalWon / totalActive) * 100) : 0}
+              % conversión
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Cotizaciones abiertas</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Cotizaciones abiertas
+            </CardTitle>
             <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold">
-              {MOCK_QUOTATIONS.filter((q) => ["SENT", "VIEWED", "DRAFT"].includes(q.status)).length}
-            </div>
+            <div className="text-2xl font-semibold">{stats.openQuotations}</div>
             <p className="text-xs text-muted-foreground">En proceso</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Valor en pipeline</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Valor en pipeline
+            </CardTitle>
             <UserPlus className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold">{formatCurrency(totalOpenValue)}</div>
-            <p className="text-xs text-muted-foreground">Cotizaciones abiertas</p>
+            <div className="text-2xl font-semibold">
+              {formatCurrency(totalOpenValue)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Cotizaciones abiertas
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -127,7 +157,9 @@ export default function VentasDashboard() {
                 <div key={stage} className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Badge className={config.color}>{config.label}</Badge>
-                    <span className="text-sm font-semibold">{clients.length}</span>
+                    <span className="text-sm font-semibold">
+                      {clients.length}
+                    </span>
                   </div>
                   <div className="space-y-1.5">
                     {clients.length === 0 ? (
@@ -136,9 +168,16 @@ export default function VentasDashboard() {
                       </div>
                     ) : (
                       clients.slice(0, 3).map((c) => (
-                        <div key={c.id} className="rounded-md border bg-card p-2 text-xs">
-                          <p className="font-medium leading-tight">{c.companyName}</p>
-                          <p className="mt-0.5 truncate text-muted-foreground">{c.contactName}</p>
+                        <div
+                          key={c.id}
+                          className="rounded-md border bg-card p-2 text-xs"
+                        >
+                          <p className="font-medium leading-tight">
+                            {c.companyName}
+                          </p>
+                          <p className="mt-0.5 truncate text-muted-foreground">
+                            {c.contactName}
+                          </p>
                         </div>
                       ))
                     )}
@@ -149,7 +188,9 @@ export default function VentasDashboard() {
                     )}
                   </div>
                   {idx < funnelOrder.length - 1 && (
-                    <div className="hidden text-center text-muted-foreground lg:block">↓</div>
+                    <div className="hidden text-center text-muted-foreground lg:block">
+                      ↓
+                    </div>
                   )}
                 </div>
               );
@@ -175,14 +216,21 @@ export default function VentasDashboard() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {MOCK_QUOTATIONS.slice(0, 4).map((q) => {
-              const client = MOCK_CLIENTS.find((c) => c.id === q.clientId);
+            {quotations.slice(0, 4).map((q) => {
+              const client = clients.find((c) => c.id === q.clientId);
               return (
-                <div key={q.id} className="flex items-center justify-between rounded-lg border p-3">
+                <div
+                  key={q.id}
+                  className="flex items-center justify-between rounded-lg border p-3"
+                >
                   <div className="flex-1">
-                    <p className="font-mono text-xs text-muted-foreground">{q.quotationNumber}</p>
+                    <p className="font-mono text-xs text-muted-foreground">
+                      {q.quotationNumber}
+                    </p>
                     <p className="font-medium">{q.title}</p>
-                    <p className="text-sm text-muted-foreground">{client?.companyName}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {client?.companyName}
+                    </p>
                   </div>
                   <div className="text-right">
                     <p className="font-semibold">{formatCurrency(q.total)}</p>

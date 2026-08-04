@@ -16,7 +16,9 @@ interface PSCsStore {
   hasPSC: (projectId: string, providerId: string) => boolean;
 
   // CRUD
-  createPSC: (data: Omit<PSC, "id" | "pscNumber" | "totalValue" | "createdAt">) => {
+  createPSC: (
+    data: Omit<PSC, "id" | "pscNumber" | "totalValue" | "createdAt">,
+  ) => {
     ok: boolean;
     error?: string;
     psc?: PSC;
@@ -31,7 +33,11 @@ interface PSCsStore {
 
   // Calculados
   getItemsAvailable: (projectId: string, excludePscId?: string) => BudgetItem[];
-  isItemCovered: (projectId: string, budgetItemId: string, excludePscId?: string) => boolean;
+  isItemCovered: (
+    projectId: string,
+    budgetItemId: string,
+    excludePscId?: string,
+  ) => boolean;
 }
 
 function nextId(): string {
@@ -63,33 +69,41 @@ export const usePSCsStore = create<PSCsStore>()(
       getPSC: (id) => get().pscs.find((p) => p.id === id),
 
       hasPSC: (projectId, providerId) =>
+        // FIX Bug #7: excluir también DRAFT, no solo CANCELLED.
+        // Un PSC en DRAFT ya está "ocupando" items del PT.
         !!get().pscs.find(
           (p) =>
             p.projectId === projectId &&
             p.providerId === providerId &&
-            p.status !== "CANCELLED"
+            p.status !== "CANCELLED" &&
+            p.status !== "DRAFT",
         ),
 
       createPSC: (data) => {
-        // Regla: 1 PSC activo por (proyecto, contratista)
+        // Regla: 1 PSC activo (no DRAFT ni CANCELLED) por (proyecto, contratista)
         const existing = get().pscs.find(
           (p) =>
             p.projectId === data.projectId &&
             p.providerId === data.providerId &&
-            p.status !== "CANCELLED"
+            p.status !== "CANCELLED" &&
+            p.status !== "DRAFT",
         );
         if (existing) {
           return {
             ok: false,
-            error: `Ya existe un PSC para este contratista en este proyecto (${existing.pscNumber}). Crea uno nuevo solo si el anterior está cancelado.`,
+            error: `Ya existe un PSC activo para este contratista en este proyecto (${existing.pscNumber}). Cancela o completa el anterior antes de crear uno nuevo.`,
           };
         }
         // Validación: cada item del PSC debe corresponder a un item del PT
-        const budget = useBudgetStore.getState().getBudgetByProject(data.projectId);
+        const budget = useBudgetStore
+          .getState()
+          .getBudgetByProject(data.projectId);
         if (!budget) {
           return { ok: false, error: "El proyecto no tiene un PT cargado" };
         }
-        const validIds = new Set(budget.layers.flatMap((l) => l.items.map((i) => i.id)));
+        const validIds = new Set(
+          budget.layers.flatMap((l) => l.items.map((i) => i.id)),
+        );
         for (const item of data.items) {
           if (!validIds.has(item.budgetItemId)) {
             return {
@@ -111,6 +125,30 @@ export const usePSCsStore = create<PSCsStore>()(
       },
 
       updatePSC: (id, updates) => {
+        // FIX Bug #6: si se intenta cambiar projectId o providerId, validar
+        // que no choque con otro PSC activo del mismo par.
+        if (updates.projectId || updates.providerId) {
+          const current = get().pscs.find((p) => p.id === id);
+          if (current) {
+            const newProjectId = updates.projectId ?? current.projectId;
+            const newProviderId = updates.providerId ?? current.providerId;
+            const conflicting = get().pscs.find(
+              (p) =>
+                p.id !== id &&
+                p.projectId === newProjectId &&
+                p.providerId === newProviderId &&
+                p.status !== "CANCELLED" &&
+                p.status !== "DRAFT",
+            );
+            if (conflicting) {
+              // No mutar; loggear para que la UI pueda mostrar el error.
+              console.warn(
+                `[PSC] No se puede reasignar: ya existe PSC ${conflicting.pscNumber} para ese par proyecto/proveedor.`,
+              );
+              return;
+            }
+          }
+        }
         set({
           pscs: get().pscs.map((p) => {
             if (p.id !== id) return p;
@@ -136,9 +174,7 @@ export const usePSCsStore = create<PSCsStore>()(
       setItems: (id, items) => {
         set({
           pscs: get().pscs.map((p) =>
-            p.id !== id
-              ? p
-              : { ...p, items, totalValue: computeTotal(items) }
+            p.id !== id ? p : { ...p, items, totalValue: computeTotal(items) },
           ),
         });
       },
@@ -155,9 +191,10 @@ export const usePSCsStore = create<PSCsStore>()(
                     totalPrice:
                       updates.totalPrice !== undefined
                         ? updates.totalPrice
-                        : (updates.quantity ?? it.quantity) * (updates.unitPrice ?? it.unitPrice),
+                        : (updates.quantity ?? it.quantity) *
+                          (updates.unitPrice ?? it.unitPrice),
                   }
-                : it
+                : it,
             );
             return { ...p, items, totalValue: computeTotal(items) };
           }),
@@ -175,9 +212,11 @@ export const usePSCsStore = create<PSCsStore>()(
             p.projectId === projectId &&
             p.id !== excludePscId &&
             p.status !== "CANCELLED" &&
-            p.status !== "DRAFT"
+            p.status !== "DRAFT",
         );
-        const usedIds = new Set(otherPscs.flatMap((p) => p.items.map((i) => i.budgetItemId)));
+        const usedIds = new Set(
+          otherPscs.flatMap((p) => p.items.map((i) => i.budgetItemId)),
+        );
         return allPTItems.filter((i) => !usedIds.has(i.id));
       },
 
@@ -187,13 +226,15 @@ export const usePSCsStore = create<PSCsStore>()(
             p.projectId === projectId &&
             p.id !== excludePscId &&
             p.status !== "CANCELLED" &&
-            p.status !== "DRAFT"
+            p.status !== "DRAFT",
         );
-        return otherPscs.some((p) => p.items.some((i) => i.budgetItemId === budgetItemId));
+        return otherPscs.some((p) =>
+          p.items.some((i) => i.budgetItemId === budgetItemId),
+        );
       },
     }),
-    { name: "controlobra-psc" }
-  )
+    { name: "controlobra-psc" },
+  ),
 );
 
 export const PSC_STATUS_LABELS: Record<PSCStatus, string> = {
@@ -204,7 +245,10 @@ export const PSC_STATUS_LABELS: Record<PSCStatus, string> = {
   CANCELLED: "Cancelado",
 };
 
-export const PSC_STATUS_VARIANTS: Record<PSCStatus, "default" | "success" | "warning" | "info" | "destructive"> = {
+export const PSC_STATUS_VARIANTS: Record<
+  PSCStatus,
+  "default" | "success" | "warning" | "info" | "destructive"
+> = {
   DRAFT: "default",
   ACTIVE: "success",
   SUSPENDED: "warning",

@@ -10,7 +10,7 @@ import {
   Search,
   User as UserIcon,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/lib/auth-store";
 import { AREA_COLORS, AREA_LABELS, NAV_BY_AREA } from "@/lib/navigation";
@@ -22,6 +22,29 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const { user, logout, switchArea, hydrated } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // FIX Bug #27: cerrar el menú al hacer click fuera o presionar ESC
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        userMenuRef.current &&
+        !userMenuRef.current.contains(e.target as Node)
+      ) {
+        setUserMenuOpen(false);
+      }
+    }
+    function handleEsc(e: KeyboardEvent) {
+      if (e.key === "Escape") setUserMenuOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEsc);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEsc);
+    };
+  }, [userMenuOpen]);
 
   useEffect(() => {
     if (hydrated && !user) {
@@ -55,7 +78,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-50 w-64 transform border-r bg-card transition-transform lg:relative lg:translate-x-0",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          sidebarOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
         <div className="flex h-16 items-center border-b px-6">
@@ -78,7 +101,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             {navItems.map((item) => {
               const isActive =
                 pathname === item.href ||
-                (item.href !== `/${user.area}` && pathname.startsWith(item.href));
+                (item.href !== `/${user.area}` &&
+                  pathname.startsWith(item.href));
               const Icon = item.icon;
               return (
                 <Link
@@ -89,7 +113,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                     "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                     isActive
                       ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                   )}
                 >
                   <Icon className="h-4 w-4" />
@@ -104,19 +128,26 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               Cambiar de área
             </p>
             <div className="space-y-1">
-              {(["tecnico", "administrativo", "ventas"] as const).map((area) => {
-                if (area === user.area) return null;
-                return (
-                  <button
-                    key={area}
-                    onClick={() => handleSwitchArea(area)}
-                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                  >
-                    <div className={cn("h-2 w-2 rounded-full", AREA_COLORS[area])} />
-                    {AREA_LABELS[area]}
-                  </button>
-                );
-              })}
+              {(["tecnico", "administrativo", "ventas"] as const).map(
+                (area) => {
+                  if (area === user.area) return null;
+                  return (
+                    <button
+                      key={area}
+                      onClick={() => handleSwitchArea(area)}
+                      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <div
+                        className={cn(
+                          "h-2 w-2 rounded-full",
+                          AREA_COLORS[area],
+                        )}
+                      />
+                      {AREA_LABELS[area]}
+                    </button>
+                  );
+                },
+              )}
             </div>
           </div>
         </div>
@@ -158,7 +189,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               <Bell className="h-5 w-5" />
             </Button>
 
-            <div className="relative">
+            <div className="relative" ref={userMenuRef}>
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
                 className="flex items-center gap-2 rounded-md border bg-background px-3 py-1.5 text-sm hover:bg-accent"
@@ -167,20 +198,21 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   <UserIcon className="h-4 w-4" />
                 </div>
                 <div className="hidden text-left md:block">
-                  <p className="text-sm font-medium leading-none">{user.name}</p>
+                  <p className="text-sm font-medium leading-none">
+                    {user.name}
+                  </p>
                   <p className="text-xs text-muted-foreground">{user.role}</p>
                 </div>
                 <ChevronDown className="h-4 w-4" />
               </button>
 
               {userMenuOpen && (
-                <div
-                  className="absolute right-0 mt-2 w-56 rounded-md border bg-card shadow-lg"
-                  onMouseLeave={() => setUserMenuOpen(false)}
-                >
+                <div className="absolute right-0 mt-2 w-56 rounded-md border bg-card shadow-lg">
                   <div className="border-b p-3">
                     <p className="text-sm font-medium">{user.name}</p>
-                    <p className="text-xs text-muted-foreground">{user.email}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {user.email}
+                    </p>
                   </div>
                   <button
                     onClick={handleLogout}
