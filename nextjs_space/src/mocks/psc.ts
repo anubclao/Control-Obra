@@ -1,21 +1,4 @@
-import type {
-  Project,
-  WorkCut,
-  Client,
-  Quotation,
-  PaymentRequest,
-  Provider,
-  WorkLog,
-  Budget,
-  AiuConfig,
-  Contract,
-  TaxConfig,
-  Employee,
-  Invitation,
-  PSC,
-  Expense,
-} from "@/types";
-
+import type { PSC } from "@/types";
 export const MOCK_PSC: PSC[] = [
   // Proyecto 1: Estructuras del Norte (c1) cubre cimentación y estructura
   {

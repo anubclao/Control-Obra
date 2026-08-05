@@ -1,21 +1,4 @@
-import type {
-  Project,
-  WorkCut,
-  Client,
-  Quotation,
-  PaymentRequest,
-  Provider,
-  WorkLog,
-  Budget,
-  AiuConfig,
-  Contract,
-  TaxConfig,
-  Employee,
-  Invitation,
-  PSC,
-  Expense,
-} from "@/types";
-
+import type { Expense } from "@/types";
 export const MOCK_EXPENSES: Expense[] = [
   {
     id: "ex1",

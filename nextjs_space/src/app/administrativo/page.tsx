@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MOCK_PAYMENTS, MOCK_PROJECTS } from "@/mocks";
+import { MOCK_PROJECTS } from "@/mocks";
 import { usePaymentsStore } from "@/lib/payments-store";
 import { useDashboardStats } from "@/lib/dashboard-stats";
 import { formatCurrency } from "@/lib/utils";

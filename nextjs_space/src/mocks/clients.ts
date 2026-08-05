@@ -1,21 +1,4 @@
-import type {
-  Project,
-  WorkCut,
-  Client,
-  Quotation,
-  PaymentRequest,
-  Provider,
-  WorkLog,
-  Budget,
-  AiuConfig,
-  Contract,
-  TaxConfig,
-  Employee,
-  Invitation,
-  PSC,
-  Expense,
-} from "@/types";
-
+import type { Client } from "@/types";
 export const MOCK_CLIENTS: Client[] = [
   {
     id: "cl1",
