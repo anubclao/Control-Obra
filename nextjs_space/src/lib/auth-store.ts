@@ -16,6 +16,8 @@ interface AuthState {
   loading: boolean;
   error: string | null;
   hydrated: boolean;
+  lastStatus: number | null;
+  lastDetail: any;
   switchUser: (email: string) => Promise<boolean>;
   switchArea: (area: Area) => Promise<boolean>;
   logout: () => Promise<void>;
@@ -27,6 +29,8 @@ export const useAuthStore = create<AuthState>()((set, _get) => ({
   loading: false,
   error: null,
   hydrated: false,
+  lastStatus: null as number | null,
+  lastDetail: null as any,
 
   refresh: async () => {
     set({ loading: true });

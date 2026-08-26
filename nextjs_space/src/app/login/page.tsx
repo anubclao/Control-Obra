@@ -17,7 +17,7 @@ import { api } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { switchUser, user, hydrated, refresh } = useAuthStore();
+  const { switchUser, user, hydrated, refresh, lastStatus, lastDetail } = useAuthStore();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,11 +44,26 @@ export default function LoginPage() {
       return;
     }
     setLoading(true);
-    const ok = await switchUser(trimmed);
-    setLoading(false);
-    if (!ok) {
-      setError("Usuario no encontrado. Verifica tu correo o contacta al administrador.");
-      return;
+    let status: number | null = null;
+    let detail: any = null;
+    try {
+      const ok = await switchUser(trimmed);
+      if (!ok) {
+        setError(
+          status === 404
+            ? "Usuario no encontrado en la base de datos. Verifica que el email este registrado en la tabla 'users' con is_active=1."
+            : status === 500
+            ? `Servidor devolvio 500. Diagnostico del backend:
+
+${detail ? JSON.stringify(detail, null, 2) : "(sin detalle del servidor)"}
+
+Revisa el log de errores de Hostinger (server.err.log) o llama a /api/auth/debug para ver env vars.`
+            : "No se pudo iniciar sesion. Revisa tu conexion o contacta al administrador."
+        );
+        return;
+      }
+    } finally {
+      setLoading(false);
     }
     const me = await api.get<{ user: any }>("/api/auth/login").catch(() => ({ user: null }));
     router.push(`/${me.user?.area ?? "administrativo"}`);
@@ -90,7 +105,17 @@ export default function LoginPage() {
                 />
               </div>
               {error && (
-                <p className="text-sm text-destructive">{error}</p>
+                <div className="space-y-2">
+                  <p className="text-sm text-destructive whitespace-pre-wrap font-mono text-xs">{error}</p>
+                  <details className="rounded border border-destructive/30 bg-destructive/5 p-2 text-xs">
+                    <summary className="cursor-pointer text-muted-foreground">
+                      Detalle tecnico (para soporte)
+                    </summary>
+                    <pre className="mt-2 overflow-auto text-[10px] text-muted-foreground whitespace-pre-wrap break-all">
+                      {JSON.stringify({ status: lastStatus, detail: lastDetail, requestId: new Date().toISOString() }, null, 2)}
+                    </pre>
+                  </details>
+                </div>
               )}
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
