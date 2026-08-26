@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useAiuStore, validateAiu } from "@/lib/aiu-store";
-import { useProjectsStore } from "@/lib/projects-store";
+import { useAiuStore, validateAiu } from "@/lib/data-store";
+import { useProjectsStore } from "@/lib/data-store";
 import { useAuthStore } from "@/lib/auth-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

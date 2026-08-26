@@ -30,10 +30,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useTaxesStore, TAX_TYPE_LABELS, TAX_APPLIES_LABELS } from "@/lib/taxes-store";
+import { useTaxesStore, TAX_TYPE_LABELS, TAX_APPLIES_LABELS } from "@/lib/data-store";
 import { formatDate } from "@/lib/utils";
 import type { TaxConfig, TaxType, TaxAppliesTo } from "@/types";
 
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { ModuleExplanationCard } from "@/components/ui/module-explanation-card";
 export default function ImpuestosPage() {
   const { taxes, deleteTax, toggleActive } = useTaxesStore();
   const [search, setSearch] = useState("");
@@ -57,6 +59,21 @@ export default function ImpuestosPage() {
 
   return (
     <div className="space-y-6">
+
+      <ModuleExplanationCard
+        icon={Percent}
+        variant="guide"
+        title="Impuestos"
+        description="Configura impuestos por proyecto."
+        steps={[
+            { title: "Crear configuracion", description: "Asigna proyecto, tipo y tasa." },
+            { title: "Activar/desactivar", description: "Inactivos NO se aplican." },
+          ]}
+          tips={[
+            "Tipos: IVA, RETENCION_FUENTE, RETENCION_IVA, RETENCION_ICA.",
+          ]}
+      />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Impuestos</h1>

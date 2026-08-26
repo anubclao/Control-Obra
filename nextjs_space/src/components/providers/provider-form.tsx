@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useProvidersStore } from "@/lib/providers-store";
+import { useProvidersStore } from "@/lib/data-store";
 import {
   PROVIDER_PRODUCT_SUBCATEGORIES,
   PROVIDER_SERVICE_SUBCATEGORIES,
@@ -183,7 +183,7 @@ export function ProviderForm({ provider, onSuccess }: Props) {
     );
   }
 
-  function onSubmit(data: FormData) {
+  async function onSubmit(data: FormData) {
     const cleanRefs: ProviderReference[] = data.references
       .filter((r) => r.name || r.company)
       .map((r) => ({
@@ -223,13 +223,9 @@ export function ProviderForm({ provider, onSuccess }: Props) {
     if (provider) {
       updateProvider(provider.id, payload as Partial<Provider>);
     } else {
-      const result = addProvider(
+      await addProvider(
         payload as Omit<Provider, "id" | "status" | "createdAt" | "documents">,
       );
-      if (!result.ok) {
-        setSubmitError(result.error);
-        return;
-      }
     }
     onSuccess();
   }

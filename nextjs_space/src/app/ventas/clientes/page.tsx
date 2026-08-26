@@ -34,10 +34,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useClientsStore, CLIENT_STATUS_LABELS, CLIENT_STATUS_VARIANTS, CLIENT_SOURCE_LABELS } from "@/lib/clients-store";
-import { useQuotationsStore } from "@/lib/quotations-store";
+import { useClientsStore, CLIENT_STATUS_LABELS, CLIENT_STATUS_VARIANTS, CLIENT_SOURCE_LABELS } from "@/lib/data-store";
+import { useQuotationsStore } from "@/lib/data-store";
 import type { Client, ClientStatus } from "@/types";
 
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { ModuleExplanationCard } from "@/components/ui/module-explanation-card";
 export default function ClientesPage() {
   const { clients } = useClientsStore();
   const { getByClient } = useQuotationsStore();
@@ -70,6 +72,25 @@ export default function ClientesPage() {
 
   return (
     <div className="space-y-6">
+
+      <ModuleExplanationCard
+        icon={Users}
+        variant="guide"
+        title="Clientes"
+        description="Cartera de clientes del CRM."
+        steps={[
+            { title: "Anade prospectos", description: "Captura empresa, contacto, ciudad y fuente." },
+            { title: "Avanzar en pipeline", description: "Mueve el cliente por etapas." },
+            { title: "Genera cotizacion", description: "Cuando llega a PROPOSAL, crea cotizacion." },
+          ]}
+          tips={[
+            "El NIT debe ser unico.",
+          ]}
+          warnings={[
+            "Solo ADMIN puede eliminar clientes.",
+          ]}
+      />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Clientes</h1>

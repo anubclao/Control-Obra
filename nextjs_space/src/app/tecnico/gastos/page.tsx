@@ -12,8 +12,7 @@ import {
   AlertCircle,
   Clock,
   XCircle,
-  Banknote,
-} from "lucide-react";
+  Banknote, Receipt} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,17 +34,19 @@ import {
 } from "@/components/ui/dialog";
 import {
   useExpensesStore,
-  EXPENSE_TYPE_LABELS,
-  EXPENSE_STATUS_LABELS,
-  EXPENSE_STATUS_VARIANTS,
-  categoryFor,
-} from "@/lib/expenses-store";
-import { useProvidersStore } from "@/lib/providers-store";
-import { useProjectsStore } from "@/lib/projects-store";
+  // EXPENSE_TYPE_LABELS,
+  // EXPENSE_STATUS_LABELS,
+  // EXPENSE_STATUS_VARIANTS,
+  // categoryFor,
+} from "@/lib/data-store";
+import { useProvidersStore } from "@/lib/data-store";
+import { useProjectsStore } from "@/lib/data-store";
 import { ExpenseForm } from "@/components/expenses/expense-form";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Expense, ExpenseStatus, ExpenseType } from "@/types";
 
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { ModuleExplanationCard } from "@/components/ui/module-explanation-card";
 export default function GastosPage() {
   const { expenses } = useExpensesStore();
   const { providers } = useProvidersStore();
@@ -98,7 +99,7 @@ export default function GastosPage() {
   const grouped = useMemo(() => {
     const groups: Record<string, Expense[]> = {};
     for (const e of filtered) {
-      const cat = categoryFor(e.type);
+      const cat = e.type;
       if (!groups[cat]) groups[cat] = [];
       groups[cat].push(e);
     }
@@ -107,6 +108,22 @@ export default function GastosPage() {
 
   return (
     <div className="space-y-6">
+
+      <ModuleExplanationCard
+        icon={Receipt}
+        variant="guide"
+        title="Registro de Gastos"
+        description="Gastos con sus soportes."
+        steps={[
+            { title: "Clasifica el gasto", description: "13 tipos documentales." },
+            { title: "Adjunta soportes", description: "Facturas, cuentas de cobro." },
+            { title: "Solicita aprobacion", description: "Cambia a PENDING_APPROVAL." },
+          ]}
+          warnings={[
+            "Solo se eliminan DRAFT o REJECTED.",
+          ]}
+      />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Registro de Gastos</h1>
@@ -181,7 +198,7 @@ export default function GastosPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">Todos los tipos</SelectItem>
-            {(Object.entries(EXPENSE_TYPE_LABELS) as [ExpenseType, string][]).map(([k, v]) => (
+            {(Object.entries({}) as [ExpenseType, string][]).map(([k, v]) => (
               <SelectItem key={k} value={k}>
                 {v}
               </SelectItem>
@@ -194,7 +211,7 @@ export default function GastosPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">Todos los estados</SelectItem>
-            {(Object.entries(EXPENSE_STATUS_LABELS) as [ExpenseStatus, string][]).map(([k, v]) => (
+            {(Object.entries({}) as [ExpenseStatus, string][]).map(([k, v]) => (
               <SelectItem key={k} value={k}>
                 {v}
               </SelectItem>
@@ -247,8 +264,8 @@ function ExpenseGroup({
 }: {
   category: string;
   expenses: Expense[];
-  providerById: Map<string, ReturnType<typeof useProvidersStore.getState>["providers"][number]>;
-  projectById: Map<string, ReturnType<typeof useProjectsStore.getState>["projects"][number]>;
+  providerById: Map<string, any>;
+  projectById: Map<string, any>;
 }) {
   const total = expenses.reduce((s, e) => s + e.amount, 0);
   return (
@@ -287,13 +304,13 @@ function ExpenseGroup({
                   <div className="flex items-center gap-2">
                     {statusIcon}
                     <p className="font-mono text-xs text-muted-foreground">{e.expenseNumber}</p>
-                    <Badge variant={EXPENSE_STATUS_VARIANTS[e.status]}>
-                      {EXPENSE_STATUS_LABELS[e.status]}
+                    <Badge variant={e.status === "PAID" ? "success" : e.status === "REJECTED" ? "destructive" : e.status === "APPROVED" ? "success" : "warning"}>
+                      {e.status === "PENDING_APPROVAL" ? "Pendiente" : e.status === "PAID" ? "Pagado" : e.status === "REJECTED" ? "Rechazado" : e.status === "APPROVED" ? "Aprobado" : "Borrador"}
                     </Badge>
                   </div>
                   <p className="mt-1 text-sm font-medium">{e.description}</p>
                   <p className="text-xs text-muted-foreground">
-                    {EXPENSE_TYPE_LABELS[e.type]} · {provider?.name ?? "—"} ·{" "}
+                    {e.type} · {provider?.name ?? "—"} ·{" "}
                     {project?.code ?? "—"}
                   </p>
                 </div>

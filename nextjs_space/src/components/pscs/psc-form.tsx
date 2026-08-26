@@ -14,10 +14,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { usePSCsStore } from "@/lib/pscs-store";
-import { useProjectsStore } from "@/lib/projects-store";
-import { useProvidersStore } from "@/lib/providers-store";
-import { useBudgetStore } from "@/lib/budgets-store";
+import { usePscsStore } from "@/lib/data-store";
+import { useProjectsStore } from "@/lib/data-store";
+import { useProvidersStore } from "@/lib/data-store";
+import { useBudgetsStore } from "@/lib/data-store";
 import { useAuthStore } from "@/lib/auth-store";
 import { formatCurrency } from "@/lib/utils";
 import type { PSC, PSCItem, PSCStatus } from "@/types";
@@ -28,10 +28,10 @@ interface Props {
 }
 
 export function PSCForm({ psc, onSuccess }: Props) {
-  const { createPSC, updatePSC, getItemsAvailable } = usePSCsStore();
+  const { createPSC, updatePSC, getItemsAvailable } = usePscsStore();
   const { projects } = useProjectsStore();
   const { providers } = useProvidersStore();
-  const { getBudgetByProject } = useBudgetStore();
+  const { getBudgetByProject } = useBudgetsStore();
   const { user } = useAuthStore();
   const isEditing = !!psc;
 

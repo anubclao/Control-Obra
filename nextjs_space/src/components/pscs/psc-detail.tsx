@@ -8,18 +8,18 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { usePSCsStore, PSC_STATUS_LABELS, PSC_STATUS_VARIANTS } from "@/lib/pscs-store";
-import { useProjectsStore } from "@/lib/projects-store";
-import { useProvidersStore } from "@/lib/providers-store";
-import { useBudgetStore } from "@/lib/budgets-store";
+import { usePscsStore, PSC_STATUS_LABELS, PSC_STATUS_VARIANTS } from "@/lib/data-store";
+import { useProjectsStore } from "@/lib/data-store";
+import { useProvidersStore } from "@/lib/data-store";
+import { useBudgetsStore } from "@/lib/data-store";
 import { formatCurrency, formatPercent, formatDate, cn } from "@/lib/utils";
 import type { PSC } from "@/types";
 
 export function PSCDetail({ psc, onClose }: { psc: PSC; onClose: () => void }) {
   const { getProject } = useProjectsStore();
   const { getProvider } = useProvidersStore();
-  const { getBudgetByProject } = useBudgetStore();
-  const { setStatus } = usePSCsStore();
+  const { getBudgetByProject } = useBudgetsStore();
+  const { setStatus } = usePscsStore();
 
   const project = getProject(psc.projectId);
   const provider = getProvider(psc.providerId);

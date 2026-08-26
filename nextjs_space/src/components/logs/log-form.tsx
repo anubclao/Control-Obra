@@ -17,8 +17,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useLogsStore, WEATHER_LABELS } from "@/lib/logs-store";
-import { useProjectsStore } from "@/lib/projects-store";
+import { useLogsStore, WEATHER_LABELS } from "@/lib/data-store";
+import { useProjectsStore } from "@/lib/data-store";
 import { useAuthStore } from "@/lib/auth-store";
 import type { WorkLog, WeatherCondition } from "@/types";
 

@@ -52,15 +52,19 @@ import {
   PAYMENT_PRIORITY_VARIANTS,
   PAYMENT_ACTION_LABELS,
   getAvailablePaymentActions,
-  type PaymentActionButton,
-} from "@/lib/payments-store";
-import { useProjectsStore } from "@/lib/projects-store";
-import { useProvidersStore } from "@/lib/providers-store";
-import { useCutsStore } from "@/lib/cuts-store";
+} from "@/lib/data-store";
+import { useProjectsStore } from "@/lib/data-store";
+import { useProvidersStore } from "@/lib/data-store";
+import { useCutsStore } from "@/lib/data-store";
 import { useAuthStore } from "@/lib/auth-store";
 import { PaymentForm } from "@/components/payments/payment-form";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
-import type { PaymentAction } from "@/types";
+import type { PaymentAction, PaymentRequest } from "@/types";
+interface PaymentActionButton {
+  action: PaymentAction;
+  label: string;
+  variant: "default" | "info" | "warning" | "destructive";
+}
 
 export default function PaymentDetailPage() {
   const params = useParams();
@@ -103,7 +107,7 @@ export default function PaymentDetailPage() {
   const priorityVariant = PAYMENT_PRIORITY_VARIANTS[payment.priority];
   const isEditable = payment.status === "PENDING";
   const userRole = user?.role ?? "USER";
-  const availableActions: PaymentActionButton[] = getAvailablePaymentActions(payment, userRole);
+  const availableActions = getAvailablePaymentActions(payment as any, userRole);
 
   function handleAction() {
     if (!actionDialog || !user) return;

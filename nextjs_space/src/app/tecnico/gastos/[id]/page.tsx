@@ -34,9 +34,9 @@ import {
   EXPENSE_TYPE_LABELS,
   EXPENSE_STATUS_LABELS,
   EXPENSE_STATUS_VARIANTS,
-} from "@/lib/expenses-store";
-import { useProvidersStore } from "@/lib/providers-store";
-import { useProjectsStore } from "@/lib/projects-store";
+} from "@/lib/data-store";
+import { useProvidersStore } from "@/lib/data-store";
+import { useProjectsStore } from "@/lib/data-store";
 import { useCurrentUser, useIsSuperAdmin } from "@/lib/permissions";
 import { formatCurrency, formatDate } from "@/lib/utils";
 

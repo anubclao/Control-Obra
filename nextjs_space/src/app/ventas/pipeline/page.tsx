@@ -17,8 +17,8 @@ import {
   CLIENT_STATUS_LABELS,
   CLIENT_STATUS_VARIANTS,
   CLIENT_SOURCE_LABELS,
-} from "@/lib/clients-store";
-import { useQuotationsStore } from "@/lib/quotations-store";
+} from "@/lib/data-store";
+import { useQuotationsStore } from "@/lib/data-store";
 import { formatCurrency, cn } from "@/lib/utils";
 import type { Client, ClientStatus, Quotation } from "@/types";
 
@@ -51,6 +51,8 @@ const STAGES: { key: ClientStatus; title: string; color: string }[] = [
   { key: "WON", title: "Ganado", color: "border-emerald-500 bg-emerald-50" },
 ];
 
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { ModuleExplanationCard } from "@/components/ui/module-explanation-card";
 export default function PipelinePage() {
   const { clients, setStatus } = useClientsStore();
   const { quotations } = useQuotationsStore();
@@ -83,6 +85,18 @@ export default function PipelinePage() {
 
   return (
     <div className="space-y-6">
+
+      <ModuleExplanationCard
+        icon={TrendingUp}
+        variant="guide"
+        title="Pipeline de Ventas"
+        description="Vista kanban del embudo comercial."
+        steps={[
+            { title: "Vista por etapa", description: "Cada columna es una etapa." },
+            { title: "Avanzar cliente", description: "Cambia estado desde la tarjeta." },
+          ]}
+      />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">

@@ -19,8 +19,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { useBudgetStore } from "@/lib/budgets-store";
-import { useProjectsStore } from "@/lib/projects-store";
+import { useBudgetsStore } from "@/lib/data-store";
+import { useProjectsStore } from "@/lib/data-store";
 import { parseExcelContent, buildBudgetLayers, SAMPLE_EXCEL_DATA, type ParsedExcel } from "@/lib/excel-parser";
 import { formatCurrency } from "@/lib/utils";
 
@@ -28,7 +28,7 @@ export default function CargarPresupuestoPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const projectId = searchParams.get("projectId") || "";
-  const { createPT, hasBudget } = useBudgetStore();
+  const { createPT, hasBudget } = useBudgetsStore();
   const { getProject, projects } = useProjectsStore();
 
   const [step, setStep] = useState<"upload" | "preview" | "confirm">("upload");

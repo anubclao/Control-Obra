@@ -59,10 +59,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  useBudgetStore,
-} from "@/lib/budgets-store";
-import { useAiuStore } from "@/lib/aiu-store";
-import { useProjectsStore } from "@/lib/projects-store";
+  useBudgetsStore,
+} from "@/lib/data-store";
+import { useAiuStore } from "@/lib/data-store";
+import { useProjectsStore } from "@/lib/data-store";
 import { useIsSuperAdmin } from "@/lib/permissions";
 import {
   parseExcelContent,
@@ -88,7 +88,7 @@ export default function BudgetDetailPage() {
     createNewVersion,
     addUnforeseenItem,
     removeUnforeseenItem,
-  } = useBudgetStore();
+  } = useBudgetsStore();
   const { getConfig } = useAiuStore();
   const { getProject } = useProjectsStore();
 

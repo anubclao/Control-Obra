@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   Plus,
@@ -14,6 +14,7 @@ import {
   Pause,
   XCircle,
   Calendar,
+  FileSignature,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,34 +30,41 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { ModuleExplanationCard } from "@/components/ui/module-explanation-card";
 import {
   useContractsStore,
+  useProjectsStore,
+  useProvidersStore,
   CONTRACT_TYPE_LABELS,
   CONTRACT_STATUS_LABELS,
   CONTRACT_STATUS_VARIANTS,
-} from "@/lib/contracts-store";
-import { useProjectsStore } from "@/lib/projects-store";
-import { useProvidersStore } from "@/lib/providers-store";
+} from "@/lib/data-store";
 import { ContractForm } from "@/components/contracts/contract-form";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Contract, ContractStatus, ContractType } from "@/types";
 
 export default function ContratosPage() {
-  const { contracts, deleteContract } = useContractsStore();
-  const { getProject } = useProjectsStore();
-  const { getProvider } = useProvidersStore();
+  const { contracts, deleteContract, load } = useContractsStore();
+  const { projects, getProject, load: loadProjects } = useProjectsStore();
+  const { getProvider, load: loadProviders } = useProvidersStore();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | ContractStatus>("ALL");
   const [typeFilter, setTypeFilter] = useState<"ALL" | ContractType>("ALL");
   const [projectFilter, setProjectFilter] = useState<string>("ALL");
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Contract | null>(null);
-  const [deleting, setDeleting] = useState<Contract | null>(null);
+  const confirmDel = useConfirm();
+
+  useEffect(() => {
+    load();
+    loadProjects();
+    loadProviders();
+  }, []);
 
   const filtered = useMemo(() => {
     return contracts.filter((c) => {
@@ -86,13 +94,51 @@ export default function ContratosPage() {
     return { active, suspended, completed, totalValue, activeValue, total: contracts.length };
   }, [contracts]);
 
+  function askDelete(c: Contract) {
+    const project = getProject(c.projectId);
+    const provider = getProvider(c.providerId);
+    confirmDel.open({
+      title: "Eliminar contrato?",
+      description: "Vas a eliminar el contrato y todos sus documentos asociados. Esta accion NO se puede deshacer.",
+      details: (
+        <div className="space-y-1 text-xs">
+          <p><strong>Numero:</strong> {c.contractNumber}</p>
+          <p><strong>Tipo:</strong> {CONTRACT_TYPE_LABELS[c.type]}</p>
+          <p><strong>Proyecto:</strong> {project?.code ?? "-"} - {project?.name ?? "-"}</p>
+          <p><strong>Contratista:</strong> {provider?.name ?? "-"}</p>
+          <p><strong>Valor:</strong> {formatCurrency(c.value)}</p>
+        </div>
+      ),
+      variant: "danger",
+      confirmText: "Eliminar contrato",
+      onConfirm: async () => { await deleteContract(c.id); },
+    });
+  }
+
   return (
     <div className="space-y-6">
+      <ModuleExplanationCard
+        icon={FileSignature}
+        variant="guide"
+        title="Contratos"
+        description="Formaliza la relacion con cada contratista. Cada contrato vincula un proyecto, un proveedor, un alcance y un valor."
+        steps={[
+          { title: "Crea el contrato", description: "Selecciona proyecto, contratista, tipo (obra/suministro/servicios), alcance y valor total." },
+          { title: "Adjunta documentos", description: "Sube contrato firmado, polizas (cumplimiento, responsabilidad, anticipo) y acta de inicio." },
+          { title: "Monitorea avance", description: "El residente genera cortes de obra sobre los items del presupuesto y se asocian al contrato." },
+          { title: "Cierra o cancela", description: "Al terminar cambia a COMPLETED. Si se interrumpe, marca SUSPENDED o CANCELLED con motivo." },
+        ]}
+        tips={[
+          "Los contratos sin los 3 documentos clave (firmado, poliza, acta de inicio) muestran una alerta de docs faltantes.",
+          "Solo ADMIN puede eliminar contratos. La eliminacion no se puede deshacer.",
+        ]}
+      />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Contratos</h1>
           <p className="text-sm text-muted-foreground">
-            {stats.total} contratos · {stats.active} activos · {stats.suspended} suspendidos
+            {stats.total} contratos - {stats.active} activos - {stats.suspended} suspendidos
           </p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -138,7 +184,7 @@ export default function ContratosPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Buscar por número, alcance, proyecto o contratista…"
+            placeholder="Buscar por numero, alcance, proyecto o contratista..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -150,14 +196,11 @@ export default function ContratosPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">Todos los proyectos</SelectItem>
-            {Array.from(new Set(contracts.map((c) => c.projectId))).map((pid) => {
-              const p = getProject(pid);
-              return p ? (
-                <SelectItem key={pid} value={pid}>
-                  {p.code}
-                </SelectItem>
-              ) : null;
-            })}
+            {projects.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.code}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as typeof typeFilter)}>
@@ -212,7 +255,7 @@ export default function ContratosPage() {
                 projectCode={project?.code}
                 providerName={provider?.name}
                 onEdit={() => setEditing(c)}
-                onDelete={() => setDeleting(c)}
+                onDelete={() => askDelete(c)}
               />
             );
           })}
@@ -230,34 +273,7 @@ export default function ContratosPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Confirm delete */}
-      <Dialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>¿Eliminar contrato?</DialogTitle>
-            <DialogDescription>
-              Se eliminará <strong>{deleting?.contractNumber}</strong> y todos sus documentos.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleting(null)}>
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                if (deleting) {
-                  deleteContract(deleting.id);
-                  setDeleting(null);
-                }
-              }}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Eliminar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {confirmDel.dialog}
     </div>
   );
 }
@@ -325,7 +341,7 @@ function ContractRow({
           </div>
           {projectCode && (
             <p className="text-xs text-muted-foreground">
-              {projectCode} · {projectName}
+              {projectCode} - {projectName}
             </p>
           )}
           <Link
@@ -344,7 +360,7 @@ function ContractRow({
           <p className="text-lg font-semibold">{formatCurrency(c.value)}</p>
           <p className="mt-0.5 text-xs text-muted-foreground flex items-center justify-end gap-1">
             <Calendar className="h-3 w-3" />
-            {formatDate(c.startDate)} → {formatDate(c.endDate)}
+            {formatDate(c.startDate)} - {formatDate(c.endDate)}
           </p>
         </div>
 

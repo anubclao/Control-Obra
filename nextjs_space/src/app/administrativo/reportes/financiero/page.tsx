@@ -19,18 +19,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useProjectsStore } from "@/lib/projects-store";
-import { useProvidersStore } from "@/lib/providers-store";
-import { usePaymentsStore } from "@/lib/payments-store";
-import { useCutsStore } from "@/lib/cuts-store";
-import { useBudgetStore } from "@/lib/budgets-store";
+import { useProjectsStore } from "@/lib/data-store";
+import { useProvidersStore } from "@/lib/data-store";
+import { usePaymentsStore } from "@/lib/data-store";
+import { useCutsStore } from "@/lib/data-store";
+import { useBudgetsStore } from "@/lib/data-store";
 import { formatCurrency, formatPercent, cn } from "@/lib/utils";
 
 export default function ReportesFinancierosPage() {
   const { projects } = useProjectsStore();
   const { payments } = usePaymentsStore();
   const { cuts } = useCutsStore();
-  const { getBudgetByProject } = useBudgetStore();
+  const { getBudgetByProject } = useBudgetsStore();
   const [projectFilter, setProjectFilter] = useState<string>("ALL");
 
   // Cálculo global

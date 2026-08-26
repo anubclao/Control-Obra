@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useProjectsStore, PROJECT_STATUS_LABELS } from "@/lib/projects-store";
+import { useProjectsStore, PROJECT_STATUS_LABELS } from "@/lib/data-store";
 import type { Project, ProjectStatus } from "@/types";
 
 const projectSchema = z.object({

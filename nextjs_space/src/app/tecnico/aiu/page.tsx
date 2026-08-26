@@ -12,14 +12,16 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useAiuStore, validateAiu } from "@/lib/aiu-store";
-import { useBudgetStore } from "@/lib/budgets-store";
-import { useProjectsStore } from "@/lib/projects-store";
+import { useAiuStore, validateAiu } from "@/lib/data-store";
+import { useBudgetsStore } from "@/lib/data-store";
+import { useProjectsStore } from "@/lib/data-store";
 import { formatCurrency, formatPercent } from "@/lib/utils";
 
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { ModuleExplanationCard } from "@/components/ui/module-explanation-card";
 export default function AiuOverviewPage() {
   const { getConfig, hasConfig } = useAiuStore();
-  const { getBudgetByProject } = useBudgetStore();
+  const { getBudgetByProject } = useBudgetsStore();
   const { projects } = useProjectsStore();
 
   const summary = useMemo(() => {
@@ -49,6 +51,21 @@ export default function AiuOverviewPage() {
 
   return (
     <div className="space-y-6">
+
+      <ModuleExplanationCard
+        icon={TrendingUp}
+        variant="guide"
+        title="AIU"
+        description="Administracion, Imprevistos, Utilidad. Suma = 100%."
+        steps={[
+            { title: "Configurar AIU", description: "Define el % de cada componente." },
+            { title: "Validar", description: "Backend rechaza si no es 100%." },
+          ]}
+          warnings={[
+            "CHECK constraint en BD asegura invariante.",
+          ]}
+      />
+
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">AIU</h1>
         <p className="text-sm text-muted-foreground">

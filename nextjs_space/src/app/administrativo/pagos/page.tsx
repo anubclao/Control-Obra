@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   Plus,
@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   Clock,
   Banknote,
+  CreditCard,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,36 +30,43 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { ModuleExplanationCard } from "@/components/ui/module-explanation-card";
 import {
   usePaymentsStore,
+  useProjectsStore,
+  useProvidersStore,
   PAYMENT_STATUS_LABELS,
   PAYMENT_STATUS_VARIANTS,
   PAYMENT_TYPE_LABELS,
   PAYMENT_PRIORITY_LABELS,
   PAYMENT_PRIORITY_VARIANTS,
-} from "@/lib/payments-store";
-import { useProjectsStore } from "@/lib/projects-store";
-import { useProvidersStore } from "@/lib/providers-store";
+} from "@/lib/data-store";
 import { PaymentForm } from "@/components/payments/payment-form";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import type { PaymentRequest, PaymentStatus, PaymentPriority } from "@/types";
 
 export default function PagosPage() {
-  const { payments, deletePayment } = usePaymentsStore();
-  const { getProject } = useProjectsStore();
-  const { getProvider } = useProvidersStore();
+  const { payments, deletePayment, load } = usePaymentsStore();
+  const { projects, getProject, load: loadProjects } = useProjectsStore();
+  const { getProvider, load: loadProviders } = useProvidersStore();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | PaymentStatus>("ALL");
   const [priorityFilter, setPriorityFilter] = useState<"ALL" | PaymentPriority>("ALL");
   const [projectFilter, setProjectFilter] = useState<string>("ALL");
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<PaymentRequest | null>(null);
-  const [deleting, setDeleting] = useState<PaymentRequest | null>(null);
+  const confirmDel = useConfirm();
+
+  useEffect(() => {
+    load();
+    loadProjects();
+    loadProviders();
+  }, []);
 
   const filtered = useMemo(() => {
     return payments.filter((p) => {
@@ -89,13 +97,51 @@ export default function PagosPage() {
     return { pending, inApproval, approved, paid, pendingAmount, paidAmount };
   }, [payments]);
 
+  function askDelete(p: PaymentRequest) {
+    const project = getProject(p.projectId);
+    confirmDel.open({
+      title: "Eliminar solicitud de pago?",
+      description: "Vas a eliminar la solicitud y su historial. Esta accion NO se puede deshacer.",
+      details: (
+        <div className="space-y-1 text-xs">
+          <p><strong>Numero:</strong> {p.requestNumber}</p>
+          <p><strong>Beneficiario:</strong> {p.beneficiaryName}</p>
+          <p><strong>Tipo:</strong> {PAYMENT_TYPE_LABELS[p.type] ?? p.type}</p>
+          <p><strong>Proyecto:</strong> {project?.code ?? "-"} - {project?.name ?? "-"}</p>
+          <p><strong>Monto:</strong> {formatCurrency(p.amount)}</p>
+          <p><strong>Estado:</strong> {PAYMENT_STATUS_LABELS[p.status]}</p>
+        </div>
+      ),
+      variant: "danger",
+      confirmText: "Eliminar solicitud",
+      onConfirm: async () => { await deletePayment(p.id); },
+    });
+  }
+
   return (
     <div className="space-y-6">
+      <ModuleExplanationCard
+        icon={CreditCard}
+        variant="guide"
+        title="Pagos"
+        description="Solicitudes de pago a contratistas y proveedores. Pasan por un flujo de aprobacion multinivel antes del desembolso."
+        steps={[
+          { title: "Crea la solicitud", description: "Define beneficiario, monto, tipo, prioridad y datos bancarios." },
+          { title: "Aprobacion N1 + N2", description: "Pasa por dos niveles de aprobacion: residente/administrativo y gerencia." },
+          { title: "Aprobacion final", description: "Gerencia/Super Admin aprueban para que quede lista para pago." },
+          { title: "Pago", description: "Tesoreria registra el pago real y la solicitud pasa a PAID." },
+        ]}
+        tips={[
+          "Solo se pueden editar solicitudes en estado PENDING.",
+          "Una solicitud PAGADA no se elimina desde aqui (queda como registro contable).",
+        ]}
+      />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Pagos</h1>
           <p className="text-sm text-muted-foreground">
-            {payments.length} solicitudes · {stats.pending} pendientes · {stats.paid} pagados
+            {payments.length} solicitudes - {stats.pending} pendientes - {stats.paid} pagados
           </p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -120,7 +166,7 @@ export default function PagosPage() {
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <KpiMini label="Pendientes" value={stats.pending} icon={Clock} color="text-amber-600" />
-        <KpiMini label="En aprobación" value={stats.inApproval} icon={AlertCircle} color="text-blue-600" />
+        <KpiMini label="En aprobacion" value={stats.inApproval} icon={AlertCircle} color="text-blue-600" />
         <KpiMini label="Aprobados" value={stats.approved} icon={CheckCircle2} color="text-emerald-600" />
         <KpiMini label="Pagados" value={stats.paid} icon={Banknote} color="text-emerald-700" />
       </div>
@@ -141,7 +187,7 @@ export default function PagosPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Buscar por número, beneficiario o proyecto…"
+            placeholder="Buscar por numero, beneficiario o proyecto..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -153,14 +199,11 @@ export default function PagosPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">Todos los proyectos</SelectItem>
-            {Array.from(new Set(payments.map((p) => p.projectId))).map((pid) => {
-              const p = getProject(pid);
-              return p ? (
-                <SelectItem key={pid} value={pid}>
-                  {p.code}
-                </SelectItem>
-              ) : null;
-            })}
+            {projects.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.code}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
@@ -215,7 +258,7 @@ export default function PagosPage() {
                 projectCode={project?.code}
                 providerName={provider?.name}
                 onEdit={() => setEditing(p)}
-                onDelete={() => setDeleting(p)}
+                onDelete={() => askDelete(p)}
               />
             );
           })}
@@ -233,34 +276,7 @@ export default function PagosPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Confirm delete */}
-      <Dialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>¿Eliminar solicitud?</DialogTitle>
-            <DialogDescription>
-              Se eliminará <strong>{deleting?.requestNumber}</strong> y su historial.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleting(null)}>
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                if (deleting) {
-                  deletePayment(deleting.id);
-                  setDeleting(null);
-                }
-              }}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Eliminar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {confirmDel.dialog}
     </div>
   );
 }
@@ -320,16 +336,16 @@ function PaymentRow({
             <Badge variant={variant}>{PAYMENT_STATUS_LABELS[p.status]}</Badge>
             <Badge variant={priorityVariant}>{PAYMENT_PRIORITY_LABELS[p.priority]}</Badge>
             <span className="text-xs text-muted-foreground">
-              {PAYMENT_TYPE_LABELS[p.type]}
+              {PAYMENT_TYPE_LABELS[p.type] ?? p.type}
             </span>
           </div>
           <Link href={`/administrativo/pagos/${p.id}`} className="mt-0.5 block font-medium hover:underline">
             {p.beneficiaryName}
           </Link>
           <p className="text-xs text-muted-foreground">
-            {projectCode} · {projectName}
-            {providerName ? ` · ${providerName}` : ""}
-            {p.dueDate ? ` · Vence: ${formatDate(p.dueDate)}` : ""}
+            {projectCode} - {projectName}
+            {providerName ? ` - ${providerName}` : ""}
+            {p.dueDate ? ` - Vence: ${formatDate(p.dueDate)}` : ""}
           </p>
         </div>
 

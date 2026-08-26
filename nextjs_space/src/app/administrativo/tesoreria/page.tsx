@@ -39,9 +39,9 @@ import {
   PAYMENT_STATUS_LABELS,
   PAYMENT_STATUS_VARIANTS,
   PAYMENT_TYPE_LABELS,
-} from "@/lib/payments-store";
-import { useProjectsStore } from "@/lib/projects-store";
-import { useProvidersStore } from "@/lib/providers-store";
+} from "@/lib/data-store";
+import { useProjectsStore } from "@/lib/data-store";
+import { useProvidersStore } from "@/lib/data-store";
 import { useAuthStore } from "@/lib/auth-store";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import type { PaymentRequest, PaymentStatus } from "@/types";

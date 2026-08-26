@@ -33,23 +33,23 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  usePSCsStore,
+  usePscsStore,
   PSC_STATUS_LABELS,
   PSC_STATUS_VARIANTS,
-} from "@/lib/pscs-store";
-import { useProjectsStore } from "@/lib/projects-store";
-import { useProvidersStore } from "@/lib/providers-store";
-import { useBudgetStore } from "@/lib/budgets-store";
+} from "@/lib/data-store";
+import { useProjectsStore } from "@/lib/data-store";
+import { useProvidersStore } from "@/lib/data-store";
+import { useBudgetsStore } from "@/lib/data-store";
 import { PSCForm } from "@/components/pscs/psc-form";
 import { PSCDetail } from "@/components/pscs/psc-detail";
 import { formatCurrency, formatPercent, cn } from "@/lib/utils";
 import type { PSC, PSCStatus } from "@/types";
 
 export default function PSCPage() {
-  const { pscs, deletePSC } = usePSCsStore();
+  const { pscs, deletePSC } = usePscsStore();
   const { projects, getProject } = useProjectsStore();
   const { getProvider } = useProvidersStore();
-  const { getBudgetByProject } = useBudgetStore();
+  const { getBudgetByProject } = useBudgetsStore();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | PSCStatus>("ALL");
   const [projectFilter, setProjectFilter] = useState<string>("ALL");

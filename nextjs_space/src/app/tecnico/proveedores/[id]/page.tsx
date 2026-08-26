@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -49,9 +49,9 @@ import {
   CATEGORY_LABELS,
   DOCUMENT_TYPE_LABELS,
   requiredDocsFor,
-} from "@/lib/providers-store";
+} from "@/lib/data-store";
 import { ProviderForm } from "@/components/providers/provider-form";
-import { MOCK_WORK_CUTS } from "@/mocks";
+import { useCutsStore } from "@/lib/data-store";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import type { ProviderDocument, ProviderDocumentType } from "@/types";
 
@@ -59,6 +59,12 @@ export default function ProveedorDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const { getProvider, addDocument, removeDocument } = useProvidersStore();
+  const { cuts: allCuts, load: loadCuts } = useCutsStore();
+
+  // Cargar cortes desde BD si no están en cache
+  useEffect(() => {
+    if (!allCuts || allCuts.length === 0) loadCuts();
+  }, [allCuts, loadCuts]);
   const [editOpen, setEditOpen] = useState(false);
   const [addDocOpen, setAddDocOpen] = useState(false);
 
@@ -85,8 +91,8 @@ export default function ProveedorDetailPage() {
   const requiredDocs = requiredDocsFor(provider.personType);
   const missingRequired = requiredDocs.filter((t) => !docsByType.has(t));
 
-  // Cortes del proveedor
-  const myCuts = MOCK_WORK_CUTS.filter((c) => c.providerId === provider.id);
+  // Cortes del proveedor (filtrados por providerId desde BD)
+  const myCuts = (allCuts || []).filter((c) => c.providerId === provider.id);
 
   return (
     <div className="space-y-6">
@@ -348,7 +354,7 @@ export default function ProveedorDetailPage() {
                       )}
                     >
                       <div className="flex items-center gap-3">
-                        {doc ? (
+                        {doc as any ? (
                           <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                         ) : (
                           <AlertCircle className="h-4 w-4 text-amber-600" />
@@ -358,13 +364,13 @@ export default function ProveedorDetailPage() {
                             {DOCUMENT_TYPE_LABELS[type]}
                             <span className="ml-1.5 text-xs text-muted-foreground">(obligatorio)</span>
                           </p>
-                          {doc ? (
+                          {doc as any ? (
                             <p className="text-xs text-muted-foreground">
-                              {doc.fileName} · Subido {formatDate(doc.uploadedAt)}
-                              {doc.expirationDate && (
+                              {(doc as any).fileName} · Subido {formatDate((doc as any).uploadedAt)}
+                              {(doc as any).expirationDate && (
                                 <>
                                   {" · "}
-                                  Vence {formatDate(doc.expirationDate)}
+                                  Vence {formatDate((doc as any).expirationDate)}
                                 </>
                               )}
                             </p>
@@ -377,7 +383,7 @@ export default function ProveedorDetailPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => removeDocument(provider.id, doc.id)}
+                          onClick={() => removeDocument(provider.id, (doc as any).id)}
                           className="h-7 w-7"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -391,21 +397,21 @@ export default function ProveedorDetailPage() {
                 {provider.documents
                   .filter((d) => !requiredDocs.includes(d.type))
                   .map((doc) => (
-                    <div key={doc.id} className="flex items-center justify-between rounded-md border p-3">
+                    <div key={(doc as any).id} className="flex items-center justify-between rounded-md border p-3">
                       <div className="flex items-center gap-3">
                         <FileText className="h-4 w-4 text-blue-600" />
                         <div>
-                          <p className="text-sm font-medium">{DOCUMENT_TYPE_LABELS[doc.type]}</p>
+                          <p className="text-sm font-medium">{DOCUMENT_TYPE_LABELS[(doc as any).type]}</p>
                           <p className="text-xs text-muted-foreground">
-                            {doc.fileName} · {formatDate(doc.uploadedAt)}
-                            {doc.expirationDate && ` · Vence ${formatDate(doc.expirationDate)}`}
+                            {(doc as any).fileName} · {formatDate((doc as any).uploadedAt)}
+                            {(doc as any).expirationDate && ` · Vence ${formatDate((doc as any).expirationDate)}`}
                           </p>
                         </div>
                       </div>
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => removeDocument(provider.id, doc.id)}
+                        onClick={() => removeDocument(provider.id, (doc as any).id)}
                         className="h-7 w-7"
                       >
                         <Trash2 className="h-3.5 w-3.5" />

@@ -39,12 +39,14 @@ import {
   useQuotationsStore,
   QUOTATION_STATUS_LABELS,
   QUOTATION_STATUS_VARIANTS,
-} from "@/lib/quotations-store";
-import { useClientsStore } from "@/lib/clients-store";
+} from "@/lib/data-store";
+import { useClientsStore } from "@/lib/data-store";
 import { useAuthStore } from "@/lib/auth-store";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import type { Quotation, QuotationItem, QuotationStatus } from "@/types";
 
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { ModuleExplanationCard } from "@/components/ui/module-explanation-card";
 export default function CotizacionesPage() {
   const { quotations, deleteQuotation, setStatus } = useQuotationsStore();
   const { getClient } = useClientsStore();
@@ -93,6 +95,22 @@ export default function CotizacionesPage() {
 
   return (
     <div className="space-y-6">
+
+      <ModuleExplanationCard
+        icon={FileSpreadsheet}
+        variant="guide"
+        title="Cotizaciones"
+        description="Cotizaciones con items, IVA, descuentos."
+        steps={[
+            { title: "Elige cliente", description: "De la cartera o crea uno nuevo." },
+            { title: "Agrega items", description: "Unidad, cantidad y precio unitario." },
+            { title: "Envia al cliente", description: "Cambia a SENT." },
+          ]}
+          tips={[
+            "ACCEPTED se convierte en Proyecto desde Reportes.",
+          ]}
+      />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">

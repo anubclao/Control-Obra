@@ -44,10 +44,10 @@ import {
   CONTRACT_STATUS_VARIANTS,
   CONTRACT_DOCUMENT_TYPE_LABELS,
   REQUIRED_CONTRACT_DOCS,
-} from "@/lib/contracts-store";
-import { useProjectsStore } from "@/lib/projects-store";
-import { useProvidersStore } from "@/lib/providers-store";
-import { useCutsStore } from "@/lib/cuts-store";
+} from "@/lib/data-store";
+import { useProjectsStore } from "@/lib/data-store";
+import { useProvidersStore } from "@/lib/data-store";
+import { useCutsStore } from "@/lib/data-store";
 import { ContractForm } from "@/components/contracts/contract-form";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import type { ContractDocument, ContractDocumentType } from "@/types";
@@ -283,7 +283,7 @@ export default function ContractDetailPage() {
                       )}
                     >
                       <div className="flex items-center gap-3">
-                        {doc ? (
+                        {doc as any ? (
                           <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                         ) : (
                           <XCircle className="h-4 w-4 text-amber-600" />
@@ -293,10 +293,10 @@ export default function ContractDetailPage() {
                             {CONTRACT_DOCUMENT_TYPE_LABELS[type]}
                             <span className="ml-1.5 text-xs text-muted-foreground">(obligatorio)</span>
                           </p>
-                          {doc ? (
+                          {doc as any ? (
                             <p className="text-xs text-muted-foreground">
-                              {doc.fileName} · Subido {formatDate(doc.uploadedAt)}
-                              {doc.expirationDate && ` · Vence ${formatDate(doc.expirationDate)}`}
+                              {(doc as any).fileName} · Subido {formatDate((doc as any).uploadedAt)}
+                              {(doc as any).expirationDate && ` · Vence ${formatDate((doc as any).expirationDate)}`}
                             </p>
                           ) : (
                             <p className="text-xs text-muted-foreground">No cargado</p>
@@ -307,7 +307,7 @@ export default function ContractDetailPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => removeDocument(contract.id, doc.id)}
+                          onClick={() => removeDocument(contract.id, (doc as any).id)}
                           className="h-7 w-7"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -320,21 +320,21 @@ export default function ContractDetailPage() {
                 {contract.documents
                   .filter((d) => !REQUIRED_CONTRACT_DOCS.includes(d.type))
                   .map((doc) => (
-                    <div key={doc.id} className="flex items-center justify-between rounded-md border p-3">
+                    <div key={(doc as any).id} className="flex items-center justify-between rounded-md border p-3">
                       <div className="flex items-center gap-3">
                         <FileText className="h-4 w-4 text-blue-600" />
                         <div>
-                          <p className="text-sm font-medium">{CONTRACT_DOCUMENT_TYPE_LABELS[doc.type]}</p>
+                          <p className="text-sm font-medium">{CONTRACT_DOCUMENT_TYPE_LABELS[(doc as any).type]}</p>
                           <p className="text-xs text-muted-foreground">
-                            {doc.fileName} · {formatDate(doc.uploadedAt)}
-                            {doc.expirationDate && ` · Vence ${formatDate(doc.expirationDate)}`}
+                            {(doc as any).fileName} · {formatDate((doc as any).uploadedAt)}
+                            {(doc as any).expirationDate && ` · Vence ${formatDate((doc as any).expirationDate)}`}
                           </p>
                         </div>
                       </div>
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => removeDocument(contract.id, doc.id)}
+                        onClick={() => removeDocument(contract.id, (doc as any).id)}
                         className="h-7 w-7"
                       >
                         <Trash2 className="h-3.5 w-3.5" />

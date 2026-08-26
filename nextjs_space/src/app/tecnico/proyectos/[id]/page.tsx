@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -33,10 +33,10 @@ import {
   useProjectsStore,
   PROJECT_STATUS_LABELS,
   PROJECT_STATUS_VARIANTS,
-} from "@/lib/projects-store";
+} from "@/lib/data-store";
 import { ProjectForm } from "@/components/projects/project-form";
 import { useIsSuperAdmin } from "@/lib/permissions";
-import { MOCK_WORK_CUTS, MOCK_PROVIDERS } from "@/mocks";
+import { useCutsStore, useProvidersStore } from "@/lib/data-store";
 import { formatCurrency, formatDate, formatPercent, cn } from "@/lib/utils";
 
 export default function ProjectDetailPage() {
@@ -44,7 +44,15 @@ export default function ProjectDetailPage() {
   const id = params.id as string;
   const router = useRouter();
   const { getProject, deleteProject } = useProjectsStore();
+  const { cuts: allCuts, load: loadCuts } = useCutsStore();
+  const { providers: allProviders, load: loadProviders } = useProvidersStore();
   const isSuperAdmin = useIsSuperAdmin();
+
+  // Cargar cortes y proveedores desde BD si no están en cache
+  useEffect(() => {
+    if (!allCuts || allCuts.length === 0) loadCuts();
+    if (!allProviders || allProviders.length === 0) loadProviders();
+  }, [allCuts, allProviders, loadCuts, loadProviders]);
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -70,12 +78,13 @@ export default function ProjectDetailPage() {
   }
 
   const percent = project.totalBudget > 0 ? (project.executedAmount / project.totalBudget) * 100 : 0;
-  const projectCuts = MOCK_WORK_CUTS.filter((c) => c.projectId === project.id);
+  const projectCuts = (allCuts || []).filter((c) => c.projectId === project.id);
   const cutsTotal = projectCuts.reduce((s, c) => s + c.grossValue, 0);
   const cutsPending = projectCuts.filter((c) => ["SUBMITTED", "VALIDATED"].includes(c.status)).length;
 
-  // Providers mock: simulamos que cada proyecto tiene 2-3 proveedores
-  const projectProviders = MOCK_PROVIDERS.slice(0, 3);
+  // Providers reales del proyecto (placeholder: primeros 3 hasta que exista relación project_provider)
+  // TODO: cuando exista tabla project_providers, filtrar por project.id
+  const projectProviders = (allProviders || []).slice(0, 3);
 
   return (
     <div className="space-y-6">

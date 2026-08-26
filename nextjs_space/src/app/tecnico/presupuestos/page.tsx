@@ -28,12 +28,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useBudgetStore } from "@/lib/budgets-store";
-import { useProjectsStore } from "@/lib/projects-store";
+import { useBudgetsStore } from "@/lib/data-store";
+import { useProjectsStore } from "@/lib/data-store";
 import { formatCurrency, formatDate, formatPercent } from "@/lib/utils";
 
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { ModuleExplanationCard } from "@/components/ui/module-explanation-card";
 export default function PresupuestosPage() {
-  const { getBudgetByProject, budgets } = useBudgetStore();
+  const { getBudgetByProject, budgets } = useBudgetsStore();
   const { projects } = useProjectsStore();
   const [search, setSearch] = useState("");
   const [createFor, setCreateFor] = useState<string>("");
@@ -69,6 +71,22 @@ export default function PresupuestosPage() {
 
   return (
     <div className="space-y-6">
+
+      <ModuleExplanationCard
+        icon={Calculator}
+        variant="guide"
+        title="Presupuestos (PT)"
+        description="Presupuesto Tope por proyecto."
+        steps={[
+            { title: "Carga presupuesto", description: "Importa Excel o digita items." },
+            { title: "Versionar", description: "Nueva version sin perder anterior." },
+            { title: "Vincular con PSC", description: "PSC es espejo del PT por contratista." },
+          ]}
+          tips={[
+            "Excel detecta columnas automaticamente.",
+          ]}
+      />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Presupuestos</h1>

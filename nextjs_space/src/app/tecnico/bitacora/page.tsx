@@ -35,12 +35,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useLogsStore, WEATHER_LABELS, WEATHER_ICONS } from "@/lib/logs-store";
-import { useProjectsStore } from "@/lib/projects-store";
+import { useLogsStore, WEATHER_LABELS, WEATHER_ICONS } from "@/lib/data-store";
+import { useProjectsStore } from "@/lib/data-store";
 import { LogForm } from "@/components/logs/log-form";
 import { formatDate, cn } from "@/lib/utils";
 import type { WorkLog, WeatherCondition } from "@/types";
 
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { ModuleExplanationCard } from "@/components/ui/module-explanation-card";
 export default function BitacoraPage() {
   const { logs, deleteLog } = useLogsStore();
   const { projects, getProject } = useProjectsStore();
@@ -110,6 +112,21 @@ export default function BitacoraPage() {
 
   return (
     <div className="space-y-6">
+
+      <ModuleExplanationCard
+        icon={BookOpen}
+        variant="guide"
+        title="Bitacora de Obra"
+        description="Registro diario de obra."
+        steps={[
+            { title: "Registra el dia", description: "Proyecto, fecha, clima, actividades." },
+            { title: "Sube fotografias", description: "Adjunta fotos de avance." },
+          ]}
+          warnings={[
+            "Una sola bitacora por (proyecto, fecha).",
+          ]}
+      />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">

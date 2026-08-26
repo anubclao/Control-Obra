@@ -19,12 +19,15 @@ import { cn } from "@/lib/utils";
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, logout, switchArea, hydrated } = useAuthStore();
+  const { user, logout, switchArea, hydrated, refresh } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
-  // FIX Bug #27: cerrar el menú al hacer click fuera o presionar ESC
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
   useEffect(() => {
     if (!userMenuOpen) return;
     function handleClickOutside(e: MouseEvent) {
@@ -62,19 +65,18 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   const navItems = NAV_BY_AREA[user.area];
 
-  function handleLogout() {
-    logout();
+  async function handleLogout() {
+    await logout();
     router.push("/login");
   }
 
-  function handleSwitchArea(area: "tecnico" | "administrativo" | "ventas") {
-    switchArea(area);
+  async function handleSwitchArea(area: "tecnico" | "administrativo" | "ventas") {
+    await switchArea(area);
     router.push(`/${area}`);
   }
 
   return (
     <div className="flex h-screen bg-background">
-      {/* Sidebar */}
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-50 w-64 transform border-r bg-card transition-transform lg:relative lg:translate-x-0",
@@ -153,7 +155,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Overlay mobile */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 lg:hidden"
@@ -161,9 +162,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         />
       )}
 
-      {/* Main */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Topbar */}
         <header className="flex h-16 items-center justify-between border-b bg-card px-4 lg:px-6">
           <div className="flex items-center gap-3">
             <Button
@@ -227,7 +226,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        {/* Content */}
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">{children}</main>
       </div>
     </div>

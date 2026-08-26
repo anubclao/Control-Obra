@@ -30,10 +30,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useEmployeesStore, EMPLOYEE_STATUS_LABELS, EMPLOYEE_STATUS_VARIANTS, EMPLOYEE_DEPARTMENT_LABELS, EMPLOYEE_CONTRACT_LABELS, EMPLOYEE_DOC_TYPE_LABELS } from "@/lib/employees-store";
+import { useEmployeesStore, EMPLOYEE_STATUS_LABELS, EMPLOYEE_STATUS_VARIANTS, EMPLOYEE_DEPARTMENT_LABELS, EMPLOYEE_CONTRACT_LABELS, EMPLOYEE_DOC_TYPE_LABELS } from "@/lib/data-store";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Employee, EmployeeStatus, EmployeeDepartment, EmployeeContractType, EmployeeDocumentType } from "@/types";
 
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { ModuleExplanationCard } from "@/components/ui/module-explanation-card";
 export default function EmpleadosPage() {
   const { employees, addDocument, removeDocument } = useEmployeesStore();
   const [search, setSearch] = useState("");
@@ -72,6 +74,22 @@ export default function EmpleadosPage() {
 
   return (
     <div className="space-y-6">
+
+      <ModuleExplanationCard
+        icon={Users}
+        variant="guide"
+        title="RRHH - Empleados"
+        description="Empleados: documentos, cargo, contrato."
+        steps={[
+            { title: "Registra empleado", description: "Documento, cargo, contrato, fecha." },
+            { title: "Asocia a usuario", description: "Vincula a usuario del sistema." },
+            { title: "Carga documentos", description: "11 tipos: cedula, EPS, pension, ARL." },
+          ]}
+          warnings={[
+            "Documento de identidad UNICO.",
+          ]}
+      />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Empleados</h1>
@@ -121,8 +139,8 @@ export default function EmpleadosPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">Todos</SelectItem>
-            {Object.entries(EMPLOYEE_DEPARTMENT_LABELS).map(([k, v]) => (
-              <SelectItem key={k} value={k}>{v}</SelectItem>
+            {(Object.keys(EMPLOYEE_DEPARTMENT_LABELS) as Array<keyof typeof EMPLOYEE_DEPARTMENT_LABELS>).map((k) => (
+              <SelectItem key={k} value={k}>{EMPLOYEE_DEPARTMENT_LABELS[k]}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -374,8 +392,8 @@ function EmployeeForm({ employee, onSuccess }: { employee?: Employee; onSuccess:
             <Select value={department} onValueChange={(v) => setDepartment(v as EmployeeDepartment)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {Object.entries(EMPLOYEE_DEPARTMENT_LABELS).map(([k, v]) => (
-                  <SelectItem key={k} value={k}>{v}</SelectItem>
+                {(Object.keys(EMPLOYEE_DEPARTMENT_LABELS) as Array<keyof typeof EMPLOYEE_DEPARTMENT_LABELS>).map((k) => (
+                  <SelectItem key={k} value={k}>{EMPLOYEE_DEPARTMENT_LABELS[k]}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

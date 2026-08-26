@@ -15,9 +15,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useContractsStore, CONTRACT_TYPE_LABELS } from "@/lib/contracts-store";
-import { useProjectsStore } from "@/lib/projects-store";
-import { useProvidersStore } from "@/lib/providers-store";
+import { useContractsStore, CONTRACT_TYPE_LABELS } from "@/lib/data-store";
+import { useProjectsStore } from "@/lib/data-store";
+import { useProvidersStore } from "@/lib/data-store";
 import { useAuthStore } from "@/lib/auth-store";
 import type { Contract, ContractType } from "@/types";
 

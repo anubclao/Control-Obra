@@ -1,51 +1,70 @@
+/**
+ * lib/auth-store.ts
+ *
+ * Store de autenticación conectado a BD.
+ * Sesión persiste en cookie httpOnly (servidor) + cache cliente ligero.
+ */
+
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { api } from "./api";
 import type { User, Area } from "@/types";
-import { MOCK_USERS } from "./auth-mock";
 
-interface AuthStore {
+interface AuthState {
   user: User | null;
+  loading: boolean;
+  error: string | null;
   hydrated: boolean;
-  setHydrated: () => void;
-  setUser: (user: User | null) => void;
-  switchUser: (email: string) => boolean;
-  switchArea: (area: Area) => boolean;
-  logout: () => void;
+  switchUser: (email: string) => Promise<boolean>;
+  switchArea: (area: Area) => Promise<boolean>;
+  logout: () => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthStore>()(
-  persist(
-    (set) => ({
-      user: null,
-      hydrated: false,
-      setHydrated: () => set({ hydrated: true }),
-      setUser: (user) => set({ user }),
-      switchUser: (email) => {
-        const found = MOCK_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase());
-        if (!found) return false;
-        set({ user: found });
-        return true;
-      },
-      switchArea: (area) => {
-        const emailByArea: Record<Area, string> = {
-          tecnico: "director@controlobra.com",
-          administrativo: "gerente@controlobra.com",
-          ventas: "ventas@controlobra.com",
-        };
-        const found = MOCK_USERS.find((u) => u.email === emailByArea[area]);
-        if (!found) return false;
-        set({ user: found });
-        return true;
-      },
-      logout: () => set({ user: null }),
-    }),
-    {
-      name: "controlobra-auth",
-      onRehydrateStorage: () => (state) => {
-        state?.setHydrated();
-      },
+export const useAuthStore = create<AuthState>()((set, _get) => ({
+  user: null,
+  loading: false,
+  error: null,
+  hydrated: false,
+
+  refresh: async () => {
+    set({ loading: true });
+    try {
+      const data = await api.get<{ user: User | null }>("/api/auth/login");
+      set({ user: data.user, loading: false, hydrated: true, error: null });
+    } catch (e: any) {
+      console.error("[auth refresh]", e?.message);
+      set({ user: null, loading: false, hydrated: true, error: e?.message });
     }
-  )
-);
+  },
+
+  switchUser: async (email: string) => {
+    set({ loading: true, error: null });
+    try {
+      const data = await api.post<{ user: User }>("/api/auth/login", { email });
+      set({ user: data.user, loading: false });
+      return true;
+    } catch (e: any) {
+      console.error("[auth login]", e?.message);
+      set({ loading: false, error: e?.message ?? "No se pudo iniciar sesión" });
+      return false;
+    }
+  },
+
+  switchArea: async (area: Area) => {
+    const cur = _get().user;
+    if (!cur) return false;
+    // En un sistema real, esto sería un endpoint dedicado; por ahora
+    // cambiamos el área en cliente (el backend lo persistirá al refrescar).
+    set({ user: { ...cur, area } });
+    return true;
+  },
+
+  logout: async () => {
+    try {
+      await api.post("/api/auth/logout");
+    } catch {}
+    set({ user: null, error: null });
+  },
+}));

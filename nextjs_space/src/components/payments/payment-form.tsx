@@ -17,10 +17,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { usePaymentsStore } from "@/lib/payments-store";
-import { useProjectsStore } from "@/lib/projects-store";
-import { useProvidersStore } from "@/lib/providers-store";
-import { useCutsStore } from "@/lib/cuts-store";
+import { usePaymentsStore } from "@/lib/data-store";
+import { useProjectsStore } from "@/lib/data-store";
+import { useProvidersStore } from "@/lib/data-store";
+import { useCutsStore } from "@/lib/data-store";
 import { useAuthStore } from "@/lib/auth-store";
 import { formatCurrency } from "@/lib/utils";
 import type { PaymentRequest, PaymentType, PaymentPriority } from "@/types";

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   Plus,
@@ -18,6 +18,7 @@ import {
   XCircle,
   FileText,
   Briefcase,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,30 +34,33 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { ModuleExplanationCard } from "@/components/ui/module-explanation-card";
 import {
   useProvidersStore,
   PROVIDER_STATUS_LABELS,
   PROVIDER_STATUS_VARIANTS,
   PERSON_TYPE_LABELS,
   CATEGORY_LABELS,
-} from "@/lib/providers-store";
+} from "@/lib/data-store";
 import { ProviderForm } from "@/components/providers/provider-form";
 import type { Provider, ProviderStatus, PersonType, ProviderCategory } from "@/types";
 
 export default function ProveedoresPage() {
-  const { providers, deleteProvider } = useProvidersStore();
+  const { providers, deleteProvider, load } = useProvidersStore();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | ProviderStatus>("ALL");
   const [personTypeFilter, setPersonTypeFilter] = useState<"ALL" | PersonType>("ALL");
   const [categoryFilter, setCategoryFilter] = useState<"ALL" | ProviderCategory>("ALL");
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Provider | null>(null);
-  const [deleting, setDeleting] = useState<Provider | null>(null);
+  const confirmDel = useConfirm();
+
+  useEffect(() => { load(); }, []);
 
   const filtered = useMemo(() => {
     return providers.filter((p) => {
@@ -80,14 +84,50 @@ export default function ProveedoresPage() {
     return { complete, incomplete, expired, naturales, total: providers.length };
   }, [providers]);
 
+  function askDelete(p: Provider) {
+    confirmDel.open({
+      title: "Eliminar proveedor?",
+      description: "Vas a eliminar el proveedor y todos sus documentos asociados. Esta accion NO se puede deshacer.",
+      details: (
+        <div className="space-y-1 text-xs">
+          <p><strong>Nombre:</strong> {p.name}</p>
+          <p><strong>{p.personType === "JURIDICA" ? "NIT" : "CC"}:</strong> {p.nit}</p>
+          <p><strong>Tipo:</strong> {PERSON_TYPE_LABELS[p.personType]}</p>
+          <p><strong>Contacto:</strong> {p.contact}</p>
+          <p><strong>Documentos cargados:</strong> {p.documents.length}</p>
+        </div>
+      ),
+      variant: "danger",
+      confirmText: "Eliminar proveedor",
+      onConfirm: async () => { await deleteProvider(p.id); },
+    });
+  }
+
   return (
     <div className="space-y-6">
+      <ModuleExplanationCard
+        icon={Users}
+        variant="guide"
+        title="Proveedores"
+        description="Registro maestro de contratistas y proveedores. Cada proveedor se asocia a contratos y radicacion de cuentas."
+        steps={[
+          { title: "Registra el proveedor", description: "Define tipo de persona (natural/juridica), NIT o cedula, contacto y datos bancarios." },
+          { title: "Carga documentos", description: "Sube RUT, camara de comercio, cedula, certificado bancario y certificaciones. El estado pasa a Habilitado al completar." },
+          { title: "Vincular a contrato", description: "Desde Contratos selecciona este proveedor para crear la relacion contractual." },
+          { title: "Mantener vigente", description: "Renueva docs antes de vencer. Si vence alguno, el sistema marca al proveedor como Docs vencidos." },
+        ]}
+        tips={[
+          "Un proveedor con docs vencidos no debe firmar nuevos contratos hasta renovar.",
+          "Solo ADMIN puede eliminar proveedores. La eliminacion borra su historial documental.",
+        ]}
+      />
+
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Proveedores</h1>
           <p className="text-sm text-muted-foreground">
-            {providers.length} registrados · {stats.complete} habilitados · {stats.expired} con docs vencidos
+            {providers.length} registrados - {stats.complete} habilitados - {stats.expired} con docs vencidos
           </p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -101,7 +141,7 @@ export default function ProveedoresPage() {
             <DialogHeader>
               <DialogTitle>Crear proveedor</DialogTitle>
               <DialogDescription>
-                Completa la información. Podrás agregar documentos después.
+                Completa la informacion. Podras agregar documentos despues.
               </DialogDescription>
             </DialogHeader>
             <ProviderForm onSuccess={() => setCreateOpen(false)} />
@@ -150,7 +190,7 @@ export default function ProveedoresPage() {
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Buscar por nombre, documento o contacto…"
+            placeholder="Buscar por nombre, documento o contacto..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -171,10 +211,10 @@ export default function ProveedoresPage() {
         </Select>
         <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as typeof categoryFilter)}>
           <SelectTrigger className="w-full sm:w-[180px]">
-            <SelectValue placeholder="Categoría" />
+            <SelectValue placeholder="Categoria" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="ALL">Todas las categorías</SelectItem>
+            <SelectItem value="ALL">Todas las categorias</SelectItem>
             {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
               <SelectItem key={k} value={k}>
                 {v}
@@ -215,7 +255,7 @@ export default function ProveedoresPage() {
               key={p.id}
               provider={p}
               onEdit={() => setEditing(p)}
-              onDelete={() => setDeleting(p)}
+              onDelete={() => askDelete(p)}
             />
           ))}
         </div>
@@ -232,34 +272,7 @@ export default function ProveedoresPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Confirm delete */}
-      <Dialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>¿Eliminar proveedor?</DialogTitle>
-            <DialogDescription>
-              Se eliminará <strong>{deleting?.name}</strong> y todos sus documentos asociados.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleting(null)}>
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                if (deleting) {
-                  deleteProvider(deleting.id);
-                  setDeleting(null);
-                }
-              }}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Eliminar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {confirmDel.dialog}
     </div>
   );
 }
@@ -312,12 +325,12 @@ function ProviderCard({
             <p className="flex items-center gap-1.5">
               <Mail className="h-3.5 w-3.5" />
               {p.email}
-              {p.email2 && <span className="text-xs">· {p.email2}</span>}
+              {p.email2 && <span className="text-xs">- {p.email2}</span>}
             </p>
             <p className="flex items-center gap-1.5">
               <Phone className="h-3.5 w-3.5" />
               {p.phone}
-              {p.phone2 && <span className="text-xs">· {p.phone2}</span>}
+              {p.phone2 && <span className="text-xs">- {p.phone2}</span>}
             </p>
             {p.city && (
               <p className="flex items-center gap-1.5">

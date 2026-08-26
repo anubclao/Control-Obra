@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, Loader2 } from "lucide-react";
+import { Building2, Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,29 +13,29 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useAuthStore } from "@/lib/auth-store";
-import { MOCK_USERS } from "@/lib/auth-mock";
-import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { switchUser, user, hydrated } = useAuthStore();
+  const { switchUser, user, hydrated, refresh } = useAuthStore();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [step, setStep] = useState<"email" | "otp">("email");
-  const [otp, setOtp] = useState("");
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   useEffect(() => {
     if (hydrated && user) router.push(`/${user.area}`);
   }, [hydrated, user, router]);
 
-  async function handleEmailSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    // FIX Bug #13: validar email en el paso 1 antes de mostrar OTP
     const trimmed = email.trim();
     if (!trimmed) {
-      setError("Ingresa un correo electrónico");
+      setError("Ingresa tu correo electrónico");
       return;
     }
     const isValidFormat = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
@@ -43,46 +43,15 @@ export default function LoginPage() {
       setError("Correo electrónico no válido");
       return;
     }
-    const found = MOCK_USERS.find(
-      (u) => u.email.toLowerCase() === trimmed.toLowerCase(),
-    );
-    if (!found) {
-      setError("Usuario no encontrado. Usa uno de los correos de prueba.");
-      return;
-    }
     setLoading(true);
-    // MOCK: simula envío de OTP
-    await new Promise((r) => setTimeout(r, 500));
+    const ok = await switchUser(trimmed);
     setLoading(false);
-    setStep("otp");
-  }
-
-  async function handleOtpSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
-    await new Promise((r) => setTimeout(r, 500));
-
-    // MOCK: cualquier OTP de 6 dígitos es válido si el email existe
-    if (otp.length !== 6) {
-      setError("El código debe tener 6 dígitos");
-      setLoading(false);
-      return;
-    }
-
-    const ok = switchUser(email);
     if (!ok) {
-      setError("Usuario no encontrado. Usa uno de los usuarios de prueba.");
-      setLoading(false);
+      setError("Usuario no encontrado. Verifica tu correo o contacta al administrador.");
       return;
     }
-
-    // FIX Bug #12: usar router.push en lugar de window.location.href
-    // (mantiene el cliente de Next y evita recarga completa)
-    const found = MOCK_USERS.find(
-      (u) => u.email.toLowerCase() === email.trim().toLowerCase(),
-    );
-    router.push(`/${found?.area ?? "administrativo"}`);
+    const me = await api.get<{ user: any }>("/api/auth/login").catch(() => ({ user: null }));
+    router.push(`/${me.user?.area ?? "administrativo"}`);
   }
 
   return (
@@ -100,106 +69,42 @@ export default function LoginPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">
-              {step === "email" ? "Iniciar sesión" : "Verificación"}
-            </CardTitle>
+            <CardTitle className="text-lg">Iniciar sesión</CardTitle>
             <CardDescription>
-              {step === "email"
-                ? "Ingresa tu correo para recibir un código OTP"
-                : `Ingresa el código de 6 dígitos enviado a ${email}`}
+              Ingresa tu correo corporativo para acceder al sistema.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {step === "email" ? (
-              <form onSubmit={handleEmailSubmit} className="space-y-4">
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">
-                    Correo electrónico
-                  </label>
-                  <Input
-                    type="email"
-                    placeholder="tu@correo.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    autoFocus
-                  />
-                </div>
-                {error && <p className="text-sm text-destructive">{error}</p>}
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Enviar código
-                </Button>
-              </form>
-            ) : (
-              <form onSubmit={handleOtpSubmit} className="space-y-4">
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">
-                    Código OTP
-                  </label>
-                  <Input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={6}
-                    placeholder="123456"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                    required
-                    autoFocus
-                    className="text-center text-lg tracking-widest"
-                  />
-                  <p className="mt-1.5 text-xs text-muted-foreground">
-                    (Mock: cualquier código de 6 dígitos es válido)
-                  </p>
-                </div>
-                {error && <p className="text-sm text-destructive">{error}</p>}
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => {
-                      setStep("email");
-                      setOtp("");
-                      setError(null);
-                    }}
-                  >
-                    Atrás
-                  </Button>
-                  <Button type="submit" className="flex-1" disabled={loading}>
-                    {loading && (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    Ingresar
-                  </Button>
-                </div>
-              </form>
-            )}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">
+                  Correo electrónico
+                </label>
+                <Input
+                  type="email"
+                  placeholder="tu@empresa.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoFocus
+                />
+              </div>
+              {error && (
+                <p className="text-sm text-destructive">{error}</p>
+              )}
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Ingresar
+              </Button>
+            </form>
           </CardContent>
         </Card>
 
-        <div className="mt-6 rounded-lg border bg-card p-4">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Usuarios de prueba
-          </p>
-          <div className="space-y-1">
-            {MOCK_USERS.slice(0, 5).map((u) => (
-              <button
-                key={u.id}
-                onClick={() => setEmail(u.email)}
-                className={cn(
-                  "flex w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-left text-sm transition-colors hover:bg-accent",
-                  email === u.email && "border-primary",
-                )}
-              >
-                <div>
-                  <p className="font-medium">{u.name}</p>
-                  <p className="text-xs text-muted-foreground">{u.email}</p>
-                </div>
-                <span className="text-xs text-muted-foreground">{u.area}</span>
-              </button>
-            ))}
-          </div>
+        <div className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+          <ShieldCheck className="h-3.5 w-3.5" />
+          <span>
+            Si no tienes acceso, pide al administrador que te envíe una invitación.
+          </span>
         </div>
       </div>
     </div>

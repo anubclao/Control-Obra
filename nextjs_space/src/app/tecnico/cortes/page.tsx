@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   Plus,
@@ -16,6 +16,7 @@ import {
   FileText,
   Building2,
   Truck,
+  ClipboardList,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,43 +32,45 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  useCutsStore,
-  CUT_STATUS_LABELS,
-  CUT_STATUS_VARIANTS,
-} from "@/lib/cuts-store";
-import { useProjectsStore } from "@/lib/projects-store";
-import { useProvidersStore } from "@/lib/providers-store";
+import { ConfirmDialog, useConfirm } from "@/components/ui/confirm-dialog";
+import { ModuleExplanationCard } from "@/components/ui/module-explanation-card";
+import { useCutsStore, useProjectsStore, useProvidersStore } from "@/lib/data-store";
+import { useAuthStore } from "@/lib/auth-store";
+import { CUT_STATUS_LABELS, CUT_STATUS_VARIANTS } from "@/lib/data-store";
 import { useIsSuperAdmin } from "@/lib/permissions";
 import { CutForm } from "@/components/cuts/cut-form";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import type { WorkCut, WorkCutStatus } from "@/types";
 
 export default function CortesPage() {
-  const { cuts, deleteCut } = useCutsStore();
-  const { projects, getProject } = useProjectsStore();
-  const { getProvider } = useProvidersStore();
+  const { cuts, deleteCut, load: loadCuts } = useCutsStore();
+  const { projects, getProject, load: loadProjects } = useProjectsStore();
+  const { providers, getProvider, load: loadProviders } = useProvidersStore();
+  const { user } = useAuthStore();
   const isSuperAdmin = useIsSuperAdmin();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | WorkCutStatus>("ALL");
-  // PDF p.17: vista por proyecto — seleccionar proyecto y proveedor
   const [projectFilter, setProjectFilter] = useState<string>("ALL");
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<WorkCut | null>(null);
   const [deleting, setDeleting] = useState<WorkCut | null>(null);
+  const confirmDel = useConfirm();
 
-  // Cortes del proyecto seleccionado (PDF p.17)
+  useEffect(() => {
+    loadCuts();
+    loadProjects();
+    loadProviders();
+  }, []);
+
   const projectCuts = useMemo(() => {
     if (projectFilter === "ALL") return cuts;
     return cuts.filter((c) => c.projectId === projectFilter);
   }, [cuts, projectFilter]);
 
-  // Agrupar por proveedor (PDF p.17)
   const groupedByProvider = useMemo(() => {
     const groups: Record<string, { providerName: string; cuts: WorkCut[]; gross: number; net: number }> = {};
     for (const c of projectCuts) {
@@ -75,9 +78,7 @@ export default function CortesPage() {
       if (!groups[c.providerId]) {
         groups[c.providerId] = {
           providerName: provider?.name ?? "(Proveedor no encontrado)",
-          cuts: [],
-          gross: 0,
-          net: 0,
+          cuts: [], gross: 0, net: 0,
         };
       }
       groups[c.providerId].cuts.push(c);
@@ -103,13 +104,10 @@ export default function CortesPage() {
   }, [projectCuts, search, statusFilter, getProject, getProvider]);
 
   const stats = useMemo(() => {
-    const total = projectCuts.length;
     const gross = projectCuts.reduce((s, c) => s + c.grossValue, 0);
     const net = projectCuts.reduce((s, c) => s + c.netValue, 0);
     return {
-      total,
-      gross,
-      net,
+      total: projectCuts.length, gross, net,
       draft: projectCuts.filter((c) => c.status === "DRAFT").length,
       submitted: projectCuts.filter((c) => c.status === "SUBMITTED").length,
       validated: projectCuts.filter((c) => c.status === "VALIDATED").length,
@@ -119,30 +117,75 @@ export default function CortesPage() {
     };
   }, [projectCuts]);
 
+  function openDeleteConfirm(c: WorkCut) {
+    if (!isSuperAdmin) return;
+    confirmDel.open({
+      title: "¿Eliminar este corte?",
+      description: `El corte ${c.cutNumber} se eliminará permanentemente. Esta acción NO se puede deshacer.`,
+      details: (
+        <div className="space-y-1 text-xs">
+          <p><strong>Proyecto:</strong> {getProject(c.projectId)?.name}</p>
+          <p><strong>Proveedor:</strong> {getProvider(c.providerId)?.name}</p>
+          <p><strong>Valor neto:</strong> {formatCurrency(c.netValue)}</p>
+        </div>
+      ),
+      variant: "danger",
+      confirmText: "Eliminar corte",
+      onConfirm: async () => {
+        await deleteCut(c.id);
+        setDeleting(null);
+      },
+    });
+    setDeleting(c);
+  }
+
   return (
     <div className="space-y-6">
+      <ModuleExplanationCard
+        icon={ClipboardList}
+        variant="guide"
+        title="Cortes de Obra"
+        description="Registra el avance ejecutado por el contratista en cada período. Pasa por validación, aprobación y pago."
+        steps={[
+          {
+            title: "Crea el corte",
+            description: "Define proyecto, contratista, período y los ítems ejecutados con sus cantidades.",
+          },
+          {
+            title: "Envía a validación",
+            description: "El residente envía → Director valida → Admin aprueba → Tesorería paga.",
+          },
+          {
+            title: "Vincula al pago",
+            description: "Cuando el corte está APROBADO, Tesorería puede generar la solicitud de pago asociada.",
+          },
+        ]}
+        warnings={[
+          "Solo puedes eliminar cortes en estado DRAFT o REJECTED.",
+          "El rechazo REQUIERE un motivo; el contratista debe corregir y reenviar.",
+        ]}
+      />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Cortes de Obra</h1>
           <p className="text-sm text-muted-foreground">
             {projectFilter === "ALL"
               ? `${stats.total} cortes · Vista general`
-              : `Cortes por proveedor · ${getProject(projectFilter)?.name ?? ""}`}
+              : `Agrupado por proveedor · ${getProject(projectFilter)?.name ?? ""}`}
           </p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
             <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Nuevo corte
+              <Plus className="mr-2 h-4 w-4" /> Nuevo corte
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Crear corte de obra</DialogTitle>
               <DialogDescription>
-                Define el período, los ítems ejecutados y los descuentos. El valor se calcula de las
-                actividades cargadas (no fija un valor total manual).
+                Define el período, ítems ejecutados y descuentos. El valor se calcula de las actividades.
               </DialogDescription>
             </DialogHeader>
             <CutForm onSuccess={() => setCreateOpen(false)} />
@@ -150,7 +193,6 @@ export default function CortesPage() {
         </Dialog>
       </div>
 
-      {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
         <KpiMini label="Borrador" value={stats.draft} icon={FileText} color="text-muted-foreground" />
         <KpiMini label="Enviados" value={stats.submitted} icon={Clock} color="text-amber-600" />
@@ -171,7 +213,6 @@ export default function CortesPage() {
         </div>
       </div>
 
-      {/* Filtros — PDF p.17 */}
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -203,9 +244,7 @@ export default function CortesPage() {
           <SelectContent>
             <SelectItem value="ALL">Todos los estados</SelectItem>
             {Object.entries(CUT_STATUS_LABELS).map(([k, v]) => (
-              <SelectItem key={k} value={k}>
-                {v}
-              </SelectItem>
+              <SelectItem key={k} value={k}>{v}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -227,19 +266,17 @@ export default function CortesPage() {
         <div className="space-y-2">
           {filtered.map((c) => (
             <CutRow
-              key={c.id}
-              cut={c}
+              key={c.id} cut={c}
               projectName={getProject(c.projectId)?.name}
               projectCode={getProject(c.projectId)?.code}
               providerName={getProvider(c.providerId)?.name}
               isSuperAdmin={isSuperAdmin}
               onEdit={() => setEditing(c)}
-              onDelete={() => setDeleting(c)}
+              onDelete={() => openDeleteConfirm(c)}
             />
           ))}
         </div>
       ) : (
-        // PDF p.17: agrupado por proveedor cuando hay proyecto seleccionado
         <div className="space-y-4">
           {groupedByProvider
             .filter(([, g]) => g.cuts.some((c) => filtered.includes(c)))
@@ -257,20 +294,17 @@ export default function CortesPage() {
                   </div>
                 </div>
                 <div className="divide-y">
-                  {group.cuts
-                    .filter((c) => filtered.includes(c))
-                    .map((c) => (
-                      <CutRow
-                        key={c.id}
-                        cut={c}
-                        projectName={getProject(c.projectId)?.name}
-                        projectCode={getProject(c.projectId)?.code}
-                        providerName={getProvider(c.providerId)?.name}
-                        isSuperAdmin={isSuperAdmin}
-                        onEdit={() => setEditing(c)}
-                        onDelete={() => setDeleting(c)}
-                      />
-                    ))}
+                  {group.cuts.filter((c) => filtered.includes(c)).map((c) => (
+                    <CutRow
+                      key={c.id} cut={c}
+                      projectName={getProject(c.projectId)?.name}
+                      projectCode={getProject(c.projectId)?.code}
+                      providerName={getProvider(c.providerId)?.name}
+                      isSuperAdmin={isSuperAdmin}
+                      onEdit={() => setEditing(c)}
+                      onDelete={() => openDeleteConfirm(c)}
+                    />
+                  ))}
                 </div>
               </CardWrapper>
             ))}
@@ -287,34 +321,7 @@ export default function CortesPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>¿Eliminar corte?</DialogTitle>
-            <DialogDescription>
-              Solo el Super Administrador puede eliminar cortes. Esta acción no se puede deshacer.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleting(null)}>
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={!isSuperAdmin}
-              onClick={() => {
-                if (deleting) {
-                  deleteCut(deleting.id);
-                  setDeleting(null);
-                }
-              }}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              {isSuperAdmin ? "Eliminar" : "Solo Super Admin"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {confirmDel.dialog}
     </div>
   );
 }
@@ -324,10 +331,7 @@ function CardWrapper({ children }: { children: React.ReactNode }) {
 }
 
 function KpiMini({
-  label,
-  value,
-  icon: Icon,
-  color,
+  label, value, icon: Icon, color,
 }: {
   label: string;
   value: number;
@@ -346,13 +350,7 @@ function KpiMini({
 }
 
 function CutRow({
-  cut: c,
-  projectName,
-  projectCode,
-  providerName,
-  isSuperAdmin,
-  onEdit,
-  onDelete,
+  cut: c, projectName, projectCode, providerName, isSuperAdmin, onEdit, onDelete,
 }: {
   cut: WorkCut;
   projectName?: string;
@@ -409,31 +407,22 @@ function CutRow({
                 href={`/tecnico/cortes/${c.id}`}
                 className="flex items-center gap-2 rounded-t-md px-3 py-2 text-sm hover:bg-accent"
               >
-                <Eye className="h-4 w-4" />
-                Ver detalle
+                <Eye className="h-4 w-4" /> Ver detalle
               </Link>
               {isEditable && (
                 <button
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onEdit();
-                  }}
+                  onClick={() => { setMenuOpen(false); onEdit(); }}
                   className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent"
                 >
-                  <Pencil className="h-4 w-4" />
-                  Editar
+                  <Pencil className="h-4 w-4" /> Editar
                 </button>
               )}
               {isSuperAdmin && (
                 <button
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onDelete();
-                  }}
+                  onClick={() => { setMenuOpen(false); onDelete(); }}
                   className="flex w-full items-center gap-2 rounded-b-md px-3 py-2 text-sm text-destructive hover:bg-accent"
                 >
-                  <Trash2 className="h-4 w-4" />
-                  Eliminar
+                  <Trash2 className="h-4 w-4" /> Eliminar
                 </button>
               )}
             </div>

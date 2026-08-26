@@ -13,8 +13,7 @@ import {
   Trash2,
   Send,
   Calendar,
-  KeyRound,
-} from "lucide-react";
+  KeyRound, UserCog} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,13 +34,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useInvitationsStore } from "@/lib/invitations-store";
-import { useProjectsStore } from "@/lib/projects-store";
-import { MOCK_USERS } from "@/lib/auth-mock";
+import { useInvitationsStore } from "@/lib/data-store";
+import { useProjectsStore } from "@/lib/data-store";
+import { useIsSuperAdmin } from "@/lib/permissions";
 import { useAuthStore } from "@/lib/auth-store";
 import { formatDate } from "@/lib/utils";
 import type { Role, Area, Invitation } from "@/types";
 
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { ModuleExplanationCard } from "@/components/ui/module-explanation-card";
 export default function UsuariosPage() {
   const { invitations, cancelInvitation, deleteInvitation } = useInvitationsStore();
   const { projects } = useProjectsStore();
@@ -53,16 +54,32 @@ export default function UsuariosPage() {
     const pending = invitations.filter((i) => i.status === "PENDING").length;
     const accepted = invitations.filter((i) => i.status === "ACCEPTED").length;
     const expired = invitations.filter((i) => i.status === "EXPIRED").length;
-    return { pending, accepted, expired, total: invitations.length, activeUsers: MOCK_USERS.length };
+    return { pending, accepted, expired, total: invitations.length, activeUsers: [].length };
   }, [invitations]);
 
   return (
     <div className="space-y-6">
+
+      <ModuleExplanationCard
+        icon={UserCog}
+        variant="guide"
+        title="Administracion de Usuarios"
+        description="Gestiona usuarios e invitaciones."
+        steps={[
+            { title: "Crear invitacion", description: "Codigo, email, rol y area." },
+            { title: "Compartir codigo", description: "Usuario acepta desde login." },
+            { title: "Asignar proyecto", description: "Restringir a un proyecto." },
+          ]}
+          warnings={[
+            "Solo ADMIN puede crear invitaciones.",
+          ]}
+      />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Usuarios e Invitaciones</h1>
           <p className="text-sm text-muted-foreground">
-            {MOCK_USERS.length} usuarios · {stats.pending} invitaciones pendientes
+            {[].length} usuarios · {stats.pending} invitaciones pendientes
           </p>
         </div>
         <Dialog open={createOpen} onOpenChange={(o) => { setCreateOpen(o); if (!o) setCreatedCode(null); }}>
@@ -162,7 +179,7 @@ export default function UsuariosPage() {
           Usuarios del sistema
         </h2>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-          {MOCK_USERS.map((u) => (
+          {[].map((u) => (
             <div key={u.id} className="rounded-lg border bg-card p-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">

@@ -19,9 +19,9 @@ import {
   useExpensesStore,
   EXPENSE_TYPE_LABELS,
   categoryFor,
-} from "@/lib/expenses-store";
-import { useProvidersStore } from "@/lib/providers-store";
-import { useProjectsStore } from "@/lib/projects-store";
+} from "@/lib/data-store";
+import { useProvidersStore } from "@/lib/data-store";
+import { useProjectsStore } from "@/lib/data-store";
 import { useCurrentUser } from "@/lib/permissions";
 import { formatCurrency } from "@/lib/utils";
 import type { ExpenseType } from "@/types";

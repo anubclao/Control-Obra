@@ -17,8 +17,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useLogsStore, WEATHER_LABELS, WEATHER_ICONS } from "@/lib/logs-store";
-import { useProjectsStore } from "@/lib/projects-store";
+import { useLogsStore, WEATHER_LABELS, WEATHER_ICONS } from "@/lib/data-store";
+import { useProjectsStore } from "@/lib/data-store";
 import { formatDate } from "@/lib/utils";
 
 export default function LogDetailPage() {
