@@ -3,9 +3,8 @@
  */
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { runtime, dynamic } from "@/lib/api-helpers";
-
-export { runtime, dynamic };
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 // Mapear snake_case de BD → camelCase para el frontend
 function rowToDTO(r: any) {

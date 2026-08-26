@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 /**
  * API: GET /api/auth/me  → usuario actual o 401
  * API: POST /api/auth/login { email } → inicia sesión
@@ -10,8 +12,6 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { query } from "@/lib/db";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 const SESSION_COOKIE = "co_session";
 

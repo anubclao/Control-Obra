@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 /**
  * CRUD: /api/cuts (work_cuts)
  * Reglas de transición (PDF p.21):
@@ -7,8 +9,6 @@
 import { NextResponse } from "next/server";
 import { query, transaction } from "@/lib/db";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 const TRANSITIONS: Record<string, string[]> = {
   DRAFT: ["SUBMITTED"],

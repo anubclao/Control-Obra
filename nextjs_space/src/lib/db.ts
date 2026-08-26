@@ -24,12 +24,12 @@ declare global {
 function buildPoolConfig(): PoolOptions {
   const user = process.env.DB_USER ?? "controlobra";
   const password = process.env.DB_PASSWORD ?? "";
-  // Fail-closed: si en producción falta DB_USER, no arrancamos.
-  // En dev, sólo avisamos; el primer query fallará ruidosamente.
+  // En produccion, si faltan vars criticas, logueamos y dejamos que el
+  // pool se cree con defaults. El primer query fallara ruidosamente y
+  // avisara al operador. Esto evita que Next.js aborte el build por
+  // no tener las env vars en build time (Hostinger las pasa en runtime).
   if (process.env.NODE_ENV === "production" && !process.env.DB_USER) {
-    throw new Error(
-      "[startup] DB_USER es obligatorio en producción. Define DB_USER en .env",
-    );
+    console.warn("[db] ADVERTENCIA: DB_USER no definido en produccion. Se usara 'controlobra'. Defina DB_USER en el panel de Hostinger.");
   }
 
   return {

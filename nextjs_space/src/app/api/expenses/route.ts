@@ -1,11 +1,11 @@
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 /**
  * CRUD: /api/expenses — Registro de gastos
  */
 import { NextResponse } from "next/server";
 import { query, transaction } from "@/lib/db";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 function r(row: any) {
   return {

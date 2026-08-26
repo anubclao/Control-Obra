@@ -1,11 +1,11 @@
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 /**
  * CRUD: /api/payments — solicitudes de pago con multinivel
  */
 import { NextResponse } from "next/server";
 import { query, transaction } from "@/lib/db";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 const TRANSITIONS: Record<string, string[]> = {
   PENDING: ["APPROVED_LEVEL_1", "REJECTED", "CANCELLED"],
