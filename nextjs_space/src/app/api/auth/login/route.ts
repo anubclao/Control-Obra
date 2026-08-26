@@ -67,7 +67,26 @@ export async function POST(req: Request) {
     });
     return NextResponse.json({ user }, { status: 200 });
   } catch (e: any) {
-    console.error("[auth POST] Error:", e?.code, e?.message);
-    return NextResponse.json({ error: "No se pudo iniciar sesión" }, { status: 500 });
+    // Diagnostico detallado: el 500 viene del servidor MySQL.
+    // Con estos logs podemos saber EXACTAMENTE qué pasa sin SSH.
+    console.error("[auth POST] === DB ERROR ===");
+    console.error("[auth POST] code:", e?.code);
+    console.error("[auth POST] errno:", e?.errno);
+    console.error("[auth POST] sqlState:", e?.sqlState);
+    console.error("[auth POST] message:", e?.message);
+    console.error("[auth POST] sqlMessage:", e?.sqlMessage);
+    console.error("[auth POST] stack:", e?.stack?.split("
+").slice(0, 5).join("
+"));
+    console.error("[auth POST] DB_HOST=", process.env.DB_HOST);
+    console.error("[auth POST] DB_USER=", process.env.DB_USER);
+    console.error("[auth POST] DB_NAME=", process.env.DB_NAME);
+    console.error("[auth POST] DB_PORT=", process.env.DB_PORT);
+    console.error("[auth POST] =================");
+    return NextResponse.json({
+      error: "Error interno del servidor",
+      code: e?.code,
+      detail: process.env.NODE_ENV === "production" ? undefined : e?.message,
+    }, { status: 500 });
   }
 }
