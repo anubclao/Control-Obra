@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, Loader2, ShieldCheck } from "lucide-react";
+import { Building2, Loader2, ShieldCheck, Mail, KeyRound, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -15,12 +15,18 @@ import {
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
 
+type Step = "email" | "otp";
+
 export default function LoginPage() {
   const router = useRouter();
-  const { switchUser, user, hydrated, refresh, lastStatus, lastDetail } = useAuthStore();
+  const { user, hydrated, refresh } = useAuthStore();
+  const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState(0);
 
   useEffect(() => {
     refresh();
@@ -30,37 +36,83 @@ export default function LoginPage() {
     if (hydrated && user) router.push(`/${user.area}`);
   }, [hydrated, user, router]);
 
-  async function handleSubmit(e: React.FormEvent) {
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const t = setTimeout(() => setCountdown((n) => n - 1), 1000);
+    return () => clearTimeout(t);
+  }, [countdown]);
+
+  async function requestOtp(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const trimmed = email.trim();
+    setInfo(null);
+    const trimmed = email.trim().toLowerCase();
     if (!trimmed) {
       setError("Ingresa tu correo electronico");
       return;
     }
-    const isValidFormat = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
-    if (!isValidFormat) {
+    const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+    if (!isValid) {
       setError("Correo electronico no valido");
       return;
     }
     setLoading(true);
-    const ok = await switchUser(trimmed);
-    setLoading(false);
-    if (!ok) {
-      const st = useAuthStore.getState().lastStatus;
-      const dt = useAuthStore.getState().lastDetail;
-      const statusText = st === 404
-        ? "404 - Usuario no encontrado. Verifica que el email este registrado en users con is_active=1."
-        : st === 500
-        ? "500 - El servidor fallo. Causa probable: MySQL no accesible (env vars incorrectas en Hostinger)."
-        : (st ? st + " - Error del servidor" : "Sin respuesta del servidor (timeout / DNS)");
-      const detailText = dt ? "Detalle: " + JSON.stringify(dt, null, 2) : "Sin detalle del backend. Mira el log de errores de Hostinger (server.err.log) o llama a /api/auth/debug si configuraste DEBUG_TOKEN.";
-      const fullMsg = statusText + "\n\n" + detailText;
-      setError(fullMsg);
+    try {
+      const data = await api.post<{ ok: boolean; message: string; devCode?: string }>(
+        "/api/auth/request-otp",
+        { email: trimmed }
+      );
+      setInfo(
+        (data.message ?? "Codigo enviado a tu correo") +
+        (data.devCode ? ` [DEV: ${data.devCode}]` : "")
+      );
+      setStep("otp");
+      setCountdown(60); // permite reenviar despues de 60s
+    } catch (e: any) {
+      const st = e?.status;
+      if (st === 404) {
+        setError("Este correo no esta registrado. Contacta al administrador para que te cree una cuenta.");
+      } else if (st === 500) {
+        setError("El servidor fallo al enviar el codigo. Verifica configuracion SMTP en Hostinger.");
+      } else {
+        setError(e?.message ?? "No se pudo enviar el codigo. Intenta de nuevo.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function verifyOtp(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setInfo(null);
+    if (!otp.trim() || !/^\d{6}$/.test(otp.trim())) {
+      setError("El codigo debe tener exactamente 6 digitos");
       return;
     }
-    const me = await api.get<{ user: any }>("/api/auth/login").catch(() => ({ user: null }));
-    router.push(`/${me.user?.area ?? "administrativo"}`);
+    setLoading(true);
+    try {
+      const data = await api.post<{ ok: boolean; user: any }>(
+        "/api/auth/verify-otp",
+        { email: email.trim().toLowerCase(), otp: otp.trim() }
+      );
+      if (data.ok && data.user) {
+        router.push(`/${data.user.area ?? "administrativo"}`);
+      } else {
+        setError("Codigo invalido. Verifica e intenta de nuevo.");
+      }
+    } catch (e: any) {
+      const st = e?.status;
+      if (st === 401) {
+        setError("Codigo invalido o expirado. Solicita uno nuevo.");
+      } else if (st === 500) {
+        setError("Error al verificar codigo. Mira server.err.log de Hostinger.");
+      } else {
+        setError(e?.message ?? "Error al verificar. Intenta de nuevo.");
+      }
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -72,64 +124,124 @@ export default function LoginPage() {
           </div>
           <h1 className="text-2xl font-semibold">Control de Obra Pro</h1>
           <p className="text-sm text-muted-foreground">
-            Sistema de gestión de proyectos
+            Sistema de gestion de proyectos
           </p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Iniciar sesión</CardTitle>
+            <CardTitle className="text-lg flex items-center gap-2">
+              {step === "email" ? (
+                <>
+                  <Mail className="h-4 w-4" />
+                  Iniciar sesion
+                </>
+              ) : (
+                <>
+                  <KeyRound className="h-4 w-4" />
+                  Verificar codigo
+                </>
+              )}
+            </CardTitle>
             <CardDescription>
-              Ingresa tu correo corporativo para acceder al sistema.
+              {step === "email"
+                ? "Ingresa tu correo corporativo. Te enviaremos un codigo de 6 digitos."
+                : `Ingresa el codigo de 6 digitos enviado a ${email}.`}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="mb-1.5 block text-sm font-medium">
-                  Correo electrónico
-                </label>
-                <Input
-                  type="email"
-                  placeholder="tu@empresa.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoFocus
-                />
-              </div>
-              {error && (
-                <div className="rounded border border-destructive/40 bg-destructive/5 p-3 space-y-2">
-                  <p className="text-xs text-destructive font-semibold uppercase tracking-wide">Error del servidor</p>
-                  <p className="text-xs text-destructive whitespace-pre-wrap font-medium">{error}</p>
-                  {(lastStatus !== null) && (
-                    <details className="border-t border-destructive/20 pt-2">
-                      <summary className="text-[10px] text-muted-foreground cursor-pointer uppercase tracking-wide">
-                        Detalle tecnico (soporte)
-                      </summary>
-                      <pre className="mt-2 overflow-auto text-[10px] text-foreground/70 whitespace-pre-wrap break-all bg-background/50 p-2 rounded">
-{JSON.stringify({
-  status: lastStatus,
-  detail: lastDetail,
-  requestId: `lastLogin-${new Date().toISOString()}`
-}, null, 2)}
-                      </pre>
-                    </details>
-                  )}
+            {step === "email" ? (
+              <form onSubmit={requestOtp} className="space-y-4">
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">
+                    Correo electronico
+                  </label>
+                  <Input
+                    type="email"
+                    placeholder="tu@empresa.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoFocus
+                  />
                 </div>
-              )}
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Ingresar
-              </Button>
-            </form>
+                {error && (
+                  <p className="text-xs text-destructive whitespace-pre-wrap font-mono bg-destructive/5 p-2 rounded">{error}</p>
+                )}
+                {info && (
+                  <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 p-2 rounded">{info}</p>
+                )}
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Enviar codigo
+                </Button>
+              </form>
+            ) : (
+              <form onSubmit={verifyOtp} className="space-y-4">
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">
+                    Codigo de 6 digitos
+                  </label>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    placeholder="123456"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                    required
+                    autoFocus
+                    className="text-center text-lg tracking-widest font-mono"
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Revisa tu bandeja de entrada. Codigo valido por 10 minutos.
+                  </p>
+                </div>
+                {error && (
+                  <p className="text-xs text-destructive whitespace-pre-wrap font-mono bg-destructive/5 p-2 rounded">{error}</p>
+                )}
+                {info && (
+                  <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 p-2 rounded">{info}</p>
+                )}
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      setStep("email");
+                      setOtp("");
+                      setError(null);
+                      setInfo(null);
+                    }}
+                    disabled={loading}
+                  >
+                    <ArrowLeft className="mr-1 h-3.5 w-3.5" />
+                    Cambiar email
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="flex-1"
+                    onClick={() => requestOtp({ preventDefault: () => {} } as React.FormEvent)}
+                    disabled={loading || countdown > 0}
+                  >
+                    {countdown > 0 ? `Reenviar (${countdown}s)` : "Reenviar"}
+                  </Button>
+                </div>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Verificar y entrar
+                </Button>
+              </form>
+            )}
           </CardContent>
         </Card>
 
         <div className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground">
           <ShieldCheck className="h-3.5 w-3.5" />
           <span>
-            Si no tienes acceso, pide al administrador que te envíe una invitación.
+            Autenticacion por codigo OTP enviado a tu correo. Si no tienes acceso, contacta al administrador.
           </span>
         </div>
       </div>

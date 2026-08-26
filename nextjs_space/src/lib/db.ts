@@ -21,23 +21,66 @@ declare global {
   var __controlObraPool: Pool | undefined;
 }
 
+function parseDatabaseUrl(url: string): { host: string; port: number; user: string; password: string; database: string } | null {
+  // Acepta: mysql://USER:PASS@HOST:PORT/DB  (con o sin TLS)
+  try {
+    const u = new URL(url);
+    if (!u.protocol.startsWith("mysql")) return null;
+    return {
+      host: u.hostname,
+      port: u.port ? Number(u.port) : 3306,
+      user: decodeURIComponent(u.username),
+      password: decodeURIComponent(u.password),
+      database: u.pathname.replace(/^\//, ""),
+    };
+  } catch {
+    return null;
+  }
+}
+
 function buildPoolConfig(): PoolOptions {
-  const user = process.env.DB_USER ?? "controlobra";
-  const password = process.env.DB_PASSWORD ?? "";
+  // Soporte para Hostinger: prefiere DATABASE_URL (formato mysql://...)
+  // y cae al fallback de las 4 variables separadas para dev/local.
+  let user = "controlobra";
+  let password = "";
+  let host = "localhost";
+  let port = 3306;
+  let database = "control_obra";
+  const dbUrl = process.env.DATABASE_URL;
+  if (dbUrl) {
+    const parsed = parseDatabaseUrl(dbUrl);
+    if (parsed) {
+      host = parsed.host;
+      port = parsed.port;
+      user = parsed.user;
+      password = parsed.password;
+      database = parsed.database;
+    } else {
+      console.warn("[db] DATABASE_URL presente pero no parseable. Usando fallback DB_HOST/DB_USER/DB_PASSWORD/DB_NAME.");
+    }
+  }
+  if (!dbUrl) {
+    user = process.env.DB_USER ?? "controlobra";
+    password = process.env.DB_PASSWORD ?? "";
+    host = process.env.DB_HOST ?? "localhost";
+    port = Number(process.env.DB_PORT ?? 3306);
+    database = process.env.DB_NAME ?? "control_obra";
+  }
+
   // En produccion, si faltan vars criticas, logueamos y dejamos que el
   // pool se cree con defaults. El primer query fallara ruidosamente y
   // avisara al operador. Esto evita que Next.js aborte el build por
   // no tener las env vars en build time (Hostinger las pasa en runtime).
-  if (process.env.NODE_ENV === "production" && !process.env.DB_USER) {
-    console.warn("[db] ADVERTENCIA: DB_USER no definido en produccion. Se usara 'controlobra'. Defina DB_USER en el panel de Hostinger.");
+  if (process.env.NODE_ENV === "production" && (!user || !password || !host || !database)) {
+    console.warn("[db] ADVERTENCIA: variables de conexion incompletas. Revisa DATABASE_URL o DB_HOST/DB_USER/DB_PASSWORD/DB_NAME en el panel de Hostinger.");
   }
 
   return {
-    host: process.env.DB_HOST ?? "localhost",
-    port: Number(process.env.DB_PORT ?? 3306),
+    host,
+    port,
     user,
     password,
-    database: process.env.DB_NAME ?? "control_obra",
+    database,
     connectionLimit: Number(process.env.DB_POOL_SIZE ?? 10),
     waitForConnections: true,
     queueLimit: 0,
