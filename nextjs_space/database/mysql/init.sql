@@ -762,3 +762,18 @@ SET FOREIGN_KEY_CHECKS = 1;
 --   SELECT 'Tablas creadas:', COUNT(*) FROM information_schema.tables
 --     WHERE table_schema = 'control_obra';
 -- =============================================================================
+
+-- =====================================================================
+-- AUTENTICACION: Codigos OTP (one-time password) para login
+-- =====================================================================
+CREATE TABLE IF NOT EXISTS auth_otps (
+  id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  email       VARCHAR(180)  NOT NULL,
+  code_hash   VARCHAR(128)  NOT NULL,
+  expires_at  DATETIME      NOT NULL,
+  used_at     DATETIME      NULL,
+  attempts    TINYINT       NOT NULL DEFAULT 0,
+  created_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_otps_email (email),
+  INDEX idx_otps_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
