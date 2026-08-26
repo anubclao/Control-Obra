@@ -75,9 +75,7 @@ export async function POST(req: Request) {
     console.error("[auth POST] sqlState:", e?.sqlState);
     console.error("[auth POST] message:", e?.message);
     console.error("[auth POST] sqlMessage:", e?.sqlMessage);
-    console.error("[auth POST] stack:", e?.stack?.split("
-").slice(0, 5).join("
-"));
+    console.error("[auth POST] stack:", (e?.stack ?? "").split(String.fromCharCode(10)).slice(0, 5).join(" | "));
     console.error("[auth POST] DB_HOST=", process.env.DB_HOST);
     console.error("[auth POST] DB_USER=", process.env.DB_USER);
     console.error("[auth POST] DB_NAME=", process.env.DB_NAME);
