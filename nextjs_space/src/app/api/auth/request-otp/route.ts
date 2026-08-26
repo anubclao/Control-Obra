@@ -68,7 +68,9 @@ export async function POST(req: Request) {
       //  - Estamos en dev (NODE_ENV != production)
       //  - O el operador configuro AUTH_RETURN_CODE=1 (debug)
       // En produccion, este flag SIEMPRE debe estar apagado.
-      ...((isDev || process.env.AUTH_RETURN_CODE === "1") ? { devCode: code } : {}),
+      // Solo devolver devCode si email fallo (modo fallback) o si esta en dev.
+      // En produccion con SMTP OK, el codigo se entrega por email y NO aparece aqui.
+      ...(isDev || !emailResult.ok ? { devCode: code } : {}),
       // Diagnostico
       emailSent: emailResult.ok,
       ...(emailResult.error ? { emailError: emailResult.error } : {}),

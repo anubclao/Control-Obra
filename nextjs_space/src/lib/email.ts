@@ -1,83 +1,94 @@
+import nodemailer from "nodemailer";
+
 /**
  * lib/email.ts
- * Wrapper SMTP para enviar codigos OTP al usuario.
- * Usa el SMTP de Hostinger (SMTP_HOST, SMTP_PORT, EMAIL_USER, EMAIL_PASS).
+ * SMTP wrapper para enviar codigos OTP via Gmail.
+ * Usa nodemailer (instalado via npm).
+ *
+ * Hostinger ya tiene configuradas las env vars:
+ *   SMTP_HOST=smtp.gmail.com
+ *   SMTP_PORT=465
+ *   EMAIL_USER=tecnowebiacol@gmail.com
+ *   EMAIL_PASS=*** App Password de Gmail
+ *   SMTP_FROM=tecnowebiacol@gmail.com
  */
 
-interface SendOtpOptions {
-  to: string;
-  code: string;
-}
+let cachedTransport: nodemailer.Transporter | null = null;
 
-export async function sendOtpEmail({ to, code }: SendOtpOptions): Promise<{ ok: boolean; error?: string }> {
+function getTransport() {
+  if (cachedTransport) return cachedTransport;
+
   const host = process.env.SMTP_HOST;
-  const port = Number(process.env.SMTP_PORT ?? 587);
+  const port = Number(process.env.SMTP_PORT ?? 465);
   const user = process.env.EMAIL_USER;
   const pass = process.env.EMAIL_PASS;
-  const from = process.env.SMTP_FROM ?? user ?? "noreply@controlobra.local";
 
   if (!host || !user || !pass) {
-    console.warn("[email] SMTP no configurado (SMTP_HOST/EMAIL_USER/EMAIL_PASS). Mostrando OTP en consola para dev.");
-    console.log(`[email] OTP para ${to}: ${code}`);
-    return { ok: true };
+    throw new Error(
+      `SMTP no configurado: SMTP_HOST=${!!host} EMAIL_USER=${!!user} EMAIL_PASS=${!!pass}`,
+    );
   }
 
-  // Implementacion SMTP con TLS via Node stdlib (sin dependencia extra).
-  const tls = await import("node:tls");
-  const net = await import("node:net");
-
-  return new Promise((resolve) => {
-    const socket = tls.connect({ host, port, servername: host }, () => {
-      // handshake TLS completado
-    });
-    let buf = "";
-    const commands: string[] = [
-      `EHLO controlobra.local`,
-      `AUTH LOGIN`,
-      Buffer.from(user, "utf8").toString("base64"),
-      Buffer.from(pass, "utf8").toString("base64"),
-      `MAIL FROM:<${from}>`,
-      `RCPT TO:<${to}>`,
-      `DATA`,
-      [
-        `From: Control de Obra Pro <${from}>`,
-        `To: <${to}>`,
-        `Subject: Tu codigo de acceso - Control de Obra Pro`,
-        `MIME-Version: 1.0`,
-        `Content-Type: text/plain; charset=UTF-8`,
-        ``,
-        `Hola,`,
-        ``,
-        `Tu codigo de verificacion es: ${code}`,
-        ``,
-        `Este codigo expira en 10 minutos. Si no lo solicitaste, ignora este mensaje.`,
-        ``,
-        `-- Control de Obra Pro`,
-        `.`,
-        `QUIT`,
-      ].join("\r\n"),
-    ];
-    let idx = 0;
-    socket.on("secureConnect", () => {});
-    socket.on("data", (chunk) => {
-      buf += chunk.toString("utf8");
-      // esperar lineas de respuesta del server (codigo 220/235/250/354)
-      while (buf.includes("\r\n") && idx < commands.length) {
-        const line = buf.split("\r\n")[0];
-        buf = buf.split("\r\n").slice(1).join("\r\n");
-        socket.write(commands[idx] + "\r\n");
-        idx += 1;
-        if (line.startsWith("421")) {
-          socket.end();
-          return resolve({ ok: false, error: "SMTP rejected: " + line });
-        }
-      }
-    });
-    socket.on("end", () => resolve({ ok: true }));
-    socket.on("error", (err) => resolve({ ok: false, error: err.message }));
-    socket.setTimeout(10000, () => {
-      socket.destroy();
-      resolve({ ok: false, error: "SMTP timeout" });
-    });
+  // 465 = SSL directo, 587 = STARTTLS
+  const secure = port === 465;
+  cachedTransport = nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: { user, pass },
+    // Aumentar timeouts para Hostinger
+    connectionTimeout: 15000,
+    greetingTimeout: 10000,
   });
+  return cachedTransport;
+}
+
+export async function sendOtpEmail({
+  to,
+  code,
+}: {
+  to: string;
+  code: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const from =
+    process.env.SMTP_FROM ??
+    process.env.EMAIL_USER ??
+    "noreply@controlobra.local";
+
+  try {
+    const transporter = getTransport();
+    const info = await transporter.sendMail({
+      from: `Control de Obra Pro <${from}>`,
+      to,
+      subject: "Tu codigo de acceso - Control de Obra Pro",
+      text:
+        `Hola,\n\n` +
+        `Tu codigo de verificacion es: ${code}\n\n` +
+        `Este codigo expira en 10 minutos.\n` +
+        `Si no lo solicitaste, ignora este mensaje.\n\n` +
+        `-- Control de Obra Pro`,
+      html: `
+        <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+          <div style="text-align: center; margin-bottom: 24px;">
+            <h1 style="color: #1e293b; margin: 0;">Control de Obra Pro</h1>
+          </div>
+          <p>Hola,</p>
+          <p>Tu codigo de verificacion es:</p>
+          <div style="text-align: center; margin: 32px 0;">
+            <div style="display: inline-block; background: #f1f5f9; padding: 16px 32px; border-radius: 8px; font-family: monospace; font-size: 32px; letter-spacing: 4px; color: #0f172a; font-weight: bold;">
+              ${code}
+            </div>
+          </div>
+          <p style="color: #64748b; font-size: 14px;">Este codigo expira en 10 minutos. Si no lo solicitaste, ignora este mensaje.</p>
+          <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 32px 0;" />
+          <p style="color: #94a3b8; font-size: 12px; text-align: center;">Control de Obra Pro</p>
+        </div>
+      `,
+    });
+    console.log(`[email] OTP enviado a ${to}: messageId=${info.messageId}`);
+    return { ok: true };
+  } catch (e: any) {
+    console.error(`[email] Error enviando OTP a ${to}:`, e?.message ?? e);
+    return { ok: false, error: e?.message ?? "Email send failed" };
+  }
 }
