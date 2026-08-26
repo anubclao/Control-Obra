@@ -44,14 +44,19 @@ export const useAuthStore = create<AuthState>()((set, _get) => ({
   },
 
   switchUser: async (email: string) => {
-    set({ loading: true, error: null });
+    set({ loading: true, error: null, lastStatus: null, lastDetail: null });
     try {
       const data = await api.post<{ user: User }>("/api/auth/login", { email });
       set({ user: data.user, loading: false });
       return true;
     } catch (e: any) {
-      console.error("[auth login]", e?.message);
-      set({ loading: false, error: e?.message ?? "No se pudo iniciar sesión" });
+      console.error("[auth login] status:", e?.status, "detail:", e?.payload);
+      set({
+        loading: false,
+        error: e?.message ?? "No se pudo iniciar sesión",
+        lastStatus: e?.status ?? null,
+        lastDetail: e?.payload ?? null,
+      });
       return false;
     }
   },

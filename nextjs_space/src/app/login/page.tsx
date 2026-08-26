@@ -35,35 +35,29 @@ export default function LoginPage() {
     setError(null);
     const trimmed = email.trim();
     if (!trimmed) {
-      setError("Ingresa tu correo electrónico");
+      setError("Ingresa tu correo electronico");
       return;
     }
     const isValidFormat = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
     if (!isValidFormat) {
-      setError("Correo electrónico no válido");
+      setError("Correo electronico no valido");
       return;
     }
     setLoading(true);
-    let status: number | null = null;
-    let detail: any = null;
-    try {
-      const ok = await switchUser(trimmed);
-      if (!ok) {
-        setError(
-          status === 404
-            ? "Usuario no encontrado en la base de datos. Verifica que el email este registrado en la tabla 'users' con is_active=1."
-            : status === 500
-            ? `Servidor devolvio 500. Diagnostico del backend:
-
-${detail ? JSON.stringify(detail, null, 2) : "(sin detalle del servidor)"}
-
-Revisa el log de errores de Hostinger (server.err.log) o llama a /api/auth/debug para ver env vars.`
-            : "No se pudo iniciar sesion. Revisa tu conexion o contacta al administrador."
-        );
-        return;
-      }
-    } finally {
-      setLoading(false);
+    const ok = await switchUser(trimmed);
+    setLoading(false);
+    if (!ok) {
+      const st = useAuthStore.getState().lastStatus;
+      const dt = useAuthStore.getState().lastDetail;
+      const statusText = st === 404
+        ? "404 - Usuario no encontrado. Verifica que el email este registrado en users con is_active=1."
+        : st === 500
+        ? "500 - El servidor fallo. Causa probable: MySQL no accesible (env vars incorrectas en Hostinger)."
+        : (st ? st + " - Error del servidor" : "Sin respuesta del servidor (timeout / DNS)");
+      const detailText = dt ? "Detalle: " + JSON.stringify(dt, null, 2) : "Sin detalle del backend. Mira el log de errores de Hostinger (server.err.log) o llama a /api/auth/debug si configuraste DEBUG_TOKEN.";
+      const fullMsg = statusText + "\n\n" + detailText;
+      setError(fullMsg);
+      return;
     }
     const me = await api.get<{ user: any }>("/api/auth/login").catch(() => ({ user: null }));
     router.push(`/${me.user?.area ?? "administrativo"}`);
@@ -105,16 +99,23 @@ Revisa el log de errores de Hostinger (server.err.log) o llama a /api/auth/debug
                 />
               </div>
               {error && (
-                <div className="space-y-2">
-                  <p className="text-sm text-destructive whitespace-pre-wrap font-mono text-xs">{error}</p>
-                  <details className="rounded border border-destructive/30 bg-destructive/5 p-2 text-xs">
-                    <summary className="cursor-pointer text-muted-foreground">
-                      Detalle tecnico (para soporte)
-                    </summary>
-                    <pre className="mt-2 overflow-auto text-[10px] text-muted-foreground whitespace-pre-wrap break-all">
-                      {JSON.stringify({ status: lastStatus, detail: lastDetail, requestId: new Date().toISOString() }, null, 2)}
-                    </pre>
-                  </details>
+                <div className="rounded border border-destructive/40 bg-destructive/5 p-3 space-y-2">
+                  <p className="text-xs text-destructive font-semibold uppercase tracking-wide">Error del servidor</p>
+                  <p className="text-xs text-destructive whitespace-pre-wrap font-medium">{error}</p>
+                  {(lastStatus !== null) && (
+                    <details className="border-t border-destructive/20 pt-2">
+                      <summary className="text-[10px] text-muted-foreground cursor-pointer uppercase tracking-wide">
+                        Detalle tecnico (soporte)
+                      </summary>
+                      <pre className="mt-2 overflow-auto text-[10px] text-foreground/70 whitespace-pre-wrap break-all bg-background/50 p-2 rounded">
+{JSON.stringify({
+  status: lastStatus,
+  detail: lastDetail,
+  requestId: `lastLogin-${new Date().toISOString()}`
+}, null, 2)}
+                      </pre>
+                    </details>
+                  )}
                 </div>
               )}
               <Button type="submit" className="w-full" disabled={loading}>
