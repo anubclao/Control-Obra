@@ -47,15 +47,31 @@ export async function POST(req: Request) {
       [email, codeHash, expiresAt]
     );
 
-    // Enviar por email
-    const sent = await sendOtpEmail({ to: email, code });
+    // El codigo YA se guardo en BD. Si el email falla, NO abortamos - devolvemos 200
+    // y el frontend recibe devCode (en dev) o un warning (en prod).
+    let emailResult: { ok: boolean; error?: string } = { ok: true };
+    try {
+      emailResult = await sendOtpEmail({ to: email, code });
+    } catch (emailErr: any) {
+      console.warn("[auth request-otp] email send falló:", emailErr?.message ?? emailErr);
+      emailResult = { ok: false, error: emailErr?.message ?? "Email send failed" };
+    }
 
-    // En dev (sin SMTP), el codigo se imprimio en consola del servidor
+    // Siempre devolvemos 200 (OTP ya esta en BD) con diagnostico
+    const isDev = process.env.NODE_ENV !== "production";
     return NextResponse.json({
       ok: true,
-      message: "Codigo enviado a tu correo",
-      // Solo en dev lo devolvemos en la respuesta para testing
-      ...(process.env.NODE_ENV !== "production" && sent.ok ? { devCode: code } : {}),
+      message: emailResult.ok
+        ? "Codigo enviado a tu correo"
+        : "Codigo generado. Email fallo pero puedes continuar con el codigo mostrado abajo (modo DEV).",
+      // Devolver codigo si:
+      //  - Estamos en dev (NODE_ENV != production)
+      //  - O el operador configuro AUTH_RETURN_CODE=1 (debug)
+      // En produccion, este flag SIEMPRE debe estar apagado.
+      ...((isDev || process.env.AUTH_RETURN_CODE === "1") ? { devCode: code } : {}),
+      // Diagnostico
+      emailSent: emailResult.ok,
+      ...(emailResult.error ? { emailError: emailResult.error } : {}),
     });
   } catch (e: any) {
     console.error("[auth request-otp]", e?.code, e?.message);
