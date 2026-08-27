@@ -1,30 +1,32 @@
 "use client";
 
-import { useState, useMemo } from "react";
+/**
+ * /administrativo/usuarios
+ *
+ * Spec: docs/specs/admin-user-authorization-with-otp.md
+ *
+ * Reemplaza el flujo de "invitaciones por código" por el nuevo flujo:
+ *   - Super Admin crea un AuthorizedUser (email + nombre + rol + area + opcional projectId).
+ *   - Estado inicial PENDING.
+ *   - El Super Admin activa (PENDING → ACTIVE) desde la tabla.
+ *   - Cuando el usuario final hace login OTP en /login, el backend valida que
+ *     su email exista en users con status='ACTIVE' antes de enviar el código.
+ *   - Suspender (ACTIVE → SUSPENDED) y Reactivar (SUSPENDED → ACTIVE) están
+ *     disponibles.
+ *   - Eliminar solo se permite si el usuario no tiene historial crítico.
+ *
+ * Acceso restringido a rol ADMIN (gating por useIsSuperAdmin).
+ */
+
+import { useEffect, useMemo, useState } from "react";
 import {
   Plus,
-  Users,
   Mail,
-  Copy,
+  ShieldAlert,
+  UserCog,
   CheckCircle2,
-  Clock,
-  XCircle,
-  Ban,
-  Trash2,
-  Send,
-  Calendar,
-  KeyRound, UserCog} from "lucide-react";
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -34,376 +36,299 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useInvitationsStore } from "@/lib/data-store";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useProjectsStore } from "@/lib/data-store";
-import { useIsSuperAdmin } from "@/lib/permissions";
+import { useUsersStore } from "@/lib/users-store";
 import { useAuthStore } from "@/lib/auth-store";
-import { formatDate } from "@/lib/utils";
-import type { Role, Area, Invitation } from "@/types";
-
-import { useConfirm } from "@/components/ui/confirm-dialog";
+import { useIsSuperAdmin } from "@/lib/permissions";
+import {
+  computeKpis,
+  filterAuthorizedUsers,
+  type AuthorizedUserFilters,
+} from "@/lib/admin-users";
 import { ModuleExplanationCard } from "@/components/ui/module-explanation-card";
-export default function UsuariosPage() {
-  const { invitations, cancelInvitation, deleteInvitation } = useInvitationsStore();
-  const { projects } = useProjectsStore();
-  const { user } = useAuthStore();
-  const [createOpen, setCreateOpen] = useState(false);
-  const [createdCode, setCreatedCode] = useState<string | null>(null);
+import { AuthorizedUserForm } from "@/components/admin/AuthorizedUserForm";
+import { AuthorizedUserRow } from "@/components/admin/AuthorizedUserRow";
+import { AuthorizedUsersFilters } from "@/components/admin/AuthorizedUsersFilters";
+import { AuthorizedUsersKpis } from "@/components/admin/AuthorizedUsersKpis";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import type { AuthorizedUser } from "@/types";
 
-  const stats = useMemo(() => {
-    const pending = invitations.filter((i) => i.status === "PENDING").length;
-    const accepted = invitations.filter((i) => i.status === "ACCEPTED").length;
-    const expired = invitations.filter((i) => i.status === "EXPIRED").length;
-    return { pending, accepted, expired, total: invitations.length, activeUsers: [].length };
-  }, [invitations]);
+export default function UsuariosPage() {
+  const isAdmin = useIsSuperAdmin();
+  const { user } = useAuthStore();
+  const { projects } = useProjectsStore();
+  const {
+    users,
+    loaded,
+    loading,
+    error,
+    load,
+    authorizeUser,
+    suspendUser,
+    reactivateUser,
+    deleteUser,
+  } = useUsersStore();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [lastCreated, setLastCreated] = useState<AuthorizedUser | null>(null);
+  const [filters, setFilters] = useState<AuthorizedUserFilters>({
+    search: "",
+    role: "ALL",
+    status: "ALL",
+  });
+  const confirm = useConfirm();
+
+  // Cargar usuarios solo si el viewer es Super Admin.
+  useEffect(() => {
+    if (isAdmin && !loaded && !loading) {
+      load();
+    }
+  }, [isAdmin, loaded, loading, load]);
+
+  const filtered = useMemo(
+    () => filterAuthorizedUsers(users, filters),
+    [users, filters],
+  );
+
+  const kpis = useMemo(() => computeKpis(users), [users]);
+
+  // ───────────────────────────────────────────────────────────────────
+  // Gating: si no es ADMIN, mostramos mensaje y NO renderizamos controles.
+  // ───────────────────────────────────────────────────────────────────
+  if (!isAdmin) {
+    return (
+      <div className="space-y-6">
+        <Alert variant="destructive">
+          <ShieldAlert className="h-4 w-4" />
+          <AlertTitle>Acceso restringido</AlertTitle>
+          <AlertDescription>
+            Solo el <strong>Super Administrador</strong> (rol ADMIN) puede
+            gestionar usuarios autorizados. Si necesitas acceso, contacta al
+            administrador del sistema.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  // ───────────────────────────────────────────────────────────────────
+  // Handlers
+  // ───────────────────────────────────────────────────────────────────
+  async function handleAuthorize(id: string) {
+    try {
+      await authorizeUser(id, user?.id ?? "");
+    } catch (e: any) {
+      console.error("[authorize]", e?.message);
+    }
+  }
+
+  function handleSuspend(id: string) {
+    confirm.open({
+      title: "Suspender usuario",
+      description:
+        "El usuario no podrá recibir códigos OTP para iniciar sesión. ¿Confirmas?",
+      confirmText: "Suspender",
+      variant: "danger",
+      onConfirm: async () => {
+        try {
+          await suspendUser(id, user?.id ?? "");
+        } catch (e: any) {
+          console.error("[suspend]", e?.message);
+        }
+      },
+    });
+  }
+
+  function handleReactivate(id: string) {
+    confirm.open({
+      title: "Reactivar usuario",
+      description:
+        "El usuario volverá a poder recibir códigos OTP para iniciar sesión.",
+      confirmText: "Reactivar",
+      variant: "success",
+      onConfirm: async () => {
+        try {
+          await reactivateUser(id, user?.id ?? "");
+        } catch (e: any) {
+          console.error("[reactivate]", e?.message);
+        }
+      },
+    });
+  }
+
+  function handleDelete(id: string, email: string) {
+    confirm.open({
+      title: "Eliminar usuario",
+      description: `Vas a eliminar a ${email}. Esta acción no se puede deshacer. Si tiene historial (cortes, pagos, contratos), la operación será rechazada.`,
+      confirmText: "Eliminar definitivamente",
+      variant: "danger",
+      onConfirm: async () => {
+        try {
+          await deleteUser(id);
+        } catch (e: any) {
+          console.error("[delete]", e?.message);
+          const msg =
+            e?.status === 409
+              ? "No se puede eliminar: el usuario tiene historial. Usa Suspender."
+              : e?.message ?? "Error al eliminar";
+          alert(msg);
+        }
+      },
+    });
+  }
 
   return (
     <div className="space-y-6">
-
+      {confirm.dialog}
       <ModuleExplanationCard
         icon={UserCog}
         variant="guide"
-        title="Administracion de Usuarios"
-        description="Gestiona usuarios e invitaciones."
+        title="Administración de Usuarios Autorizados"
+        description="El Super Admin controla quién puede recibir códigos OTP."
         steps={[
-            { title: "Crear invitacion", description: "Codigo, email, rol y area." },
-            { title: "Compartir codigo", description: "Usuario acepta desde login." },
-            { title: "Asignar proyecto", description: "Restringir a un proyecto." },
-          ]}
-          warnings={[
-            "Solo ADMIN puede crear invitaciones.",
-          ]}
+          {
+            title: "Crear usuario",
+            description: "Email + nombre + rol + área. Estado inicial PENDING.",
+          },
+          {
+            title: "Activar",
+            description: "PENDING → ACTIVE. A partir de ahí puede recibir OTP.",
+          },
+          {
+            title: "Suspender / Reactivar",
+            description: "Control fino cuando alguien sale de la empresa.",
+          },
+        ]}
+        warnings={[
+          "Solo ADMIN puede crear/activar/suspender usuarios.",
+          "Eliminar un usuario con historial (cortes, pagos, contratos) será rechazado.",
+        ]}
       />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Usuarios e Invitaciones</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">
+            Usuarios Autorizados
+          </h1>
           <p className="text-sm text-muted-foreground">
-            {[].length} usuarios · {stats.pending} invitaciones pendientes
+            {kpis.total} usuarios · {kpis.pending} pendientes de activar
           </p>
         </div>
-        <Dialog open={createOpen} onOpenChange={(o) => { setCreateOpen(o); if (!o) setCreatedCode(null); }}>
+
+        <Dialog
+          open={createOpen}
+          onOpenChange={(o) => {
+            setCreateOpen(o);
+            if (!o) setLastCreated(null);
+          }}
+        >
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
-              Nueva invitación
+              Nuevo usuario
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Crear invitación</DialogTitle>
+              <DialogTitle>Crear usuario autorizado</DialogTitle>
               <DialogDescription>
-                Genera un código único que el invitado usará para registrarse
+                Quedará en estado PENDING hasta que lo actives desde la tabla.
               </DialogDescription>
             </DialogHeader>
-            {createdCode ? (
+
+            {lastCreated ? (
               <div className="space-y-3">
                 <div className="rounded-md border-2 border-dashed border-emerald-500 bg-emerald-50 p-6 text-center">
-                  <KeyRound className="mx-auto h-8 w-8 text-emerald-600" />
-                  <p className="mt-2 text-xs text-muted-foreground">Código generado</p>
-                  <p className="mt-1 font-mono text-2xl font-bold tracking-widest text-emerald-700">
-                    {createdCode}
+                  <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-600" />
+                  <p className="mt-2 text-sm font-medium text-emerald-900">
+                    Usuario creado
                   </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-3"
-                    onClick={() => navigator.clipboard.writeText(createdCode)}
-                  >
-                    <Copy className="mr-2 h-4 w-4" />
-                    Copiar código
-                  </Button>
+                  <p className="mt-1 text-sm text-emerald-700">
+                    {lastCreated.name}
+                  </p>
+                  <p className="text-xs text-emerald-700">{lastCreated.email}</p>
+                  <p className="mt-2 font-mono text-xs uppercase tracking-wider text-emerald-700">
+                    Status: {lastCreated.status}
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground text-center">
-                  Comparte este código con el invitado. Caduca el {(() => {
-                    const inv = invitations.find((i) => i.code === createdCode);
-                    return inv ? formatDate(inv.expiresAt) : "";
-                  })()}
-                </p>
                 <DialogFooter>
-                  <Button onClick={() => { setCreateOpen(false); setCreatedCode(null); }}>
-                    Listo
+                  <Button
+                    onClick={() => {
+                      setCreateOpen(false);
+                      setLastCreated(null);
+                    }}
+                  >
+                    Cerrar
                   </Button>
                 </DialogFooter>
               </div>
             ) : (
-              <InvitationForm
-                onCreated={(code) => setCreatedCode(code)}
+              <AuthorizedUserForm
+                projects={projects}
                 createdBy={user?.id ?? "unknown"}
+                onCreated={(u) => setLastCreated(u)}
               />
             )}
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Kpi label="Usuarios activos" value={stats.activeUsers} icon={Users} color="text-blue-600" />
-        <Kpi label="Invitaciones pendientes" value={stats.pending} icon={Send} color="text-amber-600" />
-        <Kpi label="Aceptadas" value={stats.accepted} icon={CheckCircle2} color="text-emerald-600" />
-        <Kpi label="Vencidas" value={stats.expired} icon={XCircle} color="text-red-600" />
-      </div>
+      <AuthorizedUsersKpis kpis={kpis} />
 
-      {/* Invitaciones */}
+      <AuthorizedUsersFilters filters={filters} onChange={setFilters} />
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Tabla de usuarios */}
       <div>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          Invitaciones
+          Usuarios
         </h2>
-        {invitations.length === 0 ? (
+
+        {loading && users.length === 0 ? (
+          <div className="space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-20 animate-pulse rounded-lg border bg-muted/40" />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="rounded-lg border border-dashed p-12 text-center">
             <Mail className="mx-auto h-12 w-12 text-muted-foreground" />
-            <h3 className="mt-4 text-lg font-semibold">Sin invitaciones</h3>
+            <h3 className="mt-4 text-lg font-semibold">
+              {users.length === 0
+                ? "Aún no has autorizado ningún usuario"
+                : "Sin resultados"}
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {users.length === 0
+                ? "Crea el primero con el botón «Nuevo usuario»."
+                : "Prueba cambiando o limpiando los filtros."}
+            </p>
           </div>
         ) : (
           <div className="space-y-2">
-            {invitations.map((inv) => (
-              <InvitationRow
-                key={inv.id}
-                inv={inv}
+            {filtered.map((u) => (
+              <AuthorizedUserRow
+                key={u.id}
+                user={u}
                 projectName={
-                  inv.projectId
-                    ? projects.find((p) => p.id === inv.projectId)?.name
+                  u.projectId
+                    ? projects.find((p) => p.id === u.projectId)?.name
                     : undefined
                 }
-                onCancel={() => cancelInvitation(inv.id)}
-                onDelete={() => deleteInvitation(inv.id)}
+                onAuthorize={handleAuthorize}
+                onSuspend={handleSuspend}
+                onReactivate={handleReactivate}
+                onDelete={(id) => handleDelete(id, u.email)}
               />
             ))}
           </div>
         )}
       </div>
-
-      {/* Usuarios */}
-      <div>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          Usuarios del sistema
-        </h2>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-          {[].map((u) => (
-            <div key={u.id} className="rounded-lg border bg-card p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                  <span className="text-sm font-semibold">{u.name.charAt(0)}</span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{u.name}</p>
-                  <p className="truncate text-xs text-muted-foreground">{u.email}</p>
-                </div>
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                <Badge variant="outline">{u.role}</Badge>
-                <Badge variant="secondary">{u.area}</Badge>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
-  );
-}
-
-function Kpi({
-  label,
-  value,
-  icon: Icon,
-  color,
-}: {
-  label: string;
-  value: number;
-  icon: React.ComponentType<{ className?: string }>;
-  color: string;
-}) {
-  return (
-    <div className="rounded-lg border bg-card p-3">
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Icon className={`h-3.5 w-3.5 ${color}`} />
-        {label}
-      </div>
-      <p className="mt-1 text-xl font-semibold">{value}</p>
-    </div>
-  );
-}
-
-function InvitationRow({
-  inv,
-  projectName,
-  onCancel,
-  onDelete,
-}: {
-  inv: Invitation;
-  projectName?: string;
-  onCancel: () => void;
-  onDelete: () => void;
-}) {
-  const statusConfig = {
-    PENDING: { label: "Pendiente", variant: "warning" as const, icon: Clock, color: "text-amber-600" },
-    ACCEPTED: { label: "Aceptada", variant: "success" as const, icon: CheckCircle2, color: "text-emerald-600" },
-    EXPIRED: { label: "Vencida", variant: "destructive" as const, icon: XCircle, color: "text-red-600" },
-    CANCELLED: { label: "Cancelada", variant: "default" as const, icon: Ban, color: "text-muted-foreground" },
-  }[inv.status];
-
-  const StatusIcon = statusConfig.icon;
-
-  return (
-    <div className="rounded-lg border bg-card p-4">
-      <div className="flex items-center gap-3">
-        <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-secondary ${statusConfig.color}`}>
-          <StatusIcon className="h-5 w-5" />
-        </div>
-        <div className="flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="font-mono text-base font-bold tracking-wider">{inv.code}</p>
-            <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>
-            <Badge variant="outline">{inv.role}</Badge>
-            {inv.area && <Badge variant="secondary">{inv.area}</Badge>}
-          </div>
-          <p className="mt-1 text-sm">
-            <Mail className="mr-1 inline h-3 w-3" />
-            {inv.email}
-            {projectName ? ` · ${projectName}` : ""}
-          </p>
-          <p className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
-            <Calendar className="h-3 w-3" />
-            Creado {formatDate(inv.createdAt)}
-            {inv.acceptedAt ? ` · Aceptado ${formatDate(inv.acceptedAt)}` : ` · Expira ${formatDate(inv.expiresAt)}`}
-          </p>
-        </div>
-        <div className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigator.clipboard.writeText(inv.code)}
-            title="Copiar código"
-          >
-            <Copy className="h-4 w-4" />
-          </Button>
-          {inv.status === "PENDING" && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onCancel}
-              title="Cancelar invitación"
-            >
-              <Ban className="h-4 w-4 text-amber-600" />
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onDelete}
-            title="Eliminar invitación"
-          >
-            <Trash2 className="h-4 w-4 text-destructive" />
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function InvitationForm({
-  onCreated,
-  createdBy,
-}: {
-  onCreated: (code: string) => void;
-  createdBy: string;
-}) {
-  const { createInvitation } = useInvitationsStore();
-  const { projects } = useProjectsStore();
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState<Role>("USER");
-  const [area, setArea] = useState<Area | "">("");
-  const [projectId, setProjectId] = useState("");
-  const [expiresInDays, setExpiresInDays] = useState(30);
-  const [maxUses, setMaxUses] = useState(1);
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const inv = createInvitation({
-      email,
-      role,
-      area: area || undefined,
-      projectId: projectId || undefined,
-      maxUses,
-      expiresInDays,
-      createdBy,
-    });
-    onCreated(inv.code);
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-3">
-      <div>
-        <Label className="mb-1.5 block">Email del invitado *</Label>
-        <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nuevo@controlobra.com" required />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label className="mb-1.5 block">Rol *</Label>
-          <Select value={role} onValueChange={(v) => setRole(v as Role)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {(["ADMIN", "GERENTE", "DIRECTOR", "RESIDENTE", "CONTABILIDAD", "TESORERIA", "HSEQ", "USER"] as Role[]).map((r) => (
-                <SelectItem key={r} value={r}>{r}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label className="mb-1.5 block">Área</Label>
-          <Select value={area} onValueChange={(v) => setArea(v as Area)}>
-            <SelectTrigger><SelectValue placeholder="Sin área" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="tecnico">Técnico</SelectItem>
-              <SelectItem value="administrativo">Administrativo</SelectItem>
-              <SelectItem value="ventas">Ventas</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-      <div>
-        <Label className="mb-1.5 block">Proyecto específico (opcional)</Label>
-        <Select
-          value={projectId}
-          onValueChange={(v) => setProjectId(v === "__none" ? "" : v)}
-        >
-          <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__none">Todos los proyectos</SelectItem>
-            {projects.map((p) => (
-              <SelectItem key={p.id} value={p.id}>{p.code} – {p.name.slice(0, 30)}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label className="mb-1.5 block">Expira en (días)</Label>
-          <Input
-            type="number"
-            min="1"
-            max="365"
-            value={expiresInDays}
-            onChange={(e) => setExpiresInDays(parseInt(e.target.value) || 30)}
-          />
-        </div>
-        <div>
-          <Label className="mb-1.5 block">Máx. usos</Label>
-          <Input
-            type="number"
-            min="1"
-            max="100"
-            value={maxUses}
-            onChange={(e) => setMaxUses(parseInt(e.target.value) || 1)}
-          />
-        </div>
-      </div>
-      <DialogFooter>
-        <Button type="submit">
-          <KeyRound className="mr-2 h-4 w-4" />
-          Generar código
-        </Button>
-      </DialogFooter>
-    </form>
   );
 }

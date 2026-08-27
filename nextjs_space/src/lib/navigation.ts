@@ -19,13 +19,14 @@ import {
   ClipboardList,
   type LucideIcon,
 } from "lucide-react";
-import type { Area } from "@/types";
+import type { Area, Role } from "@/types";
 
 export interface NavItem {
   title: string;
   href: string;
   icon: LucideIcon;
   description?: string;
+  requiresRole?: Role;
 }
 
 export const NAV_BY_AREA: Record<Area, NavItem[]> = {
@@ -48,7 +49,10 @@ export const NAV_BY_AREA: Record<Area, NavItem[]> = {
     { title: "Reportes Financieros", href: "/administrativo/reportes/financiero", icon: FileSpreadsheet },
     { title: "Impuestos", href: "/administrativo/impuestos", icon: Percent },
     { title: "RRHH - Empleados", href: "/administrativo/empleados", icon: Users },
-    { title: "Administración", href: "/administrativo/usuarios", icon: UserCog },
+    // Solo visible para Super Admin (rol ADMIN).  El gating real vive en el
+    // componente de la página con useIsSuperAdmin(); aquí dejamos el item
+    // declarado para que el sidebar pueda filtrarlo si lo desea.
+    { title: "Administración", href: "/administrativo/usuarios", icon: UserCog, requiresRole: "ADMIN" as const },
   ],
   ventas: [
     { title: "Dashboard", href: "/ventas", icon: LayoutDashboard, description: "Pipeline y métricas comerciales" },

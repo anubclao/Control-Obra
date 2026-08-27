@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 import { NextResponse } from "next/server";
-import { query, transaction } from "@/lib/db";
+import { query } from "@/lib/db";
 import crypto from "node:crypto";
 import { sendOtpEmail } from "@/lib/email";
 
@@ -21,13 +21,46 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Correo electronico no valido" }, { status: 400 });
     }
 
-    // Verificar usuario existe + activo
+    // Spec admin-user-authorization-with-otp.md — AC-8:
+    // Validar contra el whitelist de usuarios autorizados por estado, NO solo
+    // por is_active.  Mensajes diferenciados para que el front pueda mostrar
+    // copy distinto al usuario final.
     const users = await query<any[]>(
-      `SELECT id FROM users WHERE LOWER(email) = ? AND is_active = 1 LIMIT 1`,
-      [email]
+      `SELECT id, email, status FROM users WHERE LOWER(email) = ? LIMIT 1`,
+      [email],
     );
     if (users.length === 0) {
-      return NextResponse.json({ error: "Email no registrado" }, { status: 404 });
+      return NextResponse.json(
+        {
+          error:
+            "Este correo no esta registrado. Contacta al administrador para que te cree una cuenta.",
+        },
+        { status: 404 },
+      );
+    }
+    const dbUser = users[0];
+    if (dbUser.status === "PENDING") {
+      return NextResponse.json(
+        {
+          error:
+            "Tu cuenta esta pendiente de autorizacion por el administrador.",
+        },
+        { status: 403 },
+      );
+    }
+    if (dbUser.status === "SUSPENDED") {
+      return NextResponse.json(
+        { error: "Tu cuenta esta suspendida. Contacta al administrador." },
+        { status: 403 },
+      );
+    }
+    // Si por alguna razon quedo is_active=0 con status=ACTIVE (legacy), tambien
+    // bloqueamos para no romper el flujo esperado.
+    if (dbUser.is_active === 0 || dbUser.is_active === false) {
+      return NextResponse.json(
+        { error: "Tu cuenta no esta activa. Contacta al administrador." },
+        { status: 403 },
+      );
     }
 
     // Generar OTP de 6 digitos
@@ -38,13 +71,13 @@ export async function POST(req: Request) {
     // Eliminar codigos previos del mismo email no usados
     await query(
       `DELETE FROM auth_otps WHERE email = ? AND used_at IS NULL`,
-      [email]
+      [email],
     );
 
     // Insertar nuevo
     await query(
       `INSERT INTO auth_otps (email, code_hash, expires_at, attempts) VALUES (?, ?, ?, 0)`,
-      [email, codeHash, expiresAt]
+      [email, codeHash, expiresAt],
     );
 
     // El codigo YA se guardo en BD. Si el email falla, NO abortamos - devolvemos 200
@@ -79,7 +112,7 @@ export async function POST(req: Request) {
     console.error("[auth request-otp]", e?.code, e?.message);
     return NextResponse.json(
       { error: "Error al enviar codigo", code: e?.code },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

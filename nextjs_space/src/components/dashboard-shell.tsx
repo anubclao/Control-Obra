@@ -63,7 +63,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const navItems = NAV_BY_AREA[user.area];
+  const navItems = NAV_BY_AREA[user.area].filter(
+    (item) => !item.requiresRole || item.requiresRole === user.role,
+  );
 
   async function handleLogout() {
     await logout();

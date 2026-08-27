@@ -23,6 +23,32 @@ export interface User {
   avatar?: string;
 }
 
+// =====================================================================
+// Autorización de usuarios (spec: admin-user-authorization-with-otp.md)
+// =====================================================================
+// Ciclo de vida explícito para usuarios del sistema. Reemplaza el flag
+// binario `is_active` por un ENUM que el Super Admin controla desde el
+// módulo /administrativo/usuarios.
+export type AuthorizedUserStatus = "PENDING" | "ACTIVE" | "SUSPENDED";
+
+export interface AuthorizedUser {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+  area: Area;
+  projectId?: string;            // alcance opcional por proyecto
+  status: AuthorizedUserStatus;
+  // Auditoría
+  createdBy: string;             // userId del Super Admin que creó el registro
+  createdAt: string;             // ISO
+  authorizedBy?: string;         // userId del Super Admin que activó
+  authorizedAt?: string;
+  suspendedBy?: string;
+  suspendedAt?: string;
+  lastLoginAt?: string;
+}
+
 export type ProjectStatus = "IN_PLANNING" | "IN_EXECUTION" | "PAUSED" | "COMPLETED";
 
 export interface Project {

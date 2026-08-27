@@ -54,17 +54,34 @@ export async function POST(req: Request) {
     // Marcar como usado
     await query(`UPDATE auth_otps SET used_at = NOW() WHERE id = ?`, [otp.id]);
 
-    // Cargar user
+    // Cargar user — Spec admin-user-authorization-with-otp.md AC-8
+    // Validar contra whitelist con status='ACTIVE'.  NO contra is_active solo,
+    // para mantener consistencia con request-otp.
     const users = await query<any[]>(
-      `SELECT id, email, name, role, area FROM users WHERE LOWER(email) = ? AND is_active = 1 LIMIT 1`,
-      [email]
+      `SELECT id, email, name, role, area, status, project_id
+         FROM users
+        WHERE LOWER(email) = ?
+        LIMIT 1`,
+      [email],
     );
     if (!users.length) {
       return NextResponse.json({ error: "Usuario ya no existe" }, { status: 401 });
     }
     const user = users[0];
+    if (user.status !== "ACTIVE") {
+      return NextResponse.json(
+        { error: "Tu cuenta ya no esta activa." },
+        { status: 401 },
+      );
+    }
 
-    // Crear sesion
+    // Marcar último login (auditoría)
+    await query(
+      `UPDATE users SET last_login_at = NOW() WHERE id = ?`,
+      [user.id],
+    );
+
+    // Crear sesión
     const jar = await cookies();
     jar.set(SESSION_COOKIE, user.id, {
       httpOnly: true,
