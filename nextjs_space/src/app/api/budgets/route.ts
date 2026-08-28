@@ -5,6 +5,7 @@ export const runtime = 'nodejs';
  */
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { requireAuth, requireRole, requireAdmin, authFailureResponse } from "@/lib/api-auth";
 
 
 function r(row: any) {
@@ -20,6 +21,9 @@ function r(row: any) {
 }
 
 export async function GET(req: Request) {
+  const auth = await requireAuth();
+  const fail = authFailureResponse(auth);
+  if (fail) return fail;
   try {
     const url = new URL(req.url);
     const projectId = url.searchParams.get("projectId");
@@ -36,6 +40,9 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const auth = await requireRole("ADMIN","GERENTE","DIRECTOR","RESIDENTE","CONTABILIDAD","TESORERIA","HSEQ");
+  const fail = authFailureResponse(auth);
+  if (fail) return fail;
   try {
     const body = await req.json();
     if (!body?.projectId) return NextResponse.json({ error: "projectId requerido" }, { status: 400 });
@@ -58,6 +65,9 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
+  const auth = await requireRole("ADMIN","GERENTE","DIRECTOR","RESIDENTE","CONTABILIDAD","TESORERIA","HSEQ");
+  const fail = authFailureResponse(auth);
+  if (fail) return fail;
   try {
     const body = await req.json();
     if (!body?.id) return NextResponse.json({ error: "ID requerido" }, { status: 400 });

@@ -5,9 +5,13 @@ export const runtime = 'nodejs';
  */
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { requireAuth, authFailureResponse } from "@/lib/api-auth";
 
 
 export async function GET() {
+  const auth = await requireAuth();
+  const fail = authFailureResponse(auth);
+  if (fail) return fail;
   try {
     const [
       projects,

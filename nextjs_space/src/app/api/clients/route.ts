@@ -5,6 +5,7 @@ export const runtime = 'nodejs';
  */
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { requireAuth, requireRole, requireAdmin, authFailureResponse } from "@/lib/api-auth";
 
 
 function r(row: any) {
@@ -26,6 +27,9 @@ function r(row: any) {
 }
 
 export async function GET() {
+  const auth = await requireAuth();
+  const fail = authFailureResponse(auth);
+  if (fail) return fail;
   try {
     const rows = await query<any[]>(`SELECT * FROM clients ORDER BY company_name ASC`);
     return NextResponse.json(rows.map(r));
@@ -36,6 +40,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const auth = await requireRole("ADMIN","GERENTE","DIRECTOR","RESIDENTE","CONTABILIDAD","TESORERIA","HSEQ");
+  const fail = authFailureResponse(auth);
+  if (fail) return fail;
   try {
     const body = await req.json();
     if (!body?.companyName || !body?.contactName || !body?.email || !body?.phone ||
@@ -61,6 +68,9 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
+  const auth = await requireRole("ADMIN","GERENTE","DIRECTOR","RESIDENTE","CONTABILIDAD","TESORERIA","HSEQ");
+  const fail = authFailureResponse(auth);
+  if (fail) return fail;
   try {
     const body = await req.json();
     if (!body?.id) return NextResponse.json({ error: "ID requerido" }, { status: 400 });
@@ -84,6 +94,9 @@ export async function PUT(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const auth = await requireAdmin();
+  const fail = authFailureResponse(auth);
+  if (fail) return fail;
   try {
     const id = new URL(req.url).searchParams.get("id");
     if (!id) return NextResponse.json({ error: "ID requerido" }, { status: 400 });

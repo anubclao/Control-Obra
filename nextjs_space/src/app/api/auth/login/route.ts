@@ -1,90 +1,65 @@
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
 /**
- * API: GET /api/auth/me  → usuario actual o 401
- * API: POST /api/auth/login { email } → inicia sesión
+ * API: GET  /api/auth/me  → usuario actual o 401
+ * API: POST /api/auth/login → DESHABILITADO (security fix)
  *
- * Sin contraseñas: el sistema está pensado para invitaciones o pre-registro.
- * Acepta cualquier email registrado y crea una sesión (cookie).
+ * HISTORIAL DE SEGURIDAD:
+ *   Antes, este endpoint aceptaba { email } y creaba una sesión sin
+ *   verificar OTP. Cualquiera podía loguearse como cualquier usuario
+ *   simplemente conociendo su email.
+ *
+ *   AHORA:
+ *     - El login SIEMPRE va por /api/auth/request-otp + /api/auth/verify-otp.
+ *     - El POST a /api/auth/login devuelve 410 Gone con mensaje explícito.
+ *     - El GET sigue funcionando para refrescar la sesión actual.
  */
 
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { query } from "@/lib/db";
+import { verifySessionCookie, SESSION_COOKIE } from "@/lib/session";
 
-
-const SESSION_COOKIE = "co_session";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   const jar = await cookies();
-  const sessionId = jar.get(SESSION_COOKIE)?.value;
-  if (!sessionId) {
+  const cookieValue = jar.get(SESSION_COOKIE)?.value;
+  const userId = verifySessionCookie(cookieValue);
+  if (!userId) {
     return NextResponse.json({ user: null }, { status: 200 });
   }
   try {
+    // status='ACTIVE' (no solo is_active) para mantener consistencia
+    // con el flujo de autorización por Super Admin.
     const rows = await query<any[]>(
-      `SELECT u.id, u.email, u.name, u.role, u.area
-         FROM users u
-        WHERE u.id = ? AND u.is_active = 1
+      `SELECT id, email, name, role, area
+         FROM users
+        WHERE id = ? AND status = 'ACTIVE'
         LIMIT 1`,
-      [sessionId],
+      [userId],
     );
     return NextResponse.json({ user: rows[0] ?? null }, { status: 200 });
   } catch (e: any) {
     console.error("[auth GET] Error:", e?.code, e?.message);
-    return NextResponse.json({ error: "No se pudo consultar sesión" }, { status: 500 });
+    return NextResponse.json(
+      { error: "No se pudo consultar sesión" },
+      { status: 500 },
+    );
   }
 }
 
-export async function POST(req: Request) {
-  try {
-    const body = await req.json().catch(() => ({}));
-    const email = String(body?.email ?? "").trim().toLowerCase();
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return NextResponse.json(
-        { error: "Correo electrónico no válido" },
-        { status: 400 },
-      );
-    }
-    const rows = await query<any[]>(
-      `SELECT id, email, name, role, area FROM users WHERE LOWER(email) = ? AND is_active = 1 LIMIT 1`,
-      [email],
-    );
-    if (rows.length === 0) {
-      return NextResponse.json(
-        { error: "Usuario no encontrado o inactivo" },
-        { status: 404 },
-      );
-    }
-    const user = rows[0];
-    const jar = await cookies();
-    jar.set(SESSION_COOKIE, user.id, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7, // 7 días
-    });
-    return NextResponse.json({ user }, { status: 200 });
-  } catch (e: any) {
-    // Diagnostico detallado: el 500 viene del servidor MySQL.
-    // Con estos logs podemos saber EXACTAMENTE qué pasa sin SSH.
-    console.error("[auth POST] === DB ERROR ===");
-    console.error("[auth POST] code:", e?.code);
-    console.error("[auth POST] errno:", e?.errno);
-    console.error("[auth POST] sqlState:", e?.sqlState);
-    console.error("[auth POST] message:", e?.message);
-    console.error("[auth POST] sqlMessage:", e?.sqlMessage);
-    console.error("[auth POST] stack:", (e?.stack ?? "").split(String.fromCharCode(10)).slice(0, 5).join(" | "));
-    console.error("[auth POST] DB_HOST=", process.env.DB_HOST);
-    console.error("[auth POST] DB_USER=", process.env.DB_USER);
-    console.error("[auth POST] DB_NAME=", process.env.DB_NAME);
-    console.error("[auth POST] DB_PORT=", process.env.DB_PORT);
-    console.error("[auth POST] =================");
-    return NextResponse.json({
-      error: "Error interno del servidor",
-      code: e?.code,
-      detail: process.env.NODE_ENV === "production" ? undefined : e?.message,
-    }, { status: 500 });
-  }
+/**
+ * POST está deshabilitado por seguridad. Use /api/auth/request-otp seguido
+ * de /api/auth/verify-otp para iniciar sesión.
+ */
+export async function POST() {
+  return NextResponse.json(
+    {
+      error:
+        "Este endpoint está deshabilitado. Para iniciar sesión use el flujo OTP en /login.",
+      disabled: true,
+      useFlow: ["/api/auth/request-otp", "/api/auth/verify-otp"],
+    },
+    { status: 410 }, // 410 Gone — el endpoint existió pero ya no.
+  );
 }

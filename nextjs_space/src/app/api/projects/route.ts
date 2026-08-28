@@ -1,8 +1,15 @@
 /**
  * CRUD: /api/projects
+ *
+ * Auth:
+ *   GET    → cualquiera con sesión válida
+ *   POST   → requireRole("ADMIN","GERENTE","DIRECTOR","RESIDENTE")
+ *   PUT    → requireRole(idem)
+ *   DELETE → requireAdmin (Super Admin)
  */
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { requireAuth, requireRole, requireAdmin, authFailureResponse } from "@/lib/api-auth";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -43,6 +50,14 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const auth = await requireRole(
+    "ADMIN",
+    "GERENTE",
+    "DIRECTOR",
+    "RESIDENTE",
+  );
+  const fail = authFailureResponse(auth);
+  if (fail) return fail;
   try {
     const body = await req.json();
     if (!body?.name || !body?.code || !body?.client || !body?.location ||
@@ -86,6 +101,14 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
+  const auth = await requireRole(
+    "ADMIN",
+    "GERENTE",
+    "DIRECTOR",
+    "RESIDENTE",
+  );
+  const fail = authFailureResponse(auth);
+  if (fail) return fail;
   try {
     const body = await req.json();
     if (!body?.id) {
@@ -123,6 +146,9 @@ export async function PUT(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const auth = await requireAdmin();
+  const fail = authFailureResponse(auth);
+  if (fail) return fail;
   try {
     const url = new URL(req.url);
     const id = url.searchParams.get("id");
