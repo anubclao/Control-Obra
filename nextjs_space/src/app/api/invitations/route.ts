@@ -6,6 +6,7 @@ export const runtime = 'nodejs';
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { requireAuth, requireRole, requireAdmin, authFailureResponse } from "@/lib/api-auth";
+import crypto from "node:crypto";
 
 
 function r(row: any) {
@@ -28,9 +29,15 @@ function r(row: any) {
 }
 
 function makeCode(): string {
+  // Genera código de 10 chars usando CSPRNG (crypto.randomInt) en lugar de
+  // Math.random() — los códigos son secretos autoritativos para aceptar
+  // invitaciones, predecibilidad = bypass.
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const charsLen = chars.length;
   let s = "";
-  for (let i = 0; i < 10; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 10; i++) {
+    s += chars[crypto.randomInt(0, charsLen)];
+  }
   return s;
 }
 

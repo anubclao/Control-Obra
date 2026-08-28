@@ -15,6 +15,20 @@ import nodemailer from "nodemailer";
 
 let cachedTransport: nodemailer.Transporter | null = null;
 
+/**
+ * Escapa caracteres HTML especiales.  Defensivo: el código OTP es generado
+ * server-side con crypto.randomInt así que SIEMPRE son 6 dígitos, pero
+ * escapamos igual por si en el futuro el input viniera de otro lugar.
+ */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function getTransport() {
   if (cachedTransport) return cachedTransport;
 
@@ -55,6 +69,11 @@ export async function sendOtpEmail({
     process.env.EMAIL_USER ??
     "noreply@controlobra.local";
 
+  // Sanitizar valores que se interpolan en HTML.
+  // 'from' y 'to' son del header del email (no se renderizan en HTML body),
+  // solo 'code' aparece visible para el usuario y debe estar escapado.
+  const safeCode = escapeHtml(code);
+
   try {
     const transporter = getTransport();
     const info = await transporter.sendMail({
@@ -76,7 +95,7 @@ export async function sendOtpEmail({
           <p>Tu codigo de verificacion es:</p>
           <div style="text-align: center; margin: 32px 0;">
             <div style="display: inline-block; background: #f1f5f9; padding: 16px 32px; border-radius: 8px; font-family: monospace; font-size: 32px; letter-spacing: 4px; color: #0f172a; font-weight: bold;">
-              ${code}
+              ${safeCode}
             </div>
           </div>
           <p style="color: #64748b; font-size: 14px;">Este codigo expira en 10 minutos. Si no lo solicitaste, ignora este mensaje.</p>

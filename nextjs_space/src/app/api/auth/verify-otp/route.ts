@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import crypto from "node:crypto";
 import { query } from "@/lib/db";
 import { signSession, SESSION_COOKIE } from "@/lib/session";
+import { rateLimit } from "@/lib/rate-limit";
 
 function hashCode(email: string, code: string): string {
   return crypto
@@ -14,6 +15,11 @@ function hashCode(email: string, code: string): string {
 }
 
 export async function POST(req: Request) {
+  // Rate limit: 10 intentos por minuto por IP (más permisivo porque
+  // el usuario legítimo puede teclear mal varias veces).
+  const rl = rateLimit(req, { key: "verify-otp", limit: 10, windowMs: 60_000 });
+  if (!rl.allowed) return rl.response!;
+
   try {
     const body = await req.json().catch(() => ({}));
     const email = String(body?.email ?? "").trim().toLowerCase();

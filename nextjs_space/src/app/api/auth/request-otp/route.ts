@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import crypto from "node:crypto";
 import { sendOtpEmail } from "@/lib/email";
+import { rateLimit } from "@/lib/rate-limit";
 
 function hashCode(email: string, code: string): string {
   // hash con sal fija por email para evitar rainbow tables
@@ -14,6 +15,11 @@ function hashCode(email: string, code: string): string {
 }
 
 export async function POST(req: Request) {
+  // Rate limit: 5 requests por minuto por IP.
+  // Evita email bombing y brute force sobre el endpoint.
+  const rl = rateLimit(req, { key: "request-otp", limit: 5, windowMs: 60_000 });
+  if (!rl.allowed) return rl.response!;
+
   try {
     const body = await req.json().catch(() => ({}));
     const email = String(body?.email ?? "").trim().toLowerCase();
