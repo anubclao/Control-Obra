@@ -45,6 +45,7 @@ export const NAV_BY_AREA: Record<Area, NavItem[]> = {
   administrativo: [
     { title: "Dashboard", href: "/administrativo", icon: LayoutDashboard, description: "Vista general administrativa" },
     { title: "Tesorería", href: "/administrativo/tesoreria", icon: Wallet },
+    { title: "Contabilidad", href: "/administrativo/contabilidad", icon: Calculator, description: "Ingresos, gastos, cuentas y metas" },
     { title: "Pagos", href: "/administrativo/pagos", icon: ListChecks },
     { title: "Reportes Financieros", href: "/administrativo/reportes/financiero", icon: FileSpreadsheet },
     { title: "Impuestos", href: "/administrativo/impuestos", icon: Percent },

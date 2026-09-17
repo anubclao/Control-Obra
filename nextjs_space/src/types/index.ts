@@ -708,3 +708,92 @@ export interface Expense {
   rejectedReason?: string;
   notes?: string;
 }
+
+// ============================================================
+// CONTABILIDAD  (spec: /docs/specs/accounting-module.md)
+// ============================================================
+
+export type AccountingIncomeStatus = "POR_PAGAR" | "PAGADO";
+
+export type AccountingExpenseStatus =
+  | "POR_PAGAR"
+  | "APROBADO"
+  | "URGENTE"
+  | "NO_PAGAR"
+  | "RETEGARANTIA"
+  | "PAGADO";
+
+export type AccountingTaxStatus = "DECLARADO" | "PAGADO";
+
+export type AccountingAccountType =
+  | "CORRIENTE"
+  | "AHORROS"
+  | "TARJETA_CREDITO"
+  | "EFECTIVO"
+  | "PAYPAL"
+  | "OTRA";
+
+/** Cuenta de tesorería. El saldo actual NUNCA se guarda: se calcula. */
+export interface AccountingAccount {
+  id: string;
+  name: string;
+  type: AccountingAccountType;
+  /** Saldo con el que se dio de alta la cuenta. */
+  openingBalance: number;
+  notes?: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface AccountingIncome {
+  id: string;
+  date: string;
+  /** null = alcance General (empresa), si no el proyecto/centro de costo de obra. */
+  projectId?: string | null;
+  costCenter: string;
+  creator: string;
+  clientName: string;
+  invoice: string;
+  amount: number;
+  taxes: number;
+  status: AccountingIncomeStatus;
+  accountId?: string | null;
+  paidAmount?: number | null;
+  createdAt: string;
+}
+
+export interface AccountingExpense {
+  id: string;
+  date: string;
+  projectId?: string | null;
+  costCenter: string;
+  responsible: string;
+  providerName: string;
+  concept: string;
+  detail?: string;
+  amount: number;
+  status: AccountingExpenseStatus;
+  accountId?: string | null;
+  createdAt: string;
+}
+
+/** Movimiento de impuesto (declarado/pagado). Distinto de TaxConfig (tarifas). */
+export interface AccountingTaxMovement {
+  id: string;
+  date: string;
+  projectId?: string | null;
+  authority: string;
+  description: string;
+  amount: number;
+  status: AccountingTaxStatus;
+  accountId?: string | null;
+  createdAt: string;
+}
+
+export interface AccountingGoal {
+  id: string;
+  projectId?: string | null;
+  monthlyIncome: number;
+  maxExpense: number;
+  monthlySavings: number;
+}
