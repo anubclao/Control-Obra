@@ -29,3 +29,15 @@ if (action === "REJECT" && !rejectionReason?.trim()) {
 
 - `nextjs_space/src/lib/cuts-store.ts`
 - `nextjs_space/tests/verifiers/workcut-rejection-reason.spec.ts` (nuevo)
+
+---
+
+## Estado de implementacion (2026-09-18)
+
+El Technical Contract de arriba apunta a `src/lib/cuts-store.ts`, que **ya no
+existe**. La regla vive hoy en `src/lib/cuts-workflow.ts`
+(`evaluateCutAction`, codigo `REJECTION_REASON_REQUIRED`), la aplica
+`src/app/api/cuts/route.ts` en el PATCH, y la verifica
+`tests/verifiers/workcut-rejection-reason.spec.ts`.
+
+La misma regla se aplica a REJECT de pagos, en `src/lib/payments-workflow.ts`.

@@ -1,159 +1,107 @@
 // VERIFIER: WorkCut REJECT Transition Validation
-// STATUS: EXPECTED TO FAIL (RED PHASE) — hasta que el bug sea arreglado
 // SPEC: /docs/specs/workcut-reject-transition-validation.md
-// BUG FIX: #1 — REJECT desde DRAFT no estaba bloqueado
+//
+// El store sincrónico de localStorage (cuts-store.ts) ya no existe: el workflow
+// vive en lib/cuts-workflow.ts y lo consume /api/cuts. Este verifier prueba la
+// máquina de estados directamente, sin BD ni React.
 
-import { describe, it, expect, beforeEach } from "vitest";
-import { useCutsStore } from "@/lib/cuts-store";
+import { describe, it, expect } from "vitest";
+import {
+  CUT_TRANSITIONS,
+  evaluateCutAction,
+  isCutTransitionAllowed,
+} from "@/lib/cuts-workflow";
+import type { WorkCutStatus } from "@/types";
 
-describe("useCutsStore — REJECT Transition Validation", () => {
-  beforeEach(() => {
-    useCutsStore.setState({
-      cuts: useCutsStore.getInitialState().cuts,
+const DIRECTOR = "DIRECTOR";
+
+describe("Cuts workflow — validación de la transición REJECT", () => {
+  describe("AC-1: REJECT no debe funcionar desde DRAFT", () => {
+    it("rechaza la acción y explica la transición inválida", () => {
+      const result = evaluateCutAction("DRAFT", "REJECT", DIRECTOR, {
+        rejectionReason: "Faltan soportes",
+      });
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("INVALID_TRANSITION");
+        expect(result.error).toContain("DRAFT");
+        expect(result.status).toBe(400);
+      }
+    });
+
+    it("DRAFT solo admite SUBMITTED como destino", () => {
+      expect(CUT_TRANSITIONS.DRAFT).toEqual(["SUBMITTED"]);
+      expect(isCutTransitionAllowed("DRAFT", "REJECTED")).toBe(false);
     });
   });
 
-  describe("Acceptance Criteria", () => {
-    it("AC-1: REJECT desde DRAFT debe fallar", () => {
-      // MOCK_WORK_CUTS incluye wc4 (status DRAFT)
-      const draftCut = useCutsStore
-        .getState()
-        .cuts.find((c) => c.status === "DRAFT");
-      expect(draftCut).toBeDefined();
-
-      const result = useCutsStore
-        .getState()
-        .performAction(
-          draftCut!.id,
-          "REJECT",
-          { id: "u-admin", name: "Admin", role: "ADMIN" },
-          "Intento de rechazo",
-        );
-
-      expect(result.ok).toBe(false);
-      expect(result.error).toBeDefined();
-      // Estado NO debe cambiar
-      const after = useCutsStore.getState().getCut(draftCut!.id);
-      expect(after?.status).toBe("DRAFT");
-    });
-
-    it("AC-2: REJECT desde SUBMITTED debe funcionar", () => {
-      // MOCK_WORK_CUTS incluye wc2 (status SUBMITTED)
-      const submittedCut = useCutsStore
-        .getState()
-        .cuts.find((c) => c.status === "SUBMITTED");
-      expect(submittedCut).toBeDefined();
-
-      const result = useCutsStore
-        .getState()
-        .performAction(
-          submittedCut!.id,
-          "REJECT",
-          { id: "u-admin", name: "Admin", role: "ADMIN" },
-          undefined,
-          "Faltan documentos",
-        );
-
-      expect(result.ok).toBe(true);
-      const after = useCutsStore.getState().getCut(submittedCut!.id);
-      expect(after?.status).toBe("REJECTED");
-      expect(after?.rejectionReason).toBe("Faltan documentos");
-      expect(after?.approvals.some((a) => a.action === "REJECT")).toBe(true);
-    });
-
-    it("AC-3: REJECT desde VALIDATED debe funcionar", () => {
-      // MOCK_WORK_CUTS incluye wc3 (status VALIDATED)
-      const validatedCut = useCutsStore
-        .getState()
-        .cuts.find((c) => c.status === "VALIDATED");
-      expect(validatedCut).toBeDefined();
-
-      const result = useCutsStore
-        .getState()
-        .performAction(
-          validatedCut!.id,
-          "REJECT",
-          { id: "u-admin", name: "Admin", role: "ADMIN" },
-          undefined,
-          "Cantidades no coinciden con la obra",
-        );
-
-      expect(result.ok).toBe(true);
-      const after = useCutsStore.getState().getCut(validatedCut!.id);
-      expect(after?.status).toBe("REJECTED");
-    });
-
-    it("AC-4: REJECT desde APPROVED debe fallar (estado terminal)", () => {
-      // MOCK_WORK_CUTS incluye wc1 (status APPROVED)
-      const approvedCut = useCutsStore
-        .getState()
-        .cuts.find((c) => c.status === "APPROVED");
-      expect(approvedCut).toBeDefined();
-
-      const result = useCutsStore
-        .getState()
-        .performAction(
-          approvedCut!.id,
-          "REJECT",
-          { id: "u-admin", name: "Admin", role: "ADMIN" },
-          undefined,
-          "Tarde",
-        );
-
-      expect(result.ok).toBe(false);
-      const after = useCutsStore.getState().getCut(approvedCut!.id);
-      expect(after?.status).toBe("APPROVED");
-    });
-
-    it("AC-4: REJECT desde PAID debe fallar (estado terminal)", () => {
-      // Crear un corte y llevarlo hasta PAID
-      const result = useCutsStore.getState().addCut(
-        {
-          projectId: "p1",
-          providerId: "c1",
-          description: "Test pago",
-          periodStart: "2026-01-01",
-          periodEnd: "2026-01-31",
-          items: [
-            {
-              id: "i1",
-              description: "Item test",
-              unit: "M2",
-              quantity: 10,
-              unitPrice: 1000,
-              totalPrice: 10000,
-            },
-          ],
-          grossValue: 10000,
-          retentionPercent: 0,
-          retentionValue: 0,
-          advanceDeduction: 0,
-          netValue: 10000,
-          status: "DRAFT",
-          createdBy: "u-test",
-        } as never,
-        "PRY-2026-001",
-      );
-
-      // DRAFT → SUBMITTED → VALIDATED → APPROVED → PAID
-      const admin = { id: "u-admin", name: "Admin", role: "ADMIN" as const };
-      useCutsStore.getState().performAction(result.id, "SUBMIT", admin);
-      useCutsStore.getState().performAction(result.id, "VALIDATE", admin);
-      useCutsStore.getState().performAction(result.id, "APPROVE", admin);
-      useCutsStore.getState().performAction(result.id, "PAY", {
-        id: "u-tesor",
-        name: "Tes",
-        role: "TESORERIA",
+  describe("AC-2: REJECT debe funcionar desde SUBMITTED", () => {
+    it("devuelve ok con destino REJECTED", () => {
+      const result = evaluateCutAction("SUBMITTED", "REJECT", DIRECTOR, {
+        rejectionReason: "Cantidades no coinciden con el acta",
       });
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.target).toBe("REJECTED");
+    });
+  });
 
-      const paid = useCutsStore.getState().getCut(result.id);
-      expect(paid?.status).toBe("PAID");
+  describe("AC-3: REJECT debe funcionar desde VALIDATED", () => {
+    it("devuelve ok con destino REJECTED", () => {
+      const result = evaluateCutAction("VALIDATED", "REJECT", DIRECTOR, {
+        rejectionReason: "El director pide revisar precios unitarios",
+      });
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.target).toBe("REJECTED");
+    });
+  });
 
-      // Ahora intentar rechazar
-      const rejectResult = useCutsStore
-        .getState()
-        .performAction(result.id, "REJECT", admin, undefined, "Tarde");
-      expect(rejectResult.ok).toBe(false);
+  describe("AC-4: REJECT no debe funcionar desde APPROVED / PAID", () => {
+    it.each<WorkCutStatus>(["APPROVED", "PAID"])(
+      "%s es terminal para REJECT",
+      (status) => {
+        const result = evaluateCutAction(status, "REJECT", DIRECTOR, {
+          rejectionReason: "Motivo válido",
+        });
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.code).toBe("INVALID_TRANSITION");
+      },
+    );
+
+    it("PAID no admite ninguna transición", () => {
+      expect(CUT_TRANSITIONS.PAID).toEqual([]);
+    });
+  });
+
+  describe("Edge Cases", () => {
+    it("el actor debe tener un rol autorizado para rechazar", () => {
+      const result = evaluateCutAction("SUBMITTED", "REJECT", "RESIDENTE", {
+        rejectionReason: "Motivo válido",
+      });
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("FORBIDDEN_ROLE");
+        expect(result.status).toBe(403);
+      }
+    });
+
+    it("el rol se valida antes que la transición", () => {
+      // Un RESIDENTE rechazando un DRAFT falla por rol, no por transición.
+      const result = evaluateCutAction("DRAFT", "REJECT", "RESIDENTE", {
+        rejectionReason: "Motivo válido",
+      });
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.code).toBe("FORBIDDEN_ROLE");
+    });
+
+    it("la matriz completa de transiciones está documentada", () => {
+      expect(CUT_TRANSITIONS).toEqual({
+        DRAFT: ["SUBMITTED"],
+        SUBMITTED: ["VALIDATED", "REJECTED"],
+        VALIDATED: ["APPROVED", "REJECTED"],
+        APPROVED: ["PAID"],
+        REJECTED: ["DRAFT"],
+        PAID: [],
+      });
     });
   });
 });

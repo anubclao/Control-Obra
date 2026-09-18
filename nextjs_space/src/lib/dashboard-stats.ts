@@ -1,39 +1,30 @@
 /**
- * lib/dashboard-stats.ts — lee desde la BD vía /api/dashboard/stats
+ * lib/dashboard-stats.ts
+ *
+ * Hook cliente de los KPIs del dashboard. Consume /api/dashboard/stats, que
+ * agrega con `computeDashboardStats` de ./dashboard-stats-compute.
+ *
+ * Re-exporta la capa pura para que quien ya importaba desde aquí siga igual.
+ *
+ * SPEC: docs/specs/dashboard-stats-from-stores.md
  */
+"use client";
+
 import { useEffect, useState } from "react";
 import { api } from "./api";
+import {
+  EMPTY_DASHBOARD_STATS,
+  type DashboardStats,
+} from "./dashboard-stats-compute";
 
-export interface DashboardStats {
-  activeProjects: number;
-  totalProjects: number;
-  totalBudget: number;
-  totalExecuted: number;
-  executionPercent: number;
-  pendingCuts: number;
-  pendingPayments: number;
-  pendingAmount: number;
-  totalExecutedAdmin: number;
-  activeClients: number;
-  totalClients: number;
-  openQuotations: number;
-  totalOpenValue: number;
-  activeEmployees: number;
-  recentLogs: number;
-}
+export * from "./dashboard-stats-compute";
 
-const EMPTY: DashboardStats = {
-  activeProjects: 0, totalProjects: 0,
-  totalBudget: 0, totalExecuted: 0, executionPercent: 0,
-  pendingCuts: 0, pendingPayments: 0, pendingAmount: 0,
-  totalExecutedAdmin: 0,
-  activeClients: 0, totalClients: 0,
-  openQuotations: 0, totalOpenValue: 0,
-  activeEmployees: 0, recentLogs: 0,
-};
+// ---------------------------------------------------------------------------
+// Hook cliente
+// ---------------------------------------------------------------------------
 
 export function useDashboardStats(): { stats: DashboardStats; loading: boolean; error: string | null; reload: () => void } {
-  const [stats, setStats] = useState<DashboardStats>(EMPTY);
+  const [stats, setStats] = useState<DashboardStats>(EMPTY_DASHBOARD_STATS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
@@ -47,6 +38,8 @@ export function useDashboardStats(): { stats: DashboardStats; loading: boolean; 
       .catch((e: any) => {
         if (mounted) {
           console.error("[dashboard stats]", e?.message);
+          // Edge case del spec: ante error se conservan KPIs en cero, sin crash.
+          setStats(EMPTY_DASHBOARD_STATS);
           setError(e?.message ?? "Error al cargar dashboard");
           setLoading(false);
         }

@@ -6,33 +6,8 @@ export const runtime = 'nodejs';
 import { NextResponse } from "next/server";
 import { query, transaction } from "@/lib/db";
 import { requireAuth, requireRole, requireAdmin, authFailureResponse } from "@/lib/api-auth";
+import { evaluatePaymentAction, isValidApprovalLevel } from "@/lib/payments-workflow";
 
-
-const TRANSITIONS: Record<string, string[]> = {
-  PENDING: ["APPROVED_LEVEL_1", "REJECTED", "CANCELLED"],
-  APPROVED_LEVEL_1: ["APPROVED_LEVEL_2", "REJECTED", "CANCELLED"],
-  APPROVED_LEVEL_2: ["APPROVED", "REJECTED", "CANCELLED"],
-  APPROVED: ["PAID", "CANCELLED"],
-  REJECTED: [],
-  PAID: [],
-  CANCELLED: [],
-};
-
-const ACTION_STATUS_TARGET: Record<string, string> = {
-  APPROVE_L1: "APPROVED_LEVEL_1",
-  APPROVE_L2: "APPROVED_LEVEL_2",
-  PAY: "PAID",
-  REJECT: "REJECTED",
-  CANCEL: "CANCELLED",
-};
-
-const ACTION_ROLES: Record<string, string[]> = {
-  APPROVE_L1: ["DIRECTOR", "ADMIN"],
-  APPROVE_L2: ["GERENTE", "ADMIN"],
-  PAY: ["TESORERIA", "ADMIN"],
-  REJECT: ["DIRECTOR", "GERENTE", "ADMIN"],
-  CANCEL: ["TESORERIA", "ADMIN"],
-};
 
 function dto(r: any) {
   return {
@@ -100,6 +75,13 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
+    const requiredApprovalLevel = Number(body.requiredApprovalLevel ?? 1);
+    if (!isValidApprovalLevel(requiredApprovalLevel)) {
+      return NextResponse.json(
+        { error: "requiredApprovalLevel debe ser 1 o 2", code: "INVALID_APPROVAL_LEVEL" },
+        { status: 400 },
+      );
+    }
     const id = require("crypto").randomUUID();
     const num = `PAG-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase().slice(-5)}`;
     await query(
@@ -112,7 +94,7 @@ export async function POST(req: Request) {
       [
         id, num, body.projectId, body.providerId ?? null, body.workCutId ?? null,
         body.type, Number(body.amount), body.priority ?? "NORMAL",
-        Number(body.requiredApprovalLevel ?? 1),
+        requiredApprovalLevel,
         body.beneficiaryName, body.beneficiaryNit, body.bankName,
         body.accountType ?? "CHECKING", body.accountNumber,
         body.dueDate ?? null, body.description ?? null,
@@ -188,29 +170,28 @@ export async function PATCH(req: Request) {
     if (!id || !action || !user?.role) {
       return NextResponse.json({ error: "id, action, user requeridos" }, { status: 400 });
     }
-    const allowed = ACTION_ROLES[action];
-    if (!allowed || !allowed.includes(user.role)) {
-      return NextResponse.json(
-        { error: `Tu rol (${user.role}) no puede ejecutar ${action}` },
-        { status: 403 },
-      );
-    }
-    if (action === "REJECT" && !rejectionReason?.trim()) {
-      return NextResponse.json(
-        { error: "El motivo del rechazo es obligatorio" },
-        { status: 400 },
-      );
-    }
-    const rows = await query<any[]>(`SELECT status FROM payment_requests WHERE id = ?`, [id]);
+    const rows = await query<any[]>(
+      `SELECT status, required_approval_level, current_approval_level
+         FROM payment_requests WHERE id = ?`,
+      [id],
+    );
     if (!rows.length) return NextResponse.json({ error: "Solicitud no existe" }, { status: 404 });
-    const current = rows[0].status;
-    const target = ACTION_STATUS_TARGET[action];
-    if (!TRANSITIONS[current]?.includes(target)) {
-      return NextResponse.json(
-        { error: `No se puede pasar de ${current} a ${target}` },
-        { status: 400 },
-      );
+
+    // Reglas de rol, nivel de aprobación y transición: lib/payments-workflow.ts
+    const decision = evaluatePaymentAction(
+      {
+        status: rows[0].status,
+        requiredApprovalLevel: Number(rows[0].required_approval_level ?? 1),
+        currentApprovalLevel: Number(rows[0].current_approval_level ?? 0),
+      },
+      action,
+      user.role,
+      { rejectionReason },
+    );
+    if (!decision.ok) {
+      return NextResponse.json({ error: decision.error, code: decision.code }, { status: decision.status });
     }
+    const target = decision.target;
     await transaction(async (conn) => {
       const now = new Date().toISOString().slice(0, 19).replace("T", " ");
       await conn.execute(
@@ -219,9 +200,7 @@ export async function PATCH(req: Request) {
           paid_at = CASE WHEN ? = 'PAY' THEN ? ELSE paid_at END,
           paid_reference = CASE WHEN ? = 'PAY' THEN ? ELSE paid_reference END,
           paid_method = CASE WHEN ? = 'PAY' THEN ? ELSE paid_method END,
-          current_approval_level = CASE
-            WHEN ? IN ('APPROVE_L1','APPROVE_L2') THEN current_approval_level + 1
-            ELSE current_approval_level END,
+          current_approval_level = ?,
           rejection_reason = CASE WHEN ? = 'REJECT' THEN ? ELSE rejection_reason END
          WHERE id = ?`,
         [
@@ -229,7 +208,7 @@ export async function PATCH(req: Request) {
           action, now,
           action, paymentReference ?? null,
           action, paymentMethod ?? null,
-          action,
+          decision.nextApprovalLevel,
           action, rejectionReason ?? null,
           id,
         ],
@@ -240,7 +219,7 @@ export async function PATCH(req: Request) {
           payment_reference, payment_method)
          VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [id, action,
-         action === "APPROVE_L1" ? 1 : action === "APPROVE_L2" ? 2 : null,
+         decision.approvalLevel,
          user.id ?? "unknown", user.name ?? "Anónimo", user.role,
          comments ?? null,
          paymentReference ?? null, paymentMethod ?? null,

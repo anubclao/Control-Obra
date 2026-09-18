@@ -17,6 +17,7 @@ import {
   computeKpis,
   filterAuthorizedUsers,
   migrateInvitationsToUsers,
+  isTransitionAllowed,
   type AuthorizedUser,
   type AuthorizedUserStatus,
 } from "@/lib/admin-users";
@@ -270,8 +271,6 @@ describe("AC-9 · Migración de Invitations legacy", () => {
 // AC-3/4/5 · Transiciones de estado válidas
 // ──────────────────────────────────────────────────────────────
 describe("AC-3/4/5 · Transiciones válidas de estado", () => {
-  // Helper para que sea trivial si se importa el módulo real
-  // (si no existe, este test seguirá siendo parte del contrato).
   const transitions: Array<{ from: AuthorizedUserStatus; to: AuthorizedUserStatus; allowed: boolean }> = [
     { from: "PENDING",   to: "ACTIVE",    allowed: true },
     { from: "PENDING",   to: "SUSPENDED", allowed: false },
@@ -282,22 +281,14 @@ describe("AC-3/4/5 · Transiciones válidas de estado", () => {
   ];
 
   it("documenta y respeta la matriz de transiciones", () => {
-    // Importamos dinámicamente para no acoplarnos al nombre exacto del helper
-    // mientras la implementación madura.
-    let isTransitionAllowed: ((from: AuthorizedUserStatus, to: AuthorizedUserStatus) => boolean) | undefined;
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      isTransitionAllowed = require("@/lib/admin-users").isTransitionAllowed;
-    } catch {
-      isTransitionAllowed = undefined;
-    }
-    if (!isTransitionAllowed) {
-      // Si aún no existe el helper, aceptamos el test en rojo para guiar la implementación.
-      expect(isTransitionAllowed).toBeDefined();
-      return;
-    }
     transitions.forEach(({ from, to, allowed }) => {
-      expect(isTransitionAllowed!(from, to)).toBe(allowed);
+      expect(isTransitionAllowed(from, to)).toBe(allowed);
+    });
+  });
+
+  it("ningun estado puede transicionar a si mismo", () => {
+    (["PENDING", "ACTIVE", "SUSPENDED"] as AuthorizedUserStatus[]).forEach((s) => {
+      expect(isTransitionAllowed(s, s)).toBe(false);
     });
   });
 });

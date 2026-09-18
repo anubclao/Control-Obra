@@ -214,7 +214,9 @@ export function migrateInvitationsToUsers(
     const u = migrated[migrated.length - 1];
     if (inv.status === "ACCEPTED") {
       u.status = "ACTIVE";
-      u.authorizedBy = inv.acceptedBy ?? adminId;
+      // `acceptedBy` es el invitado que aceptó, no quien lo autorizó (AC-10).
+      // La autorización es este acto de migración, ejecutado por el admin.
+      u.authorizedBy = adminId;
       u.authorizedAt = inv.acceptedAt ?? inv.createdAt;
     }
   }

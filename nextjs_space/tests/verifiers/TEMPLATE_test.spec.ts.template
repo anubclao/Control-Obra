@@ -1,0 +1,44 @@
+// VERIFIER: [Nombre del Feature]
+// SPEC: /docs/specs/[feature-name].md
+//
+// PLANTILLA — no se ejecuta. La extensión .template la deja fuera del patrón
+// `tests/verifiers/**/*.spec.{ts,tsx}` de vitest.config.mjs, para que el
+// semáforo de la suite solo muestre rojos reales.
+//
+// Para usarla (PHASE 3 del AGENTS.md):
+//   1. Copiar a tests/verifiers/[feature-name].spec.ts
+//   2. Escribir un `it` por cada AC del spec, con el número de AC en el nombre
+//   3. Correr `npm test` y confirmar que FALLA (Red phase) antes de implementar
+//
+// Estilo de la casa: probar funciones PURAS por módulo (lib/<modulo>-workflow.ts,
+// lib/<modulo>-constants.ts, lib/<modulo>-validation.ts), no stores ni BD. Las
+// rutas /api/* importan esas funciones, así que verificarlas cubre el servidor.
+// Ver tests/verifiers/one-level-payment-approval.spec.ts como referencia.
+
+import { describe, it, expect } from "vitest";
+// import { evaluateFeatureAction } from "@/lib/[modulo]-workflow";
+
+describe("AC-1 · [Criterio 1 del spec]", () => {
+  it("[comportamiento exacto esperado]", () => {
+    // TODO: derivar del spec. Assertions sobre códigos estables
+    // ({ ok, code, error }), no sobre el texto del mensaje.
+    expect.fail("Verifier sin implementar: escribir la aserción del AC-1");
+  });
+});
+
+describe("AC-2 · [Criterio 2 del spec]", () => {
+  it("[comportamiento exacto esperado]", () => {
+    expect.fail("Verifier sin implementar: escribir la aserción del AC-2");
+  });
+});
+
+describe("Edge Cases", () => {
+  it("maneja la entrada vacía o nula sin romper", () => {
+    expect.fail("Verifier sin implementar: cubrir los empty/error states del spec");
+  });
+
+  // Si el feature toca un hook de React:
+  //   const { result } = renderHook(() => useFeature());
+  //   await waitFor(() => expect(result.current.loading).toBe(false));
+  // Si toca una ruta /api/*: probar la función pura que la ruta importa.
+});

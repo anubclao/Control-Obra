@@ -6,6 +6,7 @@ export const runtime = 'nodejs';
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { requireAuth, requireRole, requireAdmin, authFailureResponse } from "@/lib/api-auth";
+import { validateProviderNit, type ProviderNitRef } from "@/lib/providers-validation";
 
 
 function r(r: any) {
@@ -71,6 +72,19 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
+    // AC-1/AC-4: unicidad sobre el NIT normalizado (el UNIQUE de MySQL compara
+    // la cadena literal, así que "900.111.222-3" y "9001112223" lo esquivan).
+    const existing = (await query<any[]>(
+      "SELECT id, name, nit FROM providers",
+    )) as ProviderNitRef[];
+    const nitCheck = validateProviderNit(existing, body.nit);
+    if (!nitCheck.ok) {
+      return NextResponse.json(
+        { error: nitCheck.error, code: nitCheck.code },
+        { status: nitCheck.code === "NIT_DUPLICATED" ? 409 : 400 },
+      );
+    }
+
     const id = require("crypto").randomUUID();
     await query(
       `INSERT INTO providers
@@ -115,6 +129,22 @@ export async function PUT(req: Request) {
   try {
     const body = await req.json();
     if (!body?.id) return NextResponse.json({ error: "ID requerido" }, { status: 400 });
+
+    // AC-2: al cambiar el NIT se valida contra los OTROS proveedores, nunca
+    // contra sí mismo.
+    if (body.nit !== undefined) {
+      const existing = (await query<any[]>(
+        "SELECT id, name, nit FROM providers",
+      )) as ProviderNitRef[];
+      const nitCheck = validateProviderNit(existing, body.nit, body.id);
+      if (!nitCheck.ok) {
+        return NextResponse.json(
+          { error: nitCheck.error, code: nitCheck.code },
+          { status: nitCheck.code === "NIT_DUPLICATED" ? 409 : 400 },
+        );
+      }
+    }
+
     const map: Record<string, string> = {
       personType: "person_type", name: "name", nit: "nit",
       contact: "contact", email: "email", email2: "email2",

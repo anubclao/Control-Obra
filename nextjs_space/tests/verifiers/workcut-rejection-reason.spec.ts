@@ -1,67 +1,65 @@
-// VERIFIER: WorkCut REJECT Requires Non-Empty Reason
-// BUG FIX: #5
+// VERIFIER: WorkCut REJECT Requires Non-Empty Rejection Reason
+// SPEC: /docs/specs/workcut-rejection-reason-required.md
+//
+// Prueba lib/cuts-workflow.ts, el módulo que consume /api/cuts.
 
-import { describe, it, expect, beforeEach } from "vitest";
-import { useCutsStore } from "@/lib/cuts-store";
+import { describe, it, expect } from "vitest";
+import { evaluateCutAction } from "@/lib/cuts-workflow";
 
-describe("useCutsStore — REJECT requires rejectionReason", () => {
-  beforeEach(() => {
-    useCutsStore.setState({ cuts: useCutsStore.getInitialState().cuts });
-  });
+const DIRECTOR = "DIRECTOR";
 
-  it("AC-1: REJECT sin rejectionReason debe fallar", () => {
-    const submittedCut = useCutsStore
-      .getState()
-      .cuts.find((c) => c.status === "SUBMITTED");
-    expect(submittedCut).toBeDefined();
-
-    const result = useCutsStore.getState().performAction(
-      submittedCut!.id,
-      "REJECT",
-      { id: "u-admin", name: "Admin", role: "ADMIN" },
-      // sin rejectionReason
-    );
-
+describe("Cuts workflow — motivo de rechazo obligatorio", () => {
+  it("AC-1: REJECT sin rejectionReason es rechazado", () => {
+    const result = evaluateCutAction("SUBMITTED", "REJECT", DIRECTOR);
     expect(result.ok).toBe(false);
-    expect(result.error?.toLowerCase()).toContain("motivo");
+    if (!result.ok) {
+      expect(result.code).toBe("REJECTION_REASON_REQUIRED");
+      expect(result.error).toBe("El motivo del rechazo es obligatorio");
+      expect(result.status).toBe(400);
+    }
   });
 
-  it("AC-2: REJECT con rejectionReason solo whitespace debe fallar", () => {
-    const submittedCut = useCutsStore
-      .getState()
-      .cuts.find((c) => c.status === "SUBMITTED");
-    expect(submittedCut).toBeDefined();
-
-    const result = useCutsStore.getState().performAction(
-      submittedCut!.id,
-      "REJECT",
-      { id: "u-admin", name: "Admin", role: "ADMIN" },
-      undefined,
-      "   \n  \t  ", // whitespace only
-    );
-
-    expect(result.ok).toBe(false);
-    expect(result.error?.toLowerCase()).toContain("motivo");
+  it("AC-2: REJECT con rejectionReason solo whitespace da el mismo error", () => {
+    for (const reason of ["", "   ", "\t", "\n  \n"]) {
+      const result = evaluateCutAction("SUBMITTED", "REJECT", DIRECTOR, {
+        rejectionReason: reason,
+      });
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.code).toBe("REJECTION_REASON_REQUIRED");
+    }
   });
 
-  it("AC-3: REJECT con rejectionReason válido debe funcionar", () => {
-    const submittedCut = useCutsStore
-      .getState()
-      .cuts.find((c) => c.status === "SUBMITTED");
-    expect(submittedCut).toBeDefined();
+  it("AC-2: rejectionReason null o undefined también falla", () => {
+    for (const reason of [null, undefined]) {
+      const result = evaluateCutAction("VALIDATED", "REJECT", DIRECTOR, {
+        rejectionReason: reason,
+      });
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.code).toBe("REJECTION_REASON_REQUIRED");
+    }
+  });
 
-    const result = useCutsStore
-      .getState()
-      .performAction(
-        submittedCut!.id,
-        "REJECT",
-        { id: "u-admin", name: "Admin", role: "ADMIN" },
-        undefined,
-        "Cantidades infladas",
-      );
-
+  it("AC-3: REJECT con rejectionReason válido pasa", () => {
+    const result = evaluateCutAction("SUBMITTED", "REJECT", DIRECTOR, {
+      rejectionReason: "Las cantidades del ítem 3 no coinciden con el acta",
+    });
     expect(result.ok).toBe(true);
-    const after = useCutsStore.getState().getCut(submittedCut!.id);
-    expect(after?.rejectionReason).toBe("Cantidades infladas");
+    if (result.ok) expect(result.target).toBe("REJECTED");
+  });
+
+  describe("Edge Cases", () => {
+    it("un carácter después de trim ya es válido", () => {
+      const result = evaluateCutAction("SUBMITTED", "REJECT", DIRECTOR, {
+        rejectionReason: "  x  ",
+      });
+      expect(result.ok).toBe(true);
+    });
+
+    it("las demás acciones no exigen motivo", () => {
+      expect(evaluateCutAction("DRAFT", "SUBMIT", "RESIDENTE").ok).toBe(true);
+      expect(evaluateCutAction("SUBMITTED", "VALIDATE", DIRECTOR).ok).toBe(true);
+      expect(evaluateCutAction("VALIDATED", "APPROVE", "ADMIN").ok).toBe(true);
+      expect(evaluateCutAction("APPROVED", "PAY", "TESORERIA").ok).toBe(true);
+    });
   });
 });

@@ -104,3 +104,23 @@ if (action === "APPROVE_L1") {
 ## 7. Approval
 
 **Status:** ⏳ Pending Review
+
+---
+
+## Estado de implementacion (2026-09-18)
+
+El Technical Contract de arriba apunta a `src/lib/payments-store.ts`, que **ya
+no existe**. La regla se implemento en:
+
+- `src/lib/payments-workflow.ts` — `resolvePaymentTarget` decide el estado
+  destino segun `requiredApprovalLevel` (con 1 nivel, `APPROVE_L1` va directo a
+  `APPROVED`); `evaluatePaymentAction` valida rol, nivel y transicion;
+  `isValidApprovalLevel` restringe a 1 o 2.
+- `src/app/api/payments/route.ts` — el PATCH delega la decision y persiste
+  `current_approval_level` desde el resultado; el POST rechaza un
+  `requiredApprovalLevel` distinto de 1 o 2.
+- `tests/verifiers/one-level-payment-approval.spec.ts`.
+
+Casos defensivos cubiertos: `APPROVE_L2` sobre una solicitud de un nivel
+(`SECOND_LEVEL_NOT_REQUIRED`) y `APPROVE_L1` repetida
+(`ALREADY_APPROVED_L1`).

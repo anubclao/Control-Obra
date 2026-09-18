@@ -90,3 +90,19 @@ Con la validación correcta, `REJECTED` ya NO está en `DRAFT` ni en `APPROVED` 
 ## 7. Approval
 
 **Status:** ⏳ Pending Review
+
+---
+
+## Estado de implementacion (2026-09-18)
+
+El Technical Contract de arriba apunta a `src/lib/cuts-store.ts`, que **ya no
+existe**. La maquina de estados vive hoy en:
+
+- `src/lib/cuts-workflow.ts` — `CUT_TRANSITIONS`, `CUT_ACTION_ROLES`,
+  `CUT_ACTION_TARGET`, `isCutTransitionAllowed`, `evaluateCutAction`.
+- `src/app/api/cuts/route.ts` — el PATCH delega en `evaluateCutAction`.
+- `tests/verifiers/workcut-reject-transition.spec.ts`.
+
+La matriz quedo como la pide el spec: `REJECTED` no es alcanzable desde `DRAFT`,
+`APPROVED` ni `PAID`. Los errores traen `code` estable
+(`INVALID_TRANSITION`, `FORBIDDEN_ROLE`, ...) para no asertar sobre texto.

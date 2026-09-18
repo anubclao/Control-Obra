@@ -9,32 +9,8 @@ export const runtime = 'nodejs';
 import { NextResponse } from "next/server";
 import { query, transaction } from "@/lib/db";
 import { requireAuth, requireRole, requireAdmin, authFailureResponse } from "@/lib/api-auth";
+import { evaluateCutAction } from "@/lib/cuts-workflow";
 
-
-const TRANSITIONS: Record<string, string[]> = {
-  DRAFT: ["SUBMITTED"],
-  SUBMITTED: ["VALIDATED", "REJECTED"],
-  VALIDATED: ["APPROVED", "REJECTED"],
-  APPROVED: ["PAID"],
-  REJECTED: ["DRAFT"],
-  PAID: [],
-};
-
-const ACTION_ROLES: Record<string, string[]> = {
-  SUBMIT: ["RESIDENTE", "DIRECTOR", "ADMIN"],
-  VALIDATE: ["DIRECTOR", "ADMIN"],
-  APPROVE: ["ADMIN"],
-  REJECT: ["ADMIN", "DIRECTOR", "GERENTE"],
-  PAY: ["TESORERIA", "ADMIN"],
-};
-
-const ACTION_TARGET: Record<string, string> = {
-  SUBMIT: "SUBMITTED",
-  VALIDATE: "VALIDATED",
-  APPROVE: "APPROVED",
-  REJECT: "REJECTED",
-  PAY: "PAID",
-};
 
 function cutDto(r: any) {
   return {
@@ -268,29 +244,16 @@ export async function PATCH(req: Request) {
     if (!id || !action || !user?.role) {
       return NextResponse.json({ error: "id, action, user requeridos" }, { status: 400 });
     }
-    const allowed = ACTION_ROLES[action];
-    if (!allowed || !allowed.includes(user.role)) {
-      return NextResponse.json(
-        { error: `Tu rol (${user.role}) no puede ejecutar ${action}` },
-        { status: 403 },
-      );
-    }
-    if (action === "REJECT" && !rejectionReason?.trim()) {
-      return NextResponse.json(
-        { error: "El motivo del rechazo es obligatorio" },
-        { status: 400 },
-      );
-    }
     const rows = await query<any[]>(`SELECT status FROM work_cuts WHERE id = ?`, [id]);
     if (!rows.length) return NextResponse.json({ error: "Corte no existe" }, { status: 404 });
     const current = rows[0].status;
-    const target = ACTION_TARGET[action];
-    if (!TRANSITIONS[current]?.includes(target)) {
-      return NextResponse.json(
-        { error: `No se puede pasar de ${current} a ${target}` },
-        { status: 400 },
-      );
+
+    // Reglas de rol, motivo de rechazo y transición: lib/cuts-workflow.ts
+    const decision = evaluateCutAction(current, action, user.role, { rejectionReason });
+    if (!decision.ok) {
+      return NextResponse.json({ error: decision.error, code: decision.code }, { status: decision.status });
     }
+    const target = decision.target;
     await transaction(async (conn) => {
       const now = new Date().toISOString().slice(0, 19).replace("T", " ");
       await conn.execute(

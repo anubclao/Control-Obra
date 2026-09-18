@@ -113,3 +113,20 @@ addProvider: (data) => {
 ## 7. Approval
 
 **Status:** ⏳ Pending Review
+
+---
+
+## Estado de implementacion (2026-09-18)
+
+El Technical Contract de arriba apunta a `src/lib/providers-store.ts`, que **ya
+no existe**: los stores por modulo se consolidaron en `src/lib/data-store.ts` y
+la fuente de verdad paso a MySQL. La regla se implemento donde corresponde hoy:
+
+- `src/lib/providers-validation.ts` — `normalizeNit`, `findProviderByNit`,
+  `validateProviderNit` (funciones puras).
+- `src/app/api/providers/route.ts` — POST valida al crear (409 si duplica) y PUT
+  valida al cambiar el NIT excluyendo el propio `id` (AC-2).
+- `tests/verifiers/unique-provider-nit.spec.ts` — verifica la funcion pura.
+
+Nota de esquema: `uk_providers_nit` en `init.sql` compara la cadena literal, por
+eso la unicidad normalizada se valida ademas en la ruta.

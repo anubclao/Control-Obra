@@ -37,12 +37,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Collapsible,
   CollapsibleContent,
@@ -58,9 +53,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  useBudgetsStore,
-} from "@/lib/data-store";
+import { useBudgetsStore } from "@/lib/data-store";
 import { useAiuStore } from "@/lib/data-store";
 import { useProjectsStore } from "@/lib/data-store";
 import { useIsSuperAdmin } from "@/lib/permissions";
@@ -71,12 +64,7 @@ import {
   type ParsedExcel,
 } from "@/lib/excel-parser";
 import { AiuForm } from "@/components/aiu/aiu-form";
-import {
-  formatCurrency,
-  formatDate,
-  formatPercent,
-  cn,
-} from "@/lib/utils";
+import { formatCurrency, formatDate, formatPercent, cn } from "@/lib/utils";
 import type { BudgetLayer, BudgetItem } from "@/types";
 
 export default function BudgetDetailPage() {
@@ -104,14 +92,16 @@ export default function BudgetDetailPage() {
   const aiuConfig = getConfig(projectId);
 
   const totals = useMemo(() => {
-    if (!budget) return { itemCount: 0, chapterCount: 0, executed: 0, executedPercent: 0 };
+    if (!budget)
+      return { itemCount: 0, chapterCount: 0, executed: 0, executedPercent: 0 };
     const allItems = budget.layers.flatMap((l) => l.items);
     const executed = allItems.reduce((s, it) => s + it.executedAmount, 0);
     return {
       itemCount: allItems.length,
       chapterCount: budget.layers.length,
       executed,
-      executedPercent: budget.totalValue > 0 ? (executed / budget.totalValue) * 100 : 0,
+      executedPercent:
+        budget.totalValue > 0 ? (executed / budget.totalValue) * 100 : 0,
     };
   }, [budget]);
 
@@ -131,7 +121,9 @@ export default function BudgetDetailPage() {
     );
   }
 
-  const activeVersion = budget.versions.find((v) => v.id === budget.activeVersionId);
+  const activeVersion = budget.versions.find(
+    (v) => v.id === budget.activeVersionId,
+  );
   const overBudget = totals.executed > budget.totalValue;
   const clientLayers = budget.clientLayers ?? [];
   const unforeseenItems = budget.unforeseenItems ?? [];
@@ -163,7 +155,7 @@ export default function BudgetDetailPage() {
         `Proyecto: ${project?.name}\n` +
         `Total Tope: ${formatCurrency(budget?.totalValue ?? 0)}\n` +
         `Total Cliente: ${formatCurrency(budget?.clientValue ?? 0)}\n` +
-        `Ítems: ${totals.itemCount}`
+        `Ítems: ${totals.itemCount}`,
     );
     setExportOpen(false);
   }
@@ -178,7 +170,11 @@ export default function BudgetDetailPage() {
           </Link>
         </Button>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => setExportOpen(true)} variant="outline" size="sm">
+          <Button
+            onClick={() => setExportOpen(true)}
+            variant="outline"
+            size="sm"
+          >
             <Download className="mr-2 h-4 w-4" />
             Exportar
           </Button>
@@ -196,9 +192,13 @@ export default function BudgetDetailPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="font-mono text-xs text-muted-foreground">{project.code}</p>
+              <p className="font-mono text-xs text-muted-foreground">
+                {project.code}
+              </p>
               <Badge variant="info">PT v{activeVersion?.version}</Badge>
-              {activeVersion?.isActive && <Badge variant="success">Activa</Badge>}
+              {activeVersion?.isActive && (
+                <Badge variant="success">Activa</Badge>
+              )}
               {overBudget && (
                 <Badge variant="destructive">
                   <AlertTriangle className="mr-1 h-3 w-3" />
@@ -206,18 +206,28 @@ export default function BudgetDetailPage() {
                 </Badge>
               )}
             </div>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">{project.name}</h1>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+              {project.name}
+            </h1>
             <p className="text-sm text-muted-foreground">{project.client}</p>
           </div>
 
           <div className="grid grid-cols-2 gap-2 sm:min-w-[300px]">
             <div className="rounded-lg bg-secondary/50 p-3">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">Cliente</p>
-              <p className="mt-1 text-lg font-bold">{formatCurrency(budget.clientValue ?? 0)}</p>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                Cliente
+              </p>
+              <p className="mt-1 text-lg font-bold">
+                {formatCurrency(budget.clientValue ?? 0)}
+              </p>
             </div>
             <div className="rounded-lg bg-secondary/50 p-3">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">Tope</p>
-              <p className="mt-1 text-lg font-bold">{formatCurrency(budget.totalValue)}</p>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                Tope
+              </p>
+              <p className="mt-1 text-lg font-bold">
+                {formatCurrency(budget.totalValue)}
+              </p>
             </div>
           </div>
         </div>
@@ -233,13 +243,20 @@ export default function BudgetDetailPage() {
           </div>
           <div className="rounded-md border bg-secondary/30 p-3">
             <p className="text-xs text-muted-foreground">Ejecutado</p>
-            <p className={cn("text-xl font-semibold", overBudget ? "text-red-600" : "text-emerald-600")}>
+            <p
+              className={cn(
+                "text-xl font-semibold",
+                overBudget ? "text-red-600" : "text-emerald-600",
+              )}
+            >
               {formatCurrency(totals.executed)}
             </p>
           </div>
           <div className="rounded-md border bg-secondary/30 p-3">
             <p className="text-xs text-muted-foreground">% Ejecución</p>
-            <p className="text-xl font-semibold">{formatPercent(totals.executedPercent)}</p>
+            <p className="text-xl font-semibold">
+              {formatPercent(totals.executedPercent)}
+            </p>
           </div>
         </div>
       </div>
@@ -250,10 +267,12 @@ export default function BudgetDetailPage() {
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Gasto por encima del tope</AlertTitle>
           <AlertDescription>
-            El ejecutado ({formatCurrency(totals.executed)}) supera el Presupuesto Tope (
-            {formatCurrency(budget.totalValue)}) por{" "}
-            <strong>{formatCurrency(totals.executed - budget.totalValue)}</strong>. Revisa los
-            ítems no previstos.
+            El ejecutado ({formatCurrency(totals.executed)}) supera el
+            Presupuesto Tope ({formatCurrency(budget.totalValue)}) por{" "}
+            <strong>
+              {formatCurrency(totals.executed - budget.totalValue)}
+            </strong>
+            . Revisa los ítems no previstos.
           </AlertDescription>
         </Alert>
       )}
@@ -298,14 +317,15 @@ export default function BudgetDetailPage() {
             <CardHeader>
               <CardTitle>Presupuesto Cliente</CardTitle>
               <CardDescription>
-                Lo que el cliente aprobó al inicio del proyecto. Los totales se usan como
-                referencia y no se modifican durante la obra.
+                Lo que el cliente aprobó al inicio del proyecto. Los totales se
+                usan como referencia y no se modifican durante la obra.
               </CardDescription>
             </CardHeader>
             <CardContent>
               {clientLayers.length === 0 ? (
                 <p className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-                  Aún no se ha cargado el presupuesto cliente para este proyecto.
+                  Aún no se ha cargado el presupuesto cliente para este
+                  proyecto.
                 </p>
               ) : (
                 clientLayers.map((layer) => (
@@ -326,8 +346,8 @@ export default function BudgetDetailPage() {
             <CardHeader>
               <CardTitle>Presupuesto Tope</CardTitle>
               <CardDescription>
-                Con el que se trabaja en obra para contratar. Incluye los ítems no previstos que se
-                hayan creado durante la ejecución.
+                Con el que se trabaja en obra para contratar. Incluye los ítems
+                no previstos que se hayan creado durante la ejecución.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -362,8 +382,9 @@ export default function BudgetDetailPage() {
                 <div>
                   <CardTitle>Ítems No Previstos</CardTitle>
                   <CardDescription>
-                    Al crear un ítem no previsto, se suma automáticamente al Presupuesto Tope
-                    con el porcentaje definido en la tabla resumen.
+                    Al crear un ítem no previsto, se suma automáticamente al
+                    Presupuesto Tope con el porcentaje definido en la tabla
+                    resumen.
                   </CardDescription>
                 </div>
                 {isSuperAdmin && (
@@ -390,21 +411,28 @@ export default function BudgetDetailPage() {
                         <p className="text-xs font-mono text-amber-700">
                           CAP### - ITEM NO PREVISTO
                         </p>
-                        <p className="text-sm font-medium">{item.description}</p>
+                        <p className="text-sm font-medium">
+                          {item.description}
+                        </p>
                         <p className="text-xs text-muted-foreground">
-                          {item.quantity} {item.unit} × {formatCurrency(item.unitPrice)}
+                          {item.quantity} {item.unit} ×{" "}
+                          {formatCurrency(item.unitPrice)}
                         </p>
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-right">
-                          <p className="font-semibold">{formatCurrency(item.totalPrice)}</p>
+                          <p className="font-semibold">
+                            {formatCurrency(item.totalPrice)}
+                          </p>
                           <p className="text-xs text-muted-foreground">Total</p>
                         </div>
                         {isSuperAdmin && (
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => removeUnforeseenItem(budget.id, item.id)}
+                            onClick={() =>
+                              removeUnforeseenItem(budget.id, item.id)
+                            }
                             className="h-7 w-7"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -415,7 +443,9 @@ export default function BudgetDetailPage() {
                   ))}
                   <div className="flex justify-end rounded-md border bg-amber-50 p-3">
                     <div className="text-right">
-                      <p className="text-xs text-muted-foreground">Total no previstos</p>
+                      <p className="text-xs text-muted-foreground">
+                        Total no previstos
+                      </p>
                       <p className="text-lg font-bold text-amber-700">
                         {formatCurrency(budget.unforeseenValue ?? 0)}
                       </p>
@@ -433,7 +463,8 @@ export default function BudgetDetailPage() {
             <CardHeader>
               <CardTitle>AIU — Administración, Imprevistos, Utilidad</CardTitle>
               <CardDescription>
-                Configurado a nivel de proyecto. Se aplica sobre el presupuesto base.
+                Configurado a nivel de proyecto. Se aplica sobre el presupuesto
+                base.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -452,7 +483,9 @@ export default function BudgetDetailPage() {
                       {aiuConfig.administration}%
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {formatCurrency((budget.totalValue * aiuConfig.administration) / 100)}
+                      {formatCurrency(
+                        (budget.totalValue * aiuConfig.administration) / 100,
+                      )}
                     </p>
                   </div>
                   <div className="rounded-md bg-amber-50 p-3">
@@ -461,7 +494,9 @@ export default function BudgetDetailPage() {
                       {aiuConfig.imprevistos}%
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {formatCurrency((budget.totalValue * aiuConfig.imprevistos) / 100)}
+                      {formatCurrency(
+                        (budget.totalValue * aiuConfig.imprevistos) / 100,
+                      )}
                     </p>
                   </div>
                   <div className="rounded-md bg-emerald-50 p-3">
@@ -470,7 +505,9 @@ export default function BudgetDetailPage() {
                       {aiuConfig.utilidad}%
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {formatCurrency((budget.totalValue * aiuConfig.utilidad) / 100)}
+                      {formatCurrency(
+                        (budget.totalValue * aiuConfig.utilidad) / 100,
+                      )}
                     </p>
                   </div>
                 </div>
@@ -485,7 +522,8 @@ export default function BudgetDetailPage() {
             <CardHeader>
               <CardTitle>Histórico de versiones</CardTitle>
               <CardDescription>
-                Cada cambio en el PT crea una nueva versión. Solo una está activa a la vez.
+                Cada cambio en el PT crea una nueva versión. Solo una está
+                activa a la vez.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -497,7 +535,9 @@ export default function BudgetDetailPage() {
                       key={v.id}
                       className={cn(
                         "flex items-center justify-between rounded-md border p-3",
-                        v.isActive ? "bg-emerald-50 border-emerald-200" : "bg-secondary/20"
+                        v.isActive
+                          ? "bg-emerald-50 border-emerald-200"
+                          : "bg-secondary/20",
                       )}
                     >
                       <div className="flex items-center gap-3">
@@ -507,14 +547,18 @@ export default function BudgetDetailPage() {
                           <AlertCircle className="h-4 w-4 text-muted-foreground" />
                         )}
                         <div>
-                          <p className="text-sm font-medium">Versión {v.version}</p>
+                          <p className="text-sm font-medium">
+                            Versión {v.version}
+                          </p>
                           <p className="text-xs text-muted-foreground">
                             {v.notes} · {formatDate(v.createdAt)}
                           </p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold">{formatCurrency(v.totalValue)}</p>
+                        <p className="font-semibold">
+                          {formatCurrency(v.totalValue)}
+                        </p>
                       </div>
                     </div>
                   ))}
@@ -542,7 +586,8 @@ export default function BudgetDetailPage() {
           {parsed && (
             <div className="space-y-3">
               <p className="text-sm">
-                Detectadas <strong>{parsed.rows.length}</strong> filas. Ajusta notas y confirma.
+                Detectadas <strong>{parsed.rows.length}</strong> filas. Ajusta
+                notas y confirma.
               </p>
               <div className="space-y-1.5">
                 <Label>Notas de la versión</Label>
@@ -621,15 +666,24 @@ function ChapterCard({
   const percent = budgetTotal > 0 ? (layerTotal / budgetTotal) * 100 : 0;
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="rounded-md border bg-card">
+    <Collapsible
+      open={open}
+      onOpenChange={setOpen}
+      className="rounded-md border bg-card"
+    >
       <CollapsibleTrigger asChild>
         <button className="flex w-full items-center justify-between p-3 hover:bg-accent/50">
           <div className="flex items-center gap-2">
             <ChevronRight
-              className={cn("h-4 w-4 transition-transform", open && "rotate-90")}
+              className={cn(
+                "h-4 w-4 transition-transform",
+                open && "rotate-90",
+              )}
             />
             <div className="text-left">
-              <p className="font-mono text-xs text-muted-foreground">CAP {layer.code}</p>
+              <p className="font-mono text-xs text-muted-foreground">
+                CAP {layer.code}
+              </p>
               <p className="text-sm font-semibold">{layer.name}</p>
             </div>
           </div>
@@ -646,7 +700,9 @@ function ChapterCard({
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Total</p>
-              <p className="text-sm font-semibold">{formatCurrency(layerTotal)}</p>
+              <p className="text-sm font-semibold">
+                {formatCurrency(layerTotal)}
+              </p>
             </div>
           </div>
         </button>
@@ -666,10 +722,18 @@ function ChapterCard({
             {layer.items.map((it) => (
               <tr key={it.id} className="border-b last:border-0">
                 <td className="px-3 py-2">{it.description}</td>
-                <td className="px-3 py-2 text-center font-mono text-xs">{it.unit}</td>
-                <td className="px-3 py-2 text-right">{it.quantity.toLocaleString("es-CO")}</td>
-                <td className="px-3 py-2 text-right">{formatCurrency(it.unitPrice)}</td>
-                <td className="px-3 py-2 text-right font-semibold">{formatCurrency(it.totalPrice)}</td>
+                <td className="px-3 py-2 text-center font-mono text-xs">
+                  {it.unit}
+                </td>
+                <td className="px-3 py-2 text-right">
+                  {it.quantity.toLocaleString("es-CO")}
+                </td>
+                <td className="px-3 py-2 text-right">
+                  {formatCurrency(it.unitPrice)}
+                </td>
+                <td className="px-3 py-2 text-right font-semibold">
+                  {formatCurrency(it.totalPrice)}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -686,7 +750,12 @@ function UnforeseenDialog({
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
-  onAdd: (item: Omit<BudgetItem, "id" | "layerId" | "totalPrice" | "executedQuantity" | "executedAmount">) => void;
+  onAdd: (
+    item: Omit<
+      BudgetItem,
+      "id" | "layerId" | "totalPrice" | "executedQuantity" | "executedAmount"
+    >,
+  ) => void;
 }) {
   const [description, setDescription] = useState("");
   const [unit, setUnit] = useState("GL");
@@ -709,8 +778,8 @@ function UnforeseenDialog({
         <DialogHeader>
           <DialogTitle>Nuevo ítem no previsto</DialogTitle>
           <DialogDescription>
-            Se creará con el código <strong>CAP### - ITEM NO PREVISTO</strong> y se sumará
-            automáticamente al Presupuesto Tope.
+            Se creará con el código <strong>CAP### - ITEM NO PREVISTO</strong> y
+            se sumará automáticamente al Presupuesto Tope.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-3">
@@ -744,8 +813,9 @@ function UnforeseenDialog({
               <Label>Cantidad</Label>
               <Input
                 type="number"
+                inputMode="decimal"
                 min="0"
-                step="0.01"
+                step="any"
                 value={quantity}
                 onChange={(e) => setQuantity(Number(e.target.value))}
               />
@@ -754,8 +824,9 @@ function UnforeseenDialog({
               <Label>Vr Unit</Label>
               <Input
                 type="number"
+                inputMode="decimal"
                 min="0"
-                step="1000"
+                step="any"
                 value={unitPrice}
                 onChange={(e) => setUnitPrice(Number(e.target.value))}
               />
@@ -765,7 +836,11 @@ function UnforeseenDialog({
             Total: <strong>{formatCurrency(quantity * unitPrice)}</strong>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Cancelar
             </Button>
             <Button type="submit">Crear ítem</Button>

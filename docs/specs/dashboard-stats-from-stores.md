@@ -139,3 +139,26 @@ export function useDashboardStats(): DashboardStats;
 ## 7. Approval
 
 **Status:** ⏳ Pending Review
+
+---
+
+## Estado de implementacion (2026-09-18)
+
+Los AC-1 a AC-3 estan redactados sobre los stores de localStorage
+(`useProjectsStore.projects`, etc.). Esa arquitectura cambio: la fuente unica de
+verdad es MySQL y los KPIs se agregan en el servidor. El **proposito** del spec
+(un solo lugar que define cada KPI, coherente con la operacion) se mantiene; el
+mecanismo es otro:
+
+- `src/lib/dashboard-stats-compute.ts` — `computeDashboardStats` y las
+  constantes que definen cada filtro (`PENDING_PAYMENT_STATUSES`,
+  `OPEN_QUOTATION_STATUSES`, ...). Funcion pura, server-safe.
+- `src/app/api/dashboard/stats/route.ts` — lee la BD y delega la agregacion.
+- `src/lib/dashboard-stats.ts` — `useDashboardStats()` (hook cliente, AC-4) y
+  re-export de la capa pura.
+- `tests/verifiers/dashboard-stats.spec.ts` — cubre los filtros de cada KPI, los
+  estados vacios y el contrato del hook.
+
+Los filtros siguen siendo los del spec: proyectos `IN_EXECUTION`; pagos
+`PENDING | APPROVED_LEVEL_1 | APPROVED_LEVEL_2`; clientes `WON`; cotizaciones
+`DRAFT | SENT | VIEWED`.

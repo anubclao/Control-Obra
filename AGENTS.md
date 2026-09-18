@@ -14,7 +14,7 @@ You DO NOT write implementation code until:
 **Action:**
 1. Read `/docs/env/ARCHITECTURE.md` to understand the tech stack
 2. Read `/docs/env/CONSTRAINTS.md` to understand rules and limitations
-3. Analyze existing codebase structure in `/src/`
+3. Analyze existing codebase structure in `nextjs_space/src/`
 4. Acknowledge current state and constraints
 
 **Output:** Brief 2-3 sentence confirmation of environment understanding.
@@ -26,7 +26,7 @@ You DO NOT write implementation code until:
 ### PHASE 2: SPEC (Especificación)
 **Trigger:** User describes a feature request.
 **Action:**
-1. Create `/docs/specs/[feature-name].md` using the template
+1. Create `docs/specs/[feature-name].md` using the template
 2. Define:
    - **User Story:** As a [user], I want to [action] so that [benefit]
    - **Acceptance Criteria:** Bulleted list of exact behaviors
@@ -41,7 +41,8 @@ You DO NOT write implementation code until:
 ### PHASE 3: VERIFIER (El Verificador / TDD)
 **Trigger:** User approves the Spec.
 **Action:**
-1. Create test files in `/tests/verifiers/[feature-name].spec.ts`
+1. Create test files in `nextjs_space/tests/verifiers/[feature-name].spec.ts`
+   (copiando `TEMPLATE_test.spec.ts.template`)
 2. Write tests covering all acceptance criteria and edge cases
 3. Run the tests to confirm they FAIL (Red phase)
 
@@ -52,7 +53,9 @@ You DO NOT write implementation code until:
 ### PHASE 4: IMPLEMENTATION (Código)
 **Trigger:** User confirms Verifiers are ready.
 **Action:**
-1. Write implementation code in `/src/` to make Verifiers pass
+1. Write implementation code in `nextjs_space/src/` to make Verifiers pass
+   (reglas de negocio en `src/lib/<modulo>-workflow.ts` o `-validation.ts`;
+   la ruta `/api/*` importa esa funcion, no duplica la regla)
 2. Strictly adhere to TypeScript interfaces from the Spec
 3. Run tests iteratively until they pass (Green phase)
 
@@ -61,7 +64,8 @@ You DO NOT write implementation code until:
 ### PHASE 5: REFACTOR & VERIFY
 **Trigger:** Implementation is complete.
 **Action:**
-1. Run all tests one final time
+1. Run all tests one final time (`cd nextjs_space && npm test`): la suite debe
+   quedar completamente verde, y `npx tsc --noEmit` en 0 errores
 2. Check for code quality (no `any` types, proper error handling)
 3. Refactor if needed (but don't break tests)
 
@@ -71,7 +75,7 @@ You DO NOT write implementation code until:
 
 ### How to Request Context Efficiently:
 1. **Start with Spec:** "Read @docs/specs/[feature].md"
-2. **Then Verifier:** "Read @tests/verifiers/[feature].spec.ts"
+2. **Then Verifier:** "Read @nextjs_space/tests/verifiers/[feature].spec.ts"
 3. **Only then specific files:** "Read @src/components/[Component].tsx"
 
 ### Rules:
@@ -84,3 +88,8 @@ You DO NOT write implementation code until:
 - ❌ Modifying tests to make them pass (fix the code instead)
 - ❌ Adding features not in the Spec
 - ❌ Using `any` types
+- ❌ Dejar un verifier en rojo permanente (nadie vuelve a mirar el semáforo)
+- ❌ Mover o renombrar algo en `src/lib/` sin actualizar los verifiers que lo
+  importan: un import roto hace que el archivo ejecute 0 tests en silencio
+- ❌ Usar `require()` dentro de un test (el módulo es ESM: lanza y genera un
+  falso rojo)

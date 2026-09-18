@@ -1,234 +1,170 @@
 // VERIFIER: One-Level Payment Approval
-// STATUS: EXPECTED TO FAIL (RED PHASE) — hasta que el bug sea arreglado
 // SPEC: /docs/specs/one-level-payment-approval.md
-// BUG FIX: #2 — Solicitud con 1 nivel no llega a APPROVED
+//
+// El store sincrónico payments-store.ts ya no existe: el workflow vive en
+// lib/payments-workflow.ts y lo consume /api/payments.
 
-import { describe, it, expect, beforeEach } from "vitest";
-import { usePaymentsStore } from "@/lib/payments-store";
+import { describe, it, expect } from "vitest";
+import {
+  evaluatePaymentAction,
+  isValidApprovalLevel,
+  resolvePaymentTarget,
+  type PaymentWorkflowState,
+} from "@/lib/payments-workflow";
 
-describe("usePaymentsStore — One-Level Approval", () => {
-  beforeEach(() => {
-    // Reset a estado inicial (sin pagos personalizados)
-    usePaymentsStore.setState({
-      payments: usePaymentsStore.getInitialState().payments,
+function pending(
+  requiredApprovalLevel: number,
+  over: Partial<PaymentWorkflowState> = {},
+): PaymentWorkflowState {
+  return {
+    status: "PENDING",
+    requiredApprovalLevel,
+    currentApprovalLevel: 0,
+    ...over,
+  };
+}
+
+describe("Payments workflow — aprobación de un solo nivel", () => {
+  describe("AC-1: con 1 nivel, PENDING → APPROVED en una sola aprobación", () => {
+    it("APPROVE_L1 lleva a APPROVED, no a APPROVED_LEVEL_1", () => {
+      const result = evaluatePaymentAction(pending(1), "APPROVE_L1", "DIRECTOR");
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.target).toBe("APPROVED");
+        expect(result.nextApprovalLevel).toBe(1);
+        expect(result.approvalLevel).toBe(1);
+      }
+    });
+
+    it("el estado APPROVED resultante permite PAY a Tesorería", () => {
+      const result = evaluatePaymentAction(
+        { status: "APPROVED", requiredApprovalLevel: 1, currentApprovalLevel: 1 },
+        "PAY",
+        "TESORERIA",
+      );
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.target).toBe("PAID");
+    });
+
+    it("ADMIN también puede ejecutar APPROVE_L1", () => {
+      const result = evaluatePaymentAction(pending(1), "APPROVE_L1", "ADMIN");
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.target).toBe("APPROVED");
     });
   });
 
-  describe("Acceptance Criteria", () => {
-    it("AC-1: solicitud con requiredApprovalLevel=1 debe pasar a APPROVED tras APPROVE_L1", () => {
-      const result = usePaymentsStore.getState().addPayment({
-        projectId: "p1",
-        providerId: "c1",
-        type: "SUMINISTRO",
-        amount: 1_000_000,
-        priority: "NORMAL",
-        requiredApprovalLevel: 1,
-        beneficiaryName: "Proveedor Test",
-        beneficiaryNit: "900.111.222-3",
-        bankName: "Bancolombia",
-        accountType: "CHECKING",
-        accountNumber: "123-456789-00",
-        createdBy: "u-test",
-      });
-
-      const actor = {
-        id: "u-director",
-        name: "Director Test",
-        role: "DIRECTOR" as const,
-      };
-      const actionResult = usePaymentsStore
-        .getState()
-        .performAction(result.id, "APPROVE_L1", actor);
-
-      expect(actionResult.ok).toBe(true);
-      const updated = usePaymentsStore.getState().getPayment(result.id);
-      expect(updated?.status).toBe("APPROVED");
-      expect(updated?.currentApprovalLevel).toBe(1);
+  describe("AC-2: con 2 niveles el flujo mantiene los dos pasos", () => {
+    it("APPROVE_L1 lleva a APPROVED_LEVEL_1", () => {
+      const result = evaluatePaymentAction(pending(2), "APPROVE_L1", "DIRECTOR");
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.target).toBe("APPROVED_LEVEL_1");
+        expect(result.nextApprovalLevel).toBe(1);
+      }
     });
 
-    it("AC-2: solicitud con requiredApprovalLevel=2 debe pasar a APPROVED_LEVEL_1 tras APPROVE_L1 (no terminal)", () => {
-      const result = usePaymentsStore.getState().addPayment({
-        projectId: "p1",
-        providerId: "c1",
-        type: "SUMINISTRO",
-        amount: 1_000_000,
-        priority: "NORMAL",
-        requiredApprovalLevel: 2,
-        beneficiaryName: "Proveedor Test",
-        beneficiaryNit: "900.111.222-3",
-        bankName: "Bancolombia",
-        accountType: "CHECKING",
-        accountNumber: "123-456789-00",
-        createdBy: "u-test",
-      });
-
-      const actor = {
-        id: "u-director",
-        name: "Director Test",
-        role: "DIRECTOR" as const,
-      };
-      const actionResult = usePaymentsStore
-        .getState()
-        .performAction(result.id, "APPROVE_L1", actor);
-
-      expect(actionResult.ok).toBe(true);
-      const updated = usePaymentsStore.getState().getPayment(result.id);
-      expect(updated?.status).toBe("APPROVED_LEVEL_1");
-      expect(updated?.currentApprovalLevel).toBe(1);
+    it("APPROVE_L2 desde APPROVED_LEVEL_1 lleva a APPROVED", () => {
+      const result = evaluatePaymentAction(
+        {
+          status: "APPROVED_LEVEL_1",
+          requiredApprovalLevel: 2,
+          currentApprovalLevel: 1,
+        },
+        "APPROVE_L2",
+        "GERENTE",
+      );
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.target).toBe("APPROVED");
+        expect(result.nextApprovalLevel).toBe(2);
+        expect(result.approvalLevel).toBe(2);
+      }
     });
 
-    it("AC-2: solicitud con requiredApprovalLevel=2 debe pasar a APPROVED tras APPROVE_L2", () => {
-      const result = usePaymentsStore.getState().addPayment({
-        projectId: "p1",
-        providerId: "c1",
-        type: "SUMINISTRO",
-        amount: 1_000_000,
-        priority: "NORMAL",
-        requiredApprovalLevel: 2,
-        beneficiaryName: "Proveedor Test",
-        beneficiaryNit: "900.111.222-3",
-        bankName: "Bancolombia",
-        accountType: "CHECKING",
-        accountNumber: "123-456789-00",
-        createdBy: "u-test",
-      });
-
-      const director = {
-        id: "u-director",
-        name: "Director",
-        role: "DIRECTOR" as const,
-      };
-      const gerente = {
-        id: "u-gerente",
-        name: "Gerente",
-        role: "GERENTE" as const,
-      };
-
-      usePaymentsStore
-        .getState()
-        .performAction(result.id, "APPROVE_L1", director);
-      const actionResult = usePaymentsStore
-        .getState()
-        .performAction(result.id, "APPROVE_L2", gerente);
-
-      expect(actionResult.ok).toBe(true);
-      const updated = usePaymentsStore.getState().getPayment(result.id);
-      expect(updated?.status).toBe("APPROVED");
-      expect(updated?.currentApprovalLevel).toBe(2);
-    });
-
-    it("AC-3: getAvailablePaymentActions debe mostrar PAY para status=APPROVED de 1 nivel", async () => {
-      const { getAvailablePaymentActions } =
-        await import("@/lib/payments-store");
-
-      const result = usePaymentsStore.getState().addPayment({
-        projectId: "p1",
-        providerId: "c1",
-        type: "SUMINISTRO",
-        amount: 1_000_000,
-        priority: "NORMAL",
-        requiredApprovalLevel: 1,
-        beneficiaryName: "Proveedor Test",
-        beneficiaryNit: "900.111.222-3",
-        bankName: "Bancolombia",
-        accountType: "CHECKING",
-        accountNumber: "123-456789-00",
-        createdBy: "u-test",
-      });
-
-      const director = {
-        id: "u-director",
-        name: "Director",
-        role: "DIRECTOR" as const,
-      };
-      usePaymentsStore
-        .getState()
-        .performAction(result.id, "APPROVE_L1", director);
-
-      const updated = usePaymentsStore.getState().getPayment(result.id);
-      expect(updated?.status).toBe("APPROVED");
-
-      const actions = getAvailablePaymentActions(updated!, "TESORERIA");
-      const hasPayAction = actions.some((a) => a.action === "PAY");
-      expect(hasPayAction).toBe(true);
-    });
-
-    it("AC-3 (regresión): getAvailablePaymentActions también debe mostrar PAY para APPROVED de 2 niveles", async () => {
-      const { getAvailablePaymentActions } =
-        await import("@/lib/payments-store");
-
-      const result = usePaymentsStore.getState().addPayment({
-        projectId: "p1",
-        providerId: "c1",
-        type: "SUMINISTRO",
-        amount: 1_000_000,
-        priority: "NORMAL",
-        requiredApprovalLevel: 2,
-        beneficiaryName: "Proveedor Test",
-        beneficiaryNit: "900.111.222-3",
-        bankName: "Bancolombia",
-        accountType: "CHECKING",
-        accountNumber: "123-456789-00",
-        createdBy: "u-test",
-      });
-
-      const director = {
-        id: "u-director",
-        name: "Director",
-        role: "DIRECTOR" as const,
-      };
-      const gerente = {
-        id: "u-gerente",
-        name: "Gerente",
-        role: "GERENTE" as const,
-      };
-      usePaymentsStore
-        .getState()
-        .performAction(result.id, "APPROVE_L1", director);
-      usePaymentsStore
-        .getState()
-        .performAction(result.id, "APPROVE_L2", gerente);
-
-      const updated = usePaymentsStore.getState().getPayment(result.id);
-      expect(updated?.status).toBe("APPROVED");
-
-      const actions = getAvailablePaymentActions(updated!, "TESORERIA");
-      expect(actions.some((a) => a.action === "PAY")).toBe(true);
+    it("defensivo: APPROVE_L2 sobre una solicitud de 1 nivel se rechaza", () => {
+      const result = evaluatePaymentAction(
+        {
+          status: "APPROVED_LEVEL_1",
+          requiredApprovalLevel: 1,
+          currentApprovalLevel: 1,
+        },
+        "APPROVE_L2",
+        "GERENTE",
+      );
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.code).toBe("SECOND_LEVEL_NOT_REQUIRED");
     });
   });
 
   describe("Edge Cases", () => {
-    it("debe rechazar APPROVE_L1 si currentApprovalLevel no es 0", () => {
-      const result = usePaymentsStore.getState().addPayment({
-        projectId: "p1",
-        providerId: "c1",
-        type: "SUMINISTRO",
-        amount: 1_000_000,
-        priority: "NORMAL",
-        requiredApprovalLevel: 1,
-        beneficiaryName: "Proveedor Test",
-        beneficiaryNit: "900.111.222-3",
-        bankName: "Bancolombia",
-        accountType: "CHECKING",
-        accountNumber: "123-456789-00",
-        createdBy: "u-test",
+    it("requiredApprovalLevel 0 o 4 es inválido", () => {
+      expect(isValidApprovalLevel(0)).toBe(false);
+      expect(isValidApprovalLevel(3)).toBe(false);
+      expect(isValidApprovalLevel(4)).toBe(false);
+      expect(isValidApprovalLevel(1)).toBe(true);
+      expect(isValidApprovalLevel(2)).toBe(true);
+
+      for (const level of [0, 4]) {
+        const result = evaluatePaymentAction(
+          pending(level),
+          "APPROVE_L1",
+          "DIRECTOR",
+        );
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.code).toBe("INVALID_APPROVAL_LEVEL");
+      }
+    });
+
+    it("APPROVE_L1 con currentApprovalLevel distinto de 0 se rechaza", () => {
+      const result = evaluatePaymentAction(
+        pending(2, { currentApprovalLevel: 1 }),
+        "APPROVE_L1",
+        "DIRECTOR",
+      );
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.code).toBe("ALREADY_APPROVED_L1");
+    });
+
+    it("solo DIRECTOR o ADMIN pueden aprobar nivel 1", () => {
+      const result = evaluatePaymentAction(pending(1), "APPROVE_L1", "RESIDENTE");
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("FORBIDDEN_ROLE");
+        expect(result.status).toBe(403);
+      }
+    });
+
+    it("REJECT exige motivo, igual que en cortes", () => {
+      const sinMotivo = evaluatePaymentAction(pending(1), "REJECT", "GERENTE");
+      expect(sinMotivo.ok).toBe(false);
+      if (!sinMotivo.ok)
+        expect(sinMotivo.code).toBe("REJECTION_REASON_REQUIRED");
+
+      const conMotivo = evaluatePaymentAction(pending(1), "REJECT", "GERENTE", {
+        rejectionReason: "Falta la factura del proveedor",
       });
+      expect(conMotivo.ok).toBe(true);
+    });
 
-      const director = {
-        id: "u-director",
-        name: "Director",
-        role: "DIRECTOR" as const,
-      };
-      usePaymentsStore
-        .getState()
-        .performAction(result.id, "APPROVE_L1", director);
+    it("PAID y REJECTED son terminales", () => {
+      for (const status of ["PAID", "REJECTED"] as const) {
+        const result = evaluatePaymentAction(
+          { status, requiredApprovalLevel: 1, currentApprovalLevel: 1 },
+          "PAY",
+          "TESORERIA",
+        );
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.code).toBe("INVALID_TRANSITION");
+      }
+    });
 
-      // Segundo intento de APPROVE_L1 debe fallar (status ya es APPROVED, no PENDING)
-      const secondAttempt = usePaymentsStore
-        .getState()
-        .performAction(result.id, "APPROVE_L1", director);
-
-      expect(secondAttempt.ok).toBe(false);
+    it("resolvePaymentTarget refleja la regla de niveles", () => {
+      expect(resolvePaymentTarget("APPROVE_L1", 1)).toBe("APPROVED");
+      expect(resolvePaymentTarget("APPROVE_L1", 2)).toBe("APPROVED_LEVEL_1");
+      expect(resolvePaymentTarget("APPROVE_L2", 2)).toBe("APPROVED");
+      expect(resolvePaymentTarget("PAY", 1)).toBe("PAID");
+      expect(resolvePaymentTarget("REJECT", 1)).toBe("REJECTED");
+      expect(resolvePaymentTarget("CANCEL", 1)).toBe("CANCELLED");
     });
   });
 });
