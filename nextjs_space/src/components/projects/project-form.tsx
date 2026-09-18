@@ -89,17 +89,22 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
   }, [project, reset]);
 
   const status = watch("status");
+  const storeError = useProjectsStore().error;
 
-  function onSubmit(data: ProjectFormData) {
+  async function onSubmit(data: ProjectFormData) {
     if (project) {
-      updateProject(project.id, data);
+      // updateProject no devuelve nada; asumimos éxito si no hay error en el store.
+      await updateProject(project.id, data);
+      // Re-leer el error del store tras la mutación.
+      const { error: postError } = useProjectsStore();
+      if (!postError) onSuccess();
     } else {
-      addProject({
+      const created = await addProject({
         ...data,
         description: data.description ?? "",
       });
+      if (created) onSuccess();
     }
-    onSuccess();
   }
 
   return (
@@ -222,12 +227,24 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
         </div>
       </div>
 
+      {storeError ? (
+        <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+          {storeError}
+        </div>
+      ) : null}
+
       <div className="flex justify-end gap-2 border-t pt-4">
         <Button type="button" variant="outline" onClick={onSuccess}>
           Cancelar
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isEditing ? "Guardar cambios" : "Crear proyecto"}
+          {isSubmitting
+            ? isEditing
+              ? "Guardando…"
+              : "Creando…"
+            : isEditing
+              ? "Guardar cambios"
+              : "Crear proyecto"}
         </Button>
       </div>
     </form>

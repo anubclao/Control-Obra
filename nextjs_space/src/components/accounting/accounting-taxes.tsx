@@ -29,7 +29,11 @@ import {
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-export function AccountingTaxes({ projectIdForNew }: { projectIdForNew: string | null }) {
+export function AccountingTaxes({
+  projectIdForNew,
+}: {
+  projectIdForNew: string | null;
+}) {
   const {
     taxMovements,
     accounts,
@@ -48,7 +52,9 @@ export function AccountingTaxes({ projectIdForNew }: { projectIdForNew: string |
       declarado: ofYear
         .filter((t) => t.status === "DECLARADO")
         .reduce((s, t) => s + t.amount, 0),
-      pagado: ofYear.filter((t) => t.status === "PAGADO").reduce((s, t) => s + t.amount, 0),
+      pagado: ofYear
+        .filter((t) => t.status === "PAGADO")
+        .reduce((s, t) => s + t.amount, 0),
     };
   }, [taxMovements, year]);
 
@@ -71,13 +77,17 @@ export function AccountingTaxes({ projectIdForNew }: { projectIdForNew: string |
             <p className="text-xs uppercase tracking-wide text-muted-foreground">
               Declarado {year}
             </p>
-            <p className="text-xl font-semibold">{formatCurrency(totals.declarado)}</p>
+            <p className="text-xl font-semibold">
+              {formatCurrency(totals.declarado)}
+            </p>
           </div>
           <div>
             <p className="text-xs uppercase tracking-wide text-muted-foreground">
               Pagado {year}
             </p>
-            <p className="text-xl font-semibold">{formatCurrency(totals.pagado)}</p>
+            <p className="text-xl font-semibold">
+              {formatCurrency(totals.pagado)}
+            </p>
           </div>
         </div>
         <Button onClick={() => setCreateOpen(true)}>
@@ -90,6 +100,8 @@ export function AccountingTaxes({ projectIdForNew }: { projectIdForNew: string |
           icon={Percent}
           title="No hay movimientos de impuestos"
           description="Las tarifas se configuran en Impuestos; aquí se registran declaraciones y pagos."
+          actionLabel="Registrar primer movimiento"
+          onAction={() => setCreateOpen(true)}
         />
       ) : (
         <div className="overflow-x-auto rounded-lg border">
@@ -107,7 +119,9 @@ export function AccountingTaxes({ projectIdForNew }: { projectIdForNew: string |
             <tbody>
               {taxMovements.map((t) => (
                 <tr key={t.id} className="border-t">
-                  <td className="p-3 whitespace-nowrap">{formatDate(t.date)}</td>
+                  <td className="p-3 whitespace-nowrap">
+                    {formatDate(t.date)}
+                  </td>
                   <td className="p-3">{t.authority}</td>
                   <td className="p-3">{t.description}</td>
                   <td className="p-3 text-right">{formatCurrency(t.amount)}</td>
@@ -144,7 +158,10 @@ export function AccountingTaxes({ projectIdForNew }: { projectIdForNew: string |
         open={createOpen}
         onOpenChange={setCreateOpen}
         onSubmit={async (values) => {
-          const ok = await addTaxMovement({ ...values, projectId: projectIdForNew });
+          const ok = await addTaxMovement({
+            ...values,
+            projectId: projectIdForNew,
+          });
           if (ok) setCreateOpen(false);
           return ok;
         }}
@@ -161,7 +178,10 @@ export function AccountingTaxes({ projectIdForNew }: { projectIdForNew: string |
           accounts={accounts}
           onCancel={() => setPaying(null)}
           onSubmit={async (id, accountId) => {
-            const ok = await updateTaxMovement(id, { status: "PAGADO", accountId });
+            const ok = await updateTaxMovement(id, {
+              status: "PAGADO",
+              accountId,
+            });
             if (ok) setPaying(null);
           }}
         />
@@ -191,7 +211,9 @@ function TaxPayContent({
       <DialogHeader>
         <DialogTitle>Registrar pago de impuesto</DialogTitle>
         <DialogDescription>
-          {movement ? `${movement.description} — ${formatCurrency(movement.amount)}` : ""}
+          {movement
+            ? `${movement.description} — ${formatCurrency(movement.amount)}`
+            : ""}
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-2">
@@ -231,7 +253,12 @@ function TaxFormDialog({
   onSubmit: (values: Partial<AccountingTaxMovement>) => Promise<boolean>;
 }) {
   const error = useAccountingStore((s) => s.error);
-  const empty = { date: today(), authority: "DIAN", description: "", amount: "" };
+  const empty = {
+    date: today(),
+    authority: "DIAN",
+    description: "",
+    amount: "",
+  };
   const [form, setForm] = useState(empty);
 
   return (
@@ -264,7 +291,9 @@ function TaxFormDialog({
             <Input
               id="tax-desc"
               value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, description: e.target.value })
+              }
             />
           </div>
           <div className="space-y-1">

@@ -79,8 +79,10 @@ export function AccountingAccounts() {
       {accounts.length === 0 ? (
         <EmptyState
           icon={Landmark}
-          title="No hay cuentas"
-          description="Crea una cuenta para poder registrar cobros y pagos."
+          title="Aún no tienes cuentas"
+          description="Crea una cuenta para empezar a registrar ingresos, gastos y pagos."
+          actionLabel="Crear primera cuenta"
+          onAction={() => setCreateOpen(true)}
         />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -117,7 +119,9 @@ export function AccountingAccounts() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => updateAccount(a.id, { isActive: !a.isActive })}
+                      onClick={() =>
+                        updateAccount(a.id, { isActive: !a.isActive })
+                      }
                     >
                       <Power className="mr-1 h-3.5 w-3.5" />
                       {a.isActive ? "Desactivar" : "Activar"}
@@ -177,7 +181,8 @@ function AccountFormDialog({
         <DialogHeader>
           <DialogTitle>Nueva cuenta</DialogTitle>
           <DialogDescription>
-            El saldo actual se calcula con los movimientos; aquí solo va el saldo inicial.
+            El saldo actual se calcula con los movimientos; aquí solo va el
+            saldo inicial.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
@@ -193,17 +198,21 @@ function AccountFormDialog({
             <Label>Tipo</Label>
             <Select
               value={form.type}
-              onValueChange={(v) => setForm({ ...form, type: v as AccountingAccountType })}
+              onValueChange={(v) =>
+                setForm({ ...form, type: v as AccountingAccountType })
+              }
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(ACCOUNTING_ACCOUNT_TYPE_LABELS).map(([k, v]) => (
-                  <SelectItem key={k} value={k}>
-                    {v}
-                  </SelectItem>
-                ))}
+                {Object.entries(ACCOUNTING_ACCOUNT_TYPE_LABELS).map(
+                  ([k, v]) => (
+                    <SelectItem key={k} value={k}>
+                      {v}
+                    </SelectItem>
+                  ),
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -213,7 +222,9 @@ function AccountFormDialog({
               id="acc-balance"
               type="number"
               value={form.openingBalance}
-              onChange={(e) => setForm({ ...form, openingBalance: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, openingBalance: e.target.value })
+              }
             />
           </div>
           <div className="space-y-1">

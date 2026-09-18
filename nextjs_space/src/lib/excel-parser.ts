@@ -1,6 +1,7 @@
-// Mock del parser de Excel para Presupuesto Tope
-// En producción se usaría una lib como xlsx o sheetjs para parsear el archivo real
+// Parser de Excel para Presupuesto Tope
+// Usa xlsx (SheetJS) para leer .xlsx/.xls/.csv en el browser.
 
+import * as XLSX from "xlsx";
 import type { BudgetLayer, BudgetItem, BudgetLayerType } from "@/types";
 
 export interface ParsedExcelRow {
@@ -45,32 +46,77 @@ export function detectColumns(headers: string[]): ExcelColumnMapping {
   };
 
   return {
-    code: find("código", "codigo", "cod", "item", "número", "numero", "no.", "n°"),
-    description: find("descripción", "descripcion", "desc", "concepto", "actividad", "detalle"),
+    code: find(
+      "código",
+      "codigo",
+      "cod",
+      "item",
+      "número",
+      "numero",
+      "no.",
+      "n°",
+    ),
+    description: find(
+      "descripción",
+      "descripcion",
+      "desc",
+      "concepto",
+      "actividad",
+      "detalle",
+    ),
     unit: find("unidad", "un", "u.m.", "um"),
-    quantity: find("cantidad", "cant", "qty", "volumen", "metrado", "rendimiento"),
-    unitPrice: find("precio unitario", "p. unitario", "p.unit", "valor unit", "v. unit", "precio"),
+    quantity: find(
+      "cantidad",
+      "cant",
+      "qty",
+      "volumen",
+      "metrado",
+      "rendimiento",
+    ),
+    unitPrice: find(
+      "precio unitario",
+      "p. unitario",
+      "p.unit",
+      "valor unit",
+      "v. unit",
+      "precio",
+    ),
     totalPrice: find("total", "valor total", "importe", "subtotal", "v. total"),
   };
 }
 
 // Convierte un string a número, manejando formatos comunes (1.234,56 → 1234.56)
-function parseNumber(value: string | undefined): number {
-  if (!value) return 0;
-  const cleaned = value.replace(/[^\d,.-]/g, "");
-  // Si tiene coma y punto, asumir formato colombiano: 1.234,56
-  if (cleaned.includes(",") && cleaned.includes(".")) {
-    return parseFloat(cleaned.replace(/\./g, "").replace(",", "."));
+// y el formato anglosajón (1,234.56 → 1234.56). Regla: el separador que
+// aparezca MÁS A LA DERECHA es el decimal; el otro es separador de miles.
+export function parseNumber(value: string | undefined): number {
+  if (value === undefined || value === null) return 0;
+  const trimmed = String(value).trim();
+  if (trimmed === "") return 0;
+  // Limpiar símbolos de moneda y espacios, conservar dígitos, coma, punto y signo.
+  const cleaned = trimmed.replace(/[^\d,.\-]/g, "");
+  const lastComma = cleaned.lastIndexOf(",");
+  const lastDot = cleaned.lastIndexOf(".");
+  if (lastComma === -1 && lastDot === -1) {
+    return parseFloat(cleaned) || 0;
   }
-  // Si solo tiene coma, asumir decimal
-  if (cleaned.includes(",")) {
-    return parseFloat(cleaned.replace(",", "."));
+  // El separador decimal es el que aparece MÁS A LA DERECHA.
+  if (lastComma > lastDot) {
+    // Formato colombiano/europeo: 1.234,56
+    return parseFloat(cleaned.replace(/\./g, "").replace(",", ".")) || 0;
   }
-  return parseFloat(cleaned) || 0;
+  if (lastDot > lastComma) {
+    // Formato anglosajón: 1,234.56
+    return parseFloat(cleaned.replace(/,/g, "")) || 0;
+  }
+  // Misma posición (no debería pasar), intentar coma como decimal.
+  return parseFloat(cleaned.replace(",", ".")) || 0;
 }
 
 // Detecta si una fila es un capítulo (sin cantidad/precio pero tiene código y descripción)
-function detectRowType(row: Record<string, string>, mapping: ExcelColumnMapping): {
+function detectRowType(
+  row: Record<string, string>,
+  mapping: ExcelColumnMapping,
+): {
   type: BudgetLayerType;
   layerName?: string;
 } {
@@ -98,19 +144,30 @@ function detectRowType(row: Record<string, string>, mapping: ExcelColumnMapping)
 // Parsea el contenido "crudo" (simulando haber leído el Excel)
 export function parseExcelContent(
   rows: Array<Record<string, string>>,
-  customMapping?: Partial<ExcelColumnMapping>
+  customMapping?: Partial<ExcelColumnMapping>,
 ): ParsedExcel {
   if (rows.length === 0) {
-    return { rows: [], totalValue: 0, chapterCount: 0, itemCount: 0, warnings: ["Archivo vacío"] };
+    return {
+      rows: [],
+      totalValue: 0,
+      chapterCount: 0,
+      itemCount: 0,
+      warnings: ["Archivo vacío"],
+    };
   }
 
   const headers = Object.keys(rows[0]);
-  const mapping: ExcelColumnMapping = { ...detectColumns(headers), ...customMapping };
+  const mapping: ExcelColumnMapping = {
+    ...detectColumns(headers),
+    ...customMapping,
+  };
   const warnings: string[] = [];
 
-  if (!mapping.description) warnings.push("No se detectó columna de descripción");
+  if (!mapping.description)
+    warnings.push("No se detectó columna de descripción");
   if (!mapping.quantity) warnings.push("No se detectó columna de cantidad");
-  if (!mapping.unitPrice) warnings.push("No se detectó columna de precio unitario");
+  if (!mapping.unitPrice)
+    warnings.push("No se detectó columna de precio unitario");
 
   const parsedRows: ParsedExcelRow[] = rows.map((raw, idx) => {
     const { type, layerName } = detectRowType(raw, mapping);
@@ -132,8 +189,12 @@ export function parseExcelContent(
   });
 
   const totalValue = parsedRows.reduce((s, r) => s + r.totalPrice, 0);
-  const chapterCount = parsedRows.filter((r) => r.layerType === "CHAPTER").length;
-  const itemCount = parsedRows.filter((r) => r.layerType === "ITEM" || r.layerType === "SUBCHAPTER").length;
+  const chapterCount = parsedRows.filter(
+    (r) => r.layerType === "CHAPTER",
+  ).length;
+  const itemCount = parsedRows.filter(
+    (r) => r.layerType === "ITEM" || r.layerType === "SUBCHAPTER",
+  ).length;
 
   return { rows: parsedRows, totalValue, chapterCount, itemCount, warnings };
 }
@@ -218,6 +279,48 @@ export function buildBudgetLayers(parsed: ParsedExcelRow[]): BudgetLayer[] {
   });
 
   return layers;
+}
+
+/**
+ * Lee un archivo Excel real (.xlsx, .xls, .csv) desde el browser y devuelve
+ * el resultado de `parseExcelContent` ya mapeado. Usa SheetJS (xlsx).
+ *
+ * - Soporta archivos con encabezados mezclados (mayúsculas, tildes, etc.)
+ *   porque `detectColumns` es case-insensitive y busca por palabra clave.
+ * - Si la primera hoja tiene headers en la fila 1, los toma tal cual; si no,
+ *   intenta con la fila 2 (algunos presupuestos tienen título arriba).
+ */
+export async function parseExcelFile(
+  file: File,
+  customMapping?: Partial<ExcelColumnMapping>,
+): Promise<ParsedExcel> {
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: "array" });
+  const firstSheetName = workbook.SheetNames[0];
+  if (!firstSheetName) {
+    throw new Error("El archivo no contiene hojas.");
+  }
+  const sheet = workbook.Sheets[firstSheetName];
+  if (!sheet) {
+    throw new Error(`La hoja "${firstSheetName}" no se pudo leer.`);
+  }
+
+  // Convertir a array de objetos usando la primera fila como header.
+  const rows = XLSX.utils.sheet_to_json<Record<string, string | number>>(sheet, {
+    defval: "",
+    raw: false, // queremos strings para parsear con parseNumber
+  });
+
+  // Normalizar keys a string (sheet_to_json ya lo hace, pero defendámonos).
+  const normalized = rows.map((r) => {
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(r)) {
+      out[String(k)] = v === null || v === undefined ? "" : String(v);
+    }
+    return out;
+  });
+
+  return parseExcelContent(normalized, customMapping);
 }
 
 // Datos de ejemplo para "Probar con archivo de muestra"

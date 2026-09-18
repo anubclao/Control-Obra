@@ -7,6 +7,7 @@
 
 import type { LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
@@ -50,9 +51,15 @@ export function KpiCard({
     <Card>
       <CardContent className="flex items-start justify-between gap-3 p-4">
         <div className="min-w-0">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-          <p className={cn("mt-1 truncate text-2xl font-semibold", color)}>{value}</p>
-          {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+            {label}
+          </p>
+          <p className={cn("mt-1 truncate text-2xl font-semibold", color)}>
+            {value}
+          </p>
+          {hint ? (
+            <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
+          ) : null}
         </div>
         <Icon className={cn("h-5 w-5 shrink-0", color)} />
       </CardContent>
@@ -64,10 +71,14 @@ export function EmptyState({
   icon: Icon,
   title,
   description,
+  actionLabel,
+  onAction,
 }: {
   icon: LucideIcon;
   title: string;
   description?: string;
+  actionLabel?: string;
+  onAction?: () => void;
 }) {
   return (
     <div className="rounded-lg border border-dashed p-12 text-center">
@@ -76,11 +87,20 @@ export function EmptyState({
       {description ? (
         <p className="mt-1 text-sm text-muted-foreground">{description}</p>
       ) : null}
+      {actionLabel && onAction ? (
+        <Button onClick={onAction} className="mt-4">
+          {actionLabel}
+        </Button>
+      ) : null}
     </div>
   );
 }
 
-export function IncomeStatusBadge({ status }: { status: AccountingIncomeStatus }) {
+export function IncomeStatusBadge({
+  status,
+}: {
+  status: AccountingIncomeStatus;
+}) {
   return (
     <Badge variant={ACCOUNTING_INCOME_STATUS_VARIANTS[status]}>
       {ACCOUNTING_INCOME_STATUS_LABELS[status]}
@@ -88,7 +108,11 @@ export function IncomeStatusBadge({ status }: { status: AccountingIncomeStatus }
   );
 }
 
-export function ExpenseStatusBadge({ status }: { status: AccountingExpenseStatus }) {
+export function ExpenseStatusBadge({
+  status,
+}: {
+  status: AccountingExpenseStatus;
+}) {
   return (
     <Badge variant={ACCOUNTING_EXPENSE_STATUS_VARIANTS[status]}>
       {ACCOUNTING_EXPENSE_STATUS_LABELS[status]}
@@ -123,7 +147,9 @@ export function AccountSelect({
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
-        {allowEmpty ? <SelectItem value={NO_ACCOUNT}>Sin cuenta</SelectItem> : null}
+        {allowEmpty ? (
+          <SelectItem value={NO_ACCOUNT}>Sin cuenta</SelectItem>
+        ) : null}
         {accounts
           .filter((a) => a.isActive)
           .map((a) => (

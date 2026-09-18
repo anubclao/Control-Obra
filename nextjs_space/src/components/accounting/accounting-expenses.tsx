@@ -58,7 +58,9 @@ export function AccountingExpenses({
     useAccountingStore();
   const confirm = useConfirm();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | AccountingExpenseStatus>("ALL");
+  const [statusFilter, setStatusFilter] = useState<
+    "ALL" | AccountingExpenseStatus
+  >("ALL");
   const [createOpen, setCreateOpen] = useState(false);
   const [paying, setPaying] = useState<AccountingExpense | null>(null);
 
@@ -70,7 +72,9 @@ export function AccountingExpenses({
         e.providerName.toLowerCase().includes(term) ||
         e.concept.toLowerCase().includes(term) ||
         e.costCenter.toLowerCase().includes(term);
-      return matchSearch && (statusFilter === "ALL" || e.status === statusFilter);
+      return (
+        matchSearch && (statusFilter === "ALL" || e.status === statusFilter)
+      );
     });
   }, [expenses, search, statusFilter]);
 
@@ -85,7 +89,10 @@ export function AccountingExpenses({
     });
   }
 
-  async function moveTo(expense: AccountingExpense, status: AccountingExpenseStatus) {
+  async function moveTo(
+    expense: AccountingExpense,
+    status: AccountingExpenseStatus,
+  ) {
     if (status === "PAGADO") {
       setPaying(expense);
       return;
@@ -131,6 +138,8 @@ export function AccountingExpenses({
           icon={Receipt}
           title="No hay gastos"
           description="Registra el primer gasto para este alcance."
+          actionLabel="Registrar primer gasto"
+          onAction={() => setCreateOpen(true)}
         />
       ) : (
         <div className="space-y-2">
@@ -145,15 +154,19 @@ export function AccountingExpenses({
                   <ExpenseStatusBadge status={e.status} />
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  {e.providerName || "Sin proveedor"} · {e.costCenter || "Sin centro de costo"} ·{" "}
-                  {formatDate(e.date)}
+                  {e.providerName || "Sin proveedor"} ·{" "}
+                  {e.costCenter || "Sin centro de costo"} · {formatDate(e.date)}
                 </p>
                 {e.detail ? (
-                  <p className="mt-1 text-xs text-muted-foreground">{e.detail}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {e.detail}
+                  </p>
                 ) : null}
               </div>
               <div className="flex shrink-0 flex-wrap items-center gap-2">
-                <span className="text-lg font-semibold">{formatCurrency(e.amount)}</span>
+                <span className="text-lg font-semibold">
+                  {formatCurrency(e.amount)}
+                </span>
                 {nextExpenseStatuses(e.status).map((next) => (
                   <Button
                     key={next}
@@ -187,7 +200,10 @@ export function AccountingExpenses({
         providerOptions={providerOptions}
         defaultResponsible={defaultResponsible}
         onSubmit={async (values) => {
-          const ok = await addExpense({ ...values, projectId: projectIdForNew });
+          const ok = await addExpense({
+            ...values,
+            projectId: projectIdForNew,
+          });
           if (ok) setCreateOpen(false);
           return ok;
         }}
@@ -260,7 +276,9 @@ function ExpenseFormDialog({
             <Input
               id="exp-resp"
               value={form.responsible}
-              onChange={(e) => setForm({ ...form, responsible: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, responsible: e.target.value })
+              }
             />
           </div>
           <div className="space-y-1">
@@ -283,7 +301,9 @@ function ExpenseFormDialog({
               id="exp-prov"
               list="accounting-providers"
               value={form.providerName}
-              onChange={(e) => setForm({ ...form, providerName: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, providerName: e.target.value })
+              }
             />
             <datalist id="accounting-providers">
               {providerOptions.map((p) => (
@@ -330,13 +350,13 @@ function ExpenseFormDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {(["POR_PAGAR", "APROBADO", "URGENTE", "RETEGARANTIA"] as const).map(
-                  (s) => (
-                    <SelectItem key={s} value={s}>
-                      {ACCOUNTING_EXPENSE_STATUS_LABELS[s]}
-                    </SelectItem>
-                  ),
-                )}
+                {(
+                  ["POR_PAGAR", "APROBADO", "URGENTE", "RETEGARANTIA"] as const
+                ).map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {ACCOUNTING_EXPENSE_STATUS_LABELS[s]}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

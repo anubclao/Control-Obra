@@ -16,12 +16,24 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { useBudgetsStore } from "@/lib/data-store";
 import { useProjectsStore } from "@/lib/data-store";
-import { parseExcelContent, buildBudgetLayers, SAMPLE_EXCEL_DATA, type ParsedExcel } from "@/lib/excel-parser";
+import {
+  parseExcelContent,
+  parseExcelFile,
+  buildBudgetLayers,
+  SAMPLE_EXCEL_DATA,
+  type ParsedExcel,
+} from "@/lib/excel-parser";
 import { formatCurrency } from "@/lib/utils";
 
 export default function CargarPresupuestoPage() {
@@ -47,16 +59,22 @@ export default function CargarPresupuestoPage() {
     setStep("preview");
   }
 
-  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     setError(null);
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Mock: en producción se leería el archivo con xlsx/SheetJS
-    // Por ahora asumimos que el archivo tiene la misma estructura que SAMPLE_EXCEL_DATA
-    setError(
-      `Mock: la carga real con "${file.name}" se conectará cuando integremos la librería Excel. Por ahora usa "Cargar muestra" para probar el flujo.`
-    );
+    try {
+      const result = await parseExcelFile(file);
+      setParsed(result);
+      setStep("preview");
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : `No se pudo leer el archivo "${file.name}". Verifica que sea .xlsx, .xls o .csv.`;
+      setError(message);
+    }
   }
 
   function handleConfirm() {
@@ -98,7 +116,9 @@ export default function CargarPresupuestoPage() {
                 href={`/tecnico/presupuestos/cargar?projectId=${p.id}`}
                 className="rounded-md border bg-secondary/30 p-3 text-sm hover:bg-accent"
               >
-                <p className="font-mono text-xs text-muted-foreground">{p.code}</p>
+                <p className="font-mono text-xs text-muted-foreground">
+                  {p.code}
+                </p>
                 <p className="font-medium">{p.name}</p>
               </Link>
             ))}
@@ -122,8 +142,10 @@ export default function CargarPresupuestoPage() {
           <AlertTitle>Este proyecto ya tiene un PT</AlertTitle>
           <AlertDescription>
             <p className="mb-2">
-              El proyecto <strong>{project?.name}</strong> ya tiene un Presupuesto Tope cargado.
-              No se puede cargar otro. Para reemplazarlo, abre el presupuesto existente y crea una nueva versión.
+              El proyecto <strong>{project?.name}</strong> ya tiene un
+              Presupuesto Tope cargado. No se puede cargar otro. Para
+              reemplazarlo, abre el presupuesto existente y crea una nueva
+              versión.
             </p>
             <Button asChild size="sm" variant="outline">
               <Link href={`/tecnico/presupuestos/${projectId}`}>
@@ -147,7 +169,9 @@ export default function CargarPresupuestoPage() {
       </Button>
 
       <div>
-        <p className="font-mono text-xs text-muted-foreground">{project?.code}</p>
+        <p className="font-mono text-xs text-muted-foreground">
+          {project?.code}
+        </p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">
           Cargar Presupuesto Tope (PT)
         </h1>
@@ -164,11 +188,26 @@ export default function CargarPresupuestoPage() {
 
       {/* Stepper */}
       <div className="flex items-center gap-2 text-sm">
-        <Step n={1} label="Subir archivo" active={step === "upload"} done={step !== "upload"} />
+        <Step
+          n={1}
+          label="Subir archivo"
+          active={step === "upload"}
+          done={step !== "upload"}
+        />
         <ArrowRight className="h-4 w-4 text-muted-foreground" />
-        <Step n={2} label="Previsualizar" active={step === "preview"} done={step === "confirm"} />
+        <Step
+          n={2}
+          label="Previsualizar"
+          active={step === "preview"}
+          done={step === "confirm"}
+        />
         <ArrowRight className="h-4 w-4 text-muted-foreground" />
-        <Step n={3} label="Confirmar" active={step === "confirm"} done={false} />
+        <Step
+          n={3}
+          label="Confirmar"
+          active={step === "confirm"}
+          done={false}
+        />
       </div>
 
       {step === "upload" && (
@@ -179,15 +218,20 @@ export default function CargarPresupuestoPage() {
               Subir archivo Excel
             </CardTitle>
             <CardDescription>
-              El archivo debe tener columnas: Código, Descripción, Unidad, Cantidad, Precio Unitario
+              El archivo debe tener columnas: Código, Descripción, Unidad,
+              Cantidad, Precio Unitario
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <label className="block">
               <div className="rounded-lg border-2 border-dashed bg-secondary/30 p-8 text-center cursor-pointer transition-colors hover:bg-accent">
                 <FileSpreadsheet className="mx-auto h-12 w-12 text-muted-foreground" />
-                <p className="mt-3 text-sm font-medium">Arrastra un archivo .xlsx aquí</p>
-                <p className="text-xs text-muted-foreground">o haz click para seleccionar</p>
+                <p className="mt-3 text-sm font-medium">
+                  Arrastra un archivo .xlsx aquí
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  o haz click para seleccionar
+                </p>
                 <input
                   type="file"
                   accept=".xlsx,.xls,.csv"
@@ -202,7 +246,9 @@ export default function CargarPresupuestoPage() {
                 <span className="w-full border-t" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">O prueba con</span>
+                <span className="bg-card px-2 text-muted-foreground">
+                  O prueba con
+                </span>
               </div>
             </div>
 
@@ -224,7 +270,11 @@ export default function CargarPresupuestoPage() {
                   Revisa los datos antes de confirmar
                 </CardDescription>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => setStep("upload")}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setStep("upload")}
+              >
                 <X className="mr-1 h-4 w-4" />
                 Cambiar archivo
               </Button>
@@ -243,7 +293,9 @@ export default function CargarPresupuestoPage() {
               </div>
               <div className="rounded-md border bg-secondary/40 p-3">
                 <p className="text-xs text-muted-foreground">Total</p>
-                <p className="text-lg font-semibold">{formatCurrency(parsed.totalValue)}</p>
+                <p className="text-lg font-semibold">
+                  {formatCurrency(parsed.totalValue)}
+                </p>
               </div>
             </div>
 
@@ -279,19 +331,31 @@ export default function CargarPresupuestoPage() {
                 <tbody>
                   {parsed.rows.map((row) => (
                     <tr key={row.rowNumber} className="border-b last:border-0">
-                      <td className="px-3 py-1.5 text-muted-foreground text-xs">{row.rowNumber}</td>
-                      <td className="px-3 py-1.5 font-mono text-xs">{row.code}</td>
+                      <td className="px-3 py-1.5 text-muted-foreground text-xs">
+                        {row.rowNumber}
+                      </td>
+                      <td className="px-3 py-1.5 font-mono text-xs">
+                        {row.code}
+                      </td>
                       <td className="px-3 py-1.5">{row.description}</td>
                       <td className="px-3 py-1.5 text-center">
                         {row.layerType === "CHAPTER" ? (
-                          <Badge variant="info" className="text-[10px]">CAP</Badge>
+                          <Badge variant="info" className="text-[10px]">
+                            CAP
+                          </Badge>
                         ) : (
-                          <Badge variant="outline" className="text-[10px]">ITEM</Badge>
+                          <Badge variant="outline" className="text-[10px]">
+                            ITEM
+                          </Badge>
                         )}
                       </td>
-                      <td className="px-3 py-1.5 text-center font-mono text-xs">{row.unit}</td>
+                      <td className="px-3 py-1.5 text-center font-mono text-xs">
+                        {row.unit}
+                      </td>
                       <td className="px-3 py-1.5 text-right">
-                        {row.quantity ? row.quantity.toLocaleString("es-CO") : "—"}
+                        {row.quantity
+                          ? row.quantity.toLocaleString("es-CO")
+                          : "—"}
                       </td>
                       <td className="px-3 py-1.5 text-right">
                         {row.unitPrice ? formatCurrency(row.unitPrice) : "—"}
@@ -334,7 +398,11 @@ export default function CargarPresupuestoPage() {
               <CheckCircle2 className="h-4 w-4" />
               <AlertTitle>Resumen</AlertTitle>
               <AlertDescription>
-                <p>Se creará el Presupuesto Tope con {parsed.chapterCount} capítulos y {parsed.itemCount} ítems por un total de <strong>{formatCurrency(parsed.totalValue)}</strong>.</p>
+                <p>
+                  Se creará el Presupuesto Tope con {parsed.chapterCount}{" "}
+                  capítulos y {parsed.itemCount} ítems por un total de{" "}
+                  <strong>{formatCurrency(parsed.totalValue)}</strong>.
+                </p>
               </AlertDescription>
             </Alert>
 
@@ -363,7 +431,17 @@ export default function CargarPresupuestoPage() {
   );
 }
 
-function Step({ n, label, active, done }: { n: number; label: string; active: boolean; done: boolean }) {
+function Step({
+  n,
+  label,
+  active,
+  done,
+}: {
+  n: number;
+  label: string;
+  active: boolean;
+  done: boolean;
+}) {
   return (
     <div className="flex items-center gap-2">
       <div
@@ -371,13 +449,17 @@ function Step({ n, label, active, done }: { n: number; label: string; active: bo
           done
             ? "bg-emerald-600 text-white"
             : active
-            ? "bg-primary text-primary-foreground"
-            : "bg-secondary text-muted-foreground"
+              ? "bg-primary text-primary-foreground"
+              : "bg-secondary text-muted-foreground"
         }`}
       >
         {done ? "✓" : n}
       </div>
-      <span className={active || done ? "font-medium" : "text-muted-foreground"}>{label}</span>
+      <span
+        className={active || done ? "font-medium" : "text-muted-foreground"}
+      >
+        {label}
+      </span>
     </div>
   );
 }

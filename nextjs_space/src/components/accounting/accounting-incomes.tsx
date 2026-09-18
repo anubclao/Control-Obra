@@ -53,7 +53,9 @@ export function AccountingIncomes({
     useAccountingStore();
   const confirm = useConfirm();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | AccountingIncomeStatus>("ALL");
+  const [statusFilter, setStatusFilter] = useState<
+    "ALL" | AccountingIncomeStatus
+  >("ALL");
   const [createOpen, setCreateOpen] = useState(false);
   const [collecting, setCollecting] = useState<AccountingIncome | null>(null);
 
@@ -65,7 +67,9 @@ export function AccountingIncomes({
         i.clientName.toLowerCase().includes(term) ||
         i.invoice.toLowerCase().includes(term) ||
         i.costCenter.toLowerCase().includes(term);
-      return matchSearch && (statusFilter === "ALL" || i.status === statusFilter);
+      return (
+        matchSearch && (statusFilter === "ALL" || i.status === statusFilter)
+      );
     });
   }, [incomes, search, statusFilter]);
 
@@ -118,6 +122,8 @@ export function AccountingIncomes({
           icon={Receipt}
           title="No hay ingresos"
           description="Registra la primera factura para este alcance."
+          actionLabel="Registrar primer ingreso"
+          onAction={() => setCreateOpen(true)}
         />
       ) : (
         <div className="overflow-x-auto rounded-lg border">
@@ -137,10 +143,14 @@ export function AccountingIncomes({
             <tbody>
               {filtered.map((i) => (
                 <tr key={i.id} className="border-t">
-                  <td className="p-3 whitespace-nowrap">{formatDate(i.date)}</td>
+                  <td className="p-3 whitespace-nowrap">
+                    {formatDate(i.date)}
+                  </td>
                   <td className="p-3">
                     <div className="font-medium">{i.clientName || "—"}</div>
-                    <div className="text-xs text-muted-foreground">{i.invoice}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {i.invoice}
+                    </div>
                   </td>
                   <td className="p-3">{i.costCenter || "—"}</td>
                   <td className="p-3 text-right">{formatCurrency(i.amount)}</td>
@@ -161,7 +171,8 @@ export function AccountingIncomes({
                       {i.status === "POR_PAGAR" ? (
                         <>
                           <Button size="sm" onClick={() => setCollecting(i)}>
-                            <Wallet className="mr-1 h-3.5 w-3.5" /> Registrar cobro
+                            <Wallet className="mr-1 h-3.5 w-3.5" /> Registrar
+                            cobro
                           </Button>
                           <Button
                             size="sm"
@@ -371,7 +382,11 @@ function CollectDialog({
   income: AccountingIncome | null;
   accounts: ReturnType<typeof useAccountingStore.getState>["accounts"];
   onClose: () => void;
-  onSubmit: (id: string, accountId: string, paidAmount: number) => Promise<boolean>;
+  onSubmit: (
+    id: string,
+    accountId: string,
+    paidAmount: number,
+  ) => Promise<boolean>;
 }) {
   const error = useAccountingStore((s) => s.error);
   const [accountId, setAccountId] = useState(NO_ACCOUNT);
