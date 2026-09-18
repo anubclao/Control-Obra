@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import nodemailer, { type Transporter } from "nodemailer";
 
 /**
  * lib/email.ts
@@ -13,7 +13,7 @@ import nodemailer from "nodemailer";
  *   SMTP_FROM=tecnowebiacol@gmail.com
  */
 
-let cachedTransport: nodemailer.Transporter | null = null;
+let cachedTransport: Transporter | null = null;
 
 /**
  * Escapa caracteres HTML especiales.  Defensivo: el código OTP es generado
