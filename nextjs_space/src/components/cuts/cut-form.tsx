@@ -27,6 +27,7 @@ import { useProjectsStore } from "@/lib/data-store";
 import { useProvidersStore } from "@/lib/data-store";
 import { useAuthStore } from "@/lib/auth-store";
 import { formatCurrency } from "@/lib/utils";
+import { computeCutTotals } from "@/lib/cuts-workflow";
 import type { WorkCut, WorkCutItem } from "@/types";
 
 const itemSchema = z.object({
@@ -123,18 +124,14 @@ export function CutForm({ cut, onSuccess }: Props) {
   const projectIdValue = useWatch({ control, name: "projectId" });
   const providerIdValue = useWatch({ control, name: "providerId" });
 
+  // Vista previa: la API recalcula con la misma función al guardar.
   const totals = useMemo(() => {
-    const itemsArr = (items ?? []) as Array<{
-      quantity: number;
-      unitPrice: number;
-    }>;
-    const gross = itemsArr.reduce(
-      (sum, it) => sum + (it.quantity || 0) * (it.unitPrice || 0),
-      0,
+    const t = computeCutTotals(
+      (items ?? []) as Array<{ quantity: number; unitPrice: number }>,
+      retentionPercent,
+      advanceDeduction,
     );
-    const retentionValue = Math.round(gross * ((retentionPercent || 0) / 100));
-    const net = gross - retentionValue - (Number(advanceDeduction) || 0);
-    return { gross, retentionValue, net };
+    return { gross: t.grossValue, retentionValue: t.retentionValue, net: t.netValue };
   }, [items, retentionPercent, advanceDeduction]);
 
   function onSubmit(data: CutFormData) {

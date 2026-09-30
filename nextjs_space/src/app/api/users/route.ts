@@ -15,9 +15,15 @@ export const runtime = 'nodejs';
  *
  * Esta ruta reemplaza el endpoint legacy para soportar el nuevo ciclo de vida
  * controlado por el Super Admin (rol ADMIN).
+ *
+ * Todos los handlers exigen sesión ADMIN y la auditoría (created_by,
+ * authorized_by, suspended_by) se toma de la sesión, no del body.
+ * Spec: docs/specs/bug-users-api-sin-auth.md
  */
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { requireAdmin, authFailureResponse } from "@/lib/api-auth";
 import { rowToAuthorizedUser } from "@/lib/admin-users";
 import type { AuthorizedUser, AuthorizedUserStatus } from "@/types";
 
@@ -29,6 +35,9 @@ function isAuthorizedUserStatus(v: unknown): v is AuthorizedUserStatus {
 // GET — listar todos los usuarios autorizados
 // =============================================================================
 export async function GET() {
+  const auth = await requireAdmin();
+  const fail = authFailureResponse(auth);
+  if (fail) return fail;
   try {
     const rows = await query<any[]>(
       `SELECT * FROM users ORDER BY name ASC`,
@@ -45,6 +54,10 @@ export async function GET() {
 // POST — crear usuario autorizado (status inicial PENDING)
 // =============================================================================
 export async function POST(req: Request) {
+  const auth = await requireAdmin();
+  const fail = authFailureResponse(auth);
+  if (fail) return fail;
+  const adminId = (auth as { userId: string }).userId;
   try {
     const body = await req.json();
     const email = String(body?.email ?? "").trim().toLowerCase();
@@ -52,11 +65,11 @@ export async function POST(req: Request) {
     const role = body?.role;
     const area = body?.area;
     const projectId = body?.projectId ?? null;
-    const createdBy = String(body?.createdBy ?? "").trim();
+    const createdBy = adminId;
 
-    if (!email || !name || !role || !area || !createdBy) {
+    if (!email || !name || !role || !area) {
       return NextResponse.json(
-        { error: "email, name, role, area y createdBy son requeridos" },
+        { error: "email, name, role y area son requeridos" },
         { status: 400 },
       );
     }
@@ -64,7 +77,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Correo no válido" }, { status: 400 });
     }
 
-    const id = require("crypto").randomUUID();
+    const id = randomUUID();
 
     await query(
       `INSERT INTO users
@@ -96,6 +109,10 @@ export async function POST(req: Request) {
 // PATCH — actualizar campos (status, role, area, projectId)
 // =============================================================================
 export async function PATCH(req: Request) {
+  const auth = await requireAdmin();
+  const fail = authFailureResponse(auth);
+  if (fail) return fail;
+  const adminId = (auth as { userId: string }).userId;
   try {
     const body = await req.json();
     const id = String(body?.id ?? "").trim();
@@ -122,14 +139,14 @@ export async function PATCH(req: Request) {
       const now = new Date().toISOString().slice(0, 19).replace("T", " ");
       if (body.status === "ACTIVE") {
         sets.push("authorized_by = ?");
-        args.push(body.authorizedBy ?? null);
+        args.push(adminId);
         sets.push("authorized_at = ?");
         args.push(now);
         sets.push("suspended_by = NULL");
         sets.push("suspended_at = NULL");
       } else if (body.status === "SUSPENDED") {
         sets.push("suspended_by = ?");
-        args.push(body.suspendedBy ?? null);
+        args.push(adminId);
         sets.push("suspended_at = ?");
         args.push(now);
       } else if (body.status === "PENDING") {
@@ -185,6 +202,9 @@ export async function PATCH(req: Request) {
 // PUT — compatibilidad legacy con la firma anterior (acepta isActive)
 // =============================================================================
 export async function PUT(req: Request) {
+  const auth = await requireAdmin();
+  const fail = authFailureResponse(auth);
+  if (fail) return fail;
   try {
     const body = await req.json();
     if (!body?.id) {
@@ -224,6 +244,9 @@ export async function PUT(req: Request) {
 // DELETE — eliminar usuario (solo si no tiene historial)
 // =============================================================================
 export async function DELETE(req: Request) {
+  const auth = await requireAdmin();
+  const fail = authFailureResponse(auth);
+  if (fail) return fail;
   try {
     const id = new URL(req.url).searchParams.get("id");
     if (!id) {

@@ -5,11 +5,35 @@ export const runtime = 'nodejs';
  * Reglas de transición (PDF p.21):
  *   DRAFT → SUBMITTED → VALIDATED → APPROVED → PAID
  *                              ↘ REJECTED → (re-edita como nuevo borrador)
+ *
+ * Totales (bruto, retención, neto) se calculan SIEMPRE aquí con
+ * computeCutTotals; el estado solo cambia vía PATCH (workflow) y el rol sale
+ * de la sesión. Spec: docs/specs/bug-cortes-pagos-integridad.md
  */
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { query, transaction } from "@/lib/db";
-import { requireAuth, requireRole, requireAdmin, authFailureResponse } from "@/lib/api-auth";
-import { evaluateCutAction } from "@/lib/cuts-workflow";
+import { requireAuth, requireRole, requireAdmin, authFailureResponse, type AuthSuccess } from "@/lib/api-auth";
+import { evaluateCutAction, computeCutTotals, isCutEditable } from "@/lib/cuts-workflow";
+
+type CutItemInput = {
+  description?: string;
+  unit?: string;
+  quantity: number;
+  unitPrice: number;
+  budgetItemCode?: string;
+};
+
+function parseItems(raw: unknown): CutItemInput[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((it: any) => ({
+    description: it?.description,
+    unit: it?.unit,
+    quantity: Number(it?.quantity ?? 0),
+    unitPrice: Number(it?.unitPrice ?? 0),
+    budgetItemCode: it?.budgetItemCode,
+  }));
+}
 
 
 function cutDto(r: any) {
@@ -102,7 +126,11 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    const id = require("crypto").randomUUID();
+    const createdBy = (auth as AuthSuccess).userId;
+    const retentionPercent = Number(body.retentionPercent ?? 0);
+    const advanceDeduction = Number(body.advanceDeduction ?? 0);
+    const totals = computeCutTotals(parseItems(body.items), retentionPercent, advanceDeduction);
+    const id = randomUUID();
     const num = `CO-${Date.now().toString(36).toUpperCase().slice(-6)}`;
     await transaction(async (conn) => {
       await conn.execute(
@@ -114,16 +142,15 @@ export async function POST(req: Request) {
         [
           id, num, body.projectId, body.providerId, body.description,
           body.periodStart, body.periodEnd,
-          Number(body.grossValue ?? 0),
-          Number(body.retentionPercent ?? 0),
-          Number(body.retentionValue ?? 0),
-          Number(body.advanceDeduction ?? 0),
-          Number(body.netValue ?? 0),
-          body.createdBy ?? "system",
+          totals.grossValue,
+          retentionPercent,
+          totals.retentionValue,
+          advanceDeduction,
+          totals.netValue,
+          createdBy,
         ],
       );
-      const items = Array.isArray(body.items) ? body.items : [];
-      for (const it of items) {
+      for (const it of totals.items) {
         await conn.execute(
           `INSERT INTO work_cut_items
            (id, work_cut_id, description, unit, quantity, unit_price,
@@ -131,14 +158,22 @@ export async function POST(req: Request) {
            VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?)`,
           [
             id, it.description, it.unit,
-            Number(it.quantity ?? 0), Number(it.unitPrice ?? 0),
-            Number(it.totalPrice ?? Number(it.quantity ?? 0) * Number(it.unitPrice ?? 0)),
+            it.quantity, it.unitPrice, it.totalPrice,
             it.budgetItemCode ?? null,
           ],
         );
       }
     });
-    return NextResponse.json({ id, ...body, cutNumber: num }, { status: 201 });
+    return NextResponse.json(
+      {
+        id, ...body, cutNumber: num, createdBy,
+        items: totals.items,
+        grossValue: totals.grossValue,
+        retentionValue: totals.retentionValue,
+        netValue: totals.netValue,
+      },
+      { status: 201 },
+    );
   } catch (e: any) {
     console.error("[cuts POST]", e?.code, e?.message);
     if (e?.code === "ER_NO_REFERENCED_ROW_2") {
@@ -158,50 +193,75 @@ export async function PUT(req: Request) {
   try {
     const body = await req.json();
     if (!body?.id) return NextResponse.json({ error: "ID requerido" }, { status: 400 });
+
+    const current = await query<any[]>(
+      `SELECT status, retention_percent, advance_deduction FROM work_cuts WHERE id = ?`,
+      [body.id],
+    );
+    if (!current.length) return NextResponse.json({ error: "Corte no existe" }, { status: 404 });
+    if (!isCutEditable(current[0].status)) {
+      return NextResponse.json(
+        { error: "Solo se pueden editar cortes en borrador o rechazados", code: "CUT_NOT_EDITABLE" },
+        { status: 409 },
+      );
+    }
+
+    // status, rejectionReason y totales NO se aceptan del body: el estado
+    // cambia vía PATCH (workflow) y los totales se recalculan abajo.
     const map: Record<string, string> = {
       projectId: "project_id",
       providerId: "provider_id",
       description: "description",
       periodStart: "period_start",
       periodEnd: "period_end",
-      grossValue: "gross_value",
       retentionPercent: "retention_percent",
-      retentionValue: "retention_value",
       advanceDeduction: "advance_deduction",
-      netValue: "net_value",
-      status: "status",
-      rejectionReason: "rejection_reason",
     };
     const sets: string[] = [];
     const args: any[] = [];
     for (const [k, vCol] of Object.entries(map)) {
       if (body[k] !== undefined) {
         sets.push(`${vCol} = ?`);
-        args.push(
-          ["grossValue", "retentionPercent", "retentionValue", "advanceDeduction", "netValue"].includes(k)
-            ? Number(body[k]) : body[k],
-        );
+        args.push(["retentionPercent", "advanceDeduction"].includes(k) ? Number(body[k]) : body[k]);
       }
     }
-    if (sets.length) {
-      args.push(body.id);
-      await query(`UPDATE work_cuts SET ${sets.join(", ")} WHERE id = ?`, args);
+
+    const newItems = Array.isArray(body.items) ? parseItems(body.items) : null;
+    let totals: ReturnType<typeof computeCutTotals<CutItemInput>> | null = null;
+    if (newItems || body.retentionPercent !== undefined || body.advanceDeduction !== undefined) {
+      const items = newItems ?? (
+        await query<any[]>(
+          `SELECT quantity, unit_price FROM work_cut_items WHERE work_cut_id = ?`,
+          [body.id],
+        )
+      ).map((r) => ({ quantity: Number(r.quantity), unitPrice: Number(r.unit_price) }));
+      totals = computeCutTotals(
+        items,
+        Number(body.retentionPercent ?? current[0].retention_percent ?? 0),
+        Number(body.advanceDeduction ?? current[0].advance_deduction ?? 0),
+      );
+      sets.push("gross_value = ?", "retention_value = ?", "net_value = ?");
+      args.push(totals.grossValue, totals.retentionValue, totals.netValue);
     }
-    // Reemplazar items si se proporcionan completos
-    if (Array.isArray(body.items)) {
-      await transaction(async (conn) => {
+
+    await transaction(async (conn) => {
+      if (sets.length) {
+        await conn.execute(`UPDATE work_cuts SET ${sets.join(", ")} WHERE id = ?`, [...args, body.id]);
+      }
+      // Reemplazar items si se proporcionan completos
+      if (newItems && totals) {
         await conn.execute(`DELETE FROM work_cut_items WHERE work_cut_id = ?`, [body.id]);
-        for (const it of body.items) {
+        for (const it of totals.items) {
           await conn.execute(
             `INSERT INTO work_cut_items
              (id, work_cut_id, description, unit, quantity, unit_price, total_price, budget_item_code)
              VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?)`,
-            [body.id, it.description, it.unit, Number(it.quantity), Number(it.unitPrice),
-             Number(it.totalPrice), it.budgetItemCode ?? null],
+            [body.id, it.description, it.unit, it.quantity, it.unitPrice,
+             it.totalPrice, it.budgetItemCode ?? null],
           );
         }
-      });
-    }
+      }
+    });
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     console.error("[cuts PUT]", e?.code, e?.message);
@@ -238,11 +298,16 @@ export async function DELETE(req: Request) {
  * Aplica reglas de transición + permisos por rol.
  */
 export async function PATCH(req: Request) {
+  const auth = await requireAuth();
+  const fail = authFailureResponse(auth);
+  if (fail) return fail;
+  // Quién actúa sale de la sesión; `body.user` se ignora.
+  const { user } = auth as AuthSuccess;
   try {
     const body = await req.json();
-    const { id, action, user, comments, rejectionReason } = body ?? {};
-    if (!id || !action || !user?.role) {
-      return NextResponse.json({ error: "id, action, user requeridos" }, { status: 400 });
+    const { id, action, comments, rejectionReason } = body ?? {};
+    if (!id || !action) {
+      return NextResponse.json({ error: "id y action requeridos" }, { status: 400 });
     }
     const rows = await query<any[]>(`SELECT status FROM work_cuts WHERE id = ?`, [id]);
     if (!rows.length) return NextResponse.json({ error: "Corte no existe" }, { status: 404 });
@@ -274,7 +339,7 @@ export async function PATCH(req: Request) {
         `INSERT INTO work_cut_approvals
          (id, work_cut_id, action, user_id, user_name, user_role, comments)
          VALUES (UUID(), ?, ?, ?, ?, ?, ?)`,
-        [id, action, user.id ?? "unknown", user.name ?? "Anónimo", user.role, comments ?? null],
+        [id, action, user.id, user.name, user.role, comments ?? null],
       );
     });
     return NextResponse.json({ ok: true });

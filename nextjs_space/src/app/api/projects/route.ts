@@ -7,6 +7,7 @@
  *   PUT    → requireRole(idem)
  *   DELETE → requireAdmin (Super Admin)
  */
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { requireAuth, requireRole, requireAdmin, authFailureResponse } from "@/lib/api-auth";
@@ -33,6 +34,9 @@ function rowToDTO(r: any) {
 }
 
 export async function GET(req: Request) {
+  const auth = await requireAuth();
+  const fail = authFailureResponse(auth);
+  if (fail) return fail;
   try {
     const url = new URL(req.url);
     const status = url.searchParams.get("status");
@@ -67,7 +71,7 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    const id = require("crypto").randomUUID();
+    const id = randomUUID();
     await query(
       `INSERT INTO projects
         (id, code, name, client, location, start_date, estimated_end_date,

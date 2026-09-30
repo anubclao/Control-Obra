@@ -124,3 +124,51 @@ export function evaluateCutAction(
 
   return { ok: true, target };
 }
+
+// =============================================================================
+// Edición y totales — SPEC: docs/specs/bug-cortes-pagos-integridad.md
+// =============================================================================
+
+/** Estados en los que un corte todavía se puede editar (igual que la UI). */
+export const CUT_EDITABLE_STATUSES: WorkCutStatus[] = ["DRAFT", "REJECTED"];
+
+export function isCutEditable(status: WorkCutStatus | string): boolean {
+  return (CUT_EDITABLE_STATUSES as string[]).includes(status);
+}
+
+export interface CutTotalsInput {
+  quantity: number;
+  unitPrice: number;
+}
+
+export interface CutTotals<T extends CutTotalsInput> {
+  items: Array<T & { totalPrice: number }>;
+  grossValue: number;
+  retentionValue: number;
+  netValue: number;
+}
+
+function num(v: unknown): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/**
+ * Única fórmula del valor de un corte. La usan el formulario (vista previa) y
+ * la API (valor guardado), así el servidor nunca confía en los totales del
+ * navegador.
+ */
+export function computeCutTotals<T extends CutTotalsInput>(
+  items: T[],
+  retentionPercent: number,
+  advanceDeduction: number,
+): CutTotals<T> {
+  const withTotals = (items ?? []).map((it) => ({
+    ...it,
+    totalPrice: num(it.quantity) * num(it.unitPrice),
+  }));
+  const grossValue = withTotals.reduce((sum, it) => sum + it.totalPrice, 0);
+  const retentionValue = Math.round(grossValue * (num(retentionPercent) / 100));
+  const netValue = grossValue - retentionValue - num(advanceDeduction);
+  return { items: withTotals, grossValue, retentionValue, netValue };
+}

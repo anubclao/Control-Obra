@@ -5,8 +5,9 @@ export const runtime = 'nodejs';
  */
 import { NextResponse } from "next/server";
 import { query, transaction } from "@/lib/db";
-import { requireAuth, requireRole, requireAdmin, authFailureResponse } from "@/lib/api-auth";
-import { evaluatePaymentAction, isValidApprovalLevel } from "@/lib/payments-workflow";
+import { randomUUID } from "node:crypto";
+import { requireAuth, requireRole, requireAdmin, authFailureResponse, type AuthSuccess } from "@/lib/api-auth";
+import { evaluatePaymentAction, isValidApprovalLevel, isPaymentEditable } from "@/lib/payments-workflow";
 
 
 function dto(r: any) {
@@ -82,7 +83,7 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    const id = require("crypto").randomUUID();
+    const id = randomUUID();
     const num = `PAG-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase().slice(-5)}`;
     await query(
       `INSERT INTO payment_requests
@@ -98,7 +99,7 @@ export async function POST(req: Request) {
         body.beneficiaryName, body.beneficiaryNit, body.bankName,
         body.accountType ?? "CHECKING", body.accountNumber,
         body.dueDate ?? null, body.description ?? null,
-        body.createdBy ?? "system",
+        (auth as AuthSuccess).userId,
       ],
     );
     return NextResponse.json({ id, ...body, requestNumber: num }, { status: 201 });
@@ -115,6 +116,20 @@ export async function PUT(req: Request) {
   try {
     const body = await req.json();
     if (!body?.id) return NextResponse.json({ error: "ID requerido" }, { status: 400 });
+    const current = await query<any[]>(`SELECT status FROM payment_requests WHERE id = ?`, [body.id]);
+    if (!current.length) return NextResponse.json({ error: "Solicitud no existe" }, { status: 404 });
+    if (!isPaymentEditable(current[0].status)) {
+      return NextResponse.json(
+        { error: "Solo se pueden editar solicitudes pendientes", code: "PAYMENT_NOT_EDITABLE" },
+        { status: 409 },
+      );
+    }
+    if (body.requiredApprovalLevel !== undefined && !isValidApprovalLevel(Number(body.requiredApprovalLevel))) {
+      return NextResponse.json(
+        { error: "requiredApprovalLevel debe ser 1 o 2", code: "INVALID_APPROVAL_LEVEL" },
+        { status: 400 },
+      );
+    }
     const map: Record<string, string> = {
       projectId: "project_id", providerId: "provider_id", workCutId: "work_cut_id",
       type: "type", amount: "amount", priority: "priority",
@@ -164,11 +179,16 @@ export async function DELETE(req: Request) {
 }
 
 export async function PATCH(req: Request) {
+  const auth = await requireAuth();
+  const fail = authFailureResponse(auth);
+  if (fail) return fail;
+  // Quién actúa sale de la sesión; `body.user` se ignora.
+  const { user } = auth as AuthSuccess;
   try {
     const body = await req.json();
-    const { id, action, user, comments, rejectionReason, paymentReference, paymentMethod } = body ?? {};
-    if (!id || !action || !user?.role) {
-      return NextResponse.json({ error: "id, action, user requeridos" }, { status: 400 });
+    const { id, action, comments, rejectionReason, paymentReference, paymentMethod } = body ?? {};
+    if (!id || !action) {
+      return NextResponse.json({ error: "id y action requeridos" }, { status: 400 });
     }
     const rows = await query<any[]>(
       `SELECT status, required_approval_level, current_approval_level
@@ -220,7 +240,7 @@ export async function PATCH(req: Request) {
          VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [id, action,
          decision.approvalLevel,
-         user.id ?? "unknown", user.name ?? "Anónimo", user.role,
+         user.id, user.name, user.role,
          comments ?? null,
          paymentReference ?? null, paymentMethod ?? null,
         ],

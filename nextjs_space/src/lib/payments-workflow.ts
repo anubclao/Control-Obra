@@ -200,3 +200,11 @@ export function evaluatePaymentAction(
       : state.currentApprovalLevel,
   };
 }
+
+/**
+ * Una solicitud solo se edita mientras nadie la ha aprobado (igual que la UI).
+ * SPEC: docs/specs/bug-cortes-pagos-integridad.md
+ */
+export function isPaymentEditable(status: PaymentStatus | string): boolean {
+  return status === "PENDING";
+}
