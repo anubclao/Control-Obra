@@ -4,6 +4,7 @@ export const runtime = 'nodejs';
  * CRUD: /api/work-logs  — bitácora diaria de obra
  * Constraint UNIQUE(project_id, date) → usar UPSERT.
  */
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { requireAuth, requireRole, requireAdmin, authFailureResponse } from "@/lib/api-auth";
@@ -56,7 +57,7 @@ export async function POST(req: Request) {
     if (!body?.projectId || !body?.date || !body?.weather || !body?.activities) {
       return NextResponse.json({ error: "Faltan campos obligatorios" }, { status: 400 });
     }
-    const id = require("crypto").randomUUID();
+    const id = randomUUID();
     await query(
       `INSERT INTO work_logs
        (id, project_id, date, weather, temperature, workers_count,

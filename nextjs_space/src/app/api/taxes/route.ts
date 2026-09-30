@@ -3,6 +3,7 @@ export const runtime = 'nodejs';
 /**
  * CRUD: /api/taxes — configuración de impuestos
  */
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { requireAuth, requireRole, requireAdmin, authFailureResponse } from "@/lib/api-auth";
@@ -43,7 +44,7 @@ export async function POST(req: Request) {
     if (!body?.name || !body?.type || body?.rate === undefined) {
       return NextResponse.json({ error: "name, type, rate requeridos" }, { status: 400 });
     }
-    const id = require("crypto").randomUUID();
+    const id = randomUUID();
     await query(
       `INSERT INTO tax_configs (id, project_id, name, type, rate, applies_to, is_active, notes)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,

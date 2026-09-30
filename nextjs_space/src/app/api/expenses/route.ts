@@ -3,6 +3,7 @@ export const runtime = 'nodejs';
 /**
  * CRUD: /api/expenses — Registro de gastos
  */
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { query, transaction } from "@/lib/db";
 import { requireAuth, requireRole, requireAdmin, authFailureResponse } from "@/lib/api-auth";
@@ -79,7 +80,7 @@ export async function POST(req: Request) {
         !body?.description || !body?.amount || !body?.date) {
       return NextResponse.json({ error: "Faltan campos obligatorios" }, { status: 400 });
     }
-    const id = require("crypto").randomUUID();
+    const id = randomUUID();
     const num = `GAS-${Date.now().toString(36).toUpperCase().slice(-6)}`;
     await transaction(async (conn) => {
       await conn.execute(

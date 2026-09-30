@@ -3,6 +3,7 @@ export const runtime = 'nodejs';
 /**
  * CRUD: /api/pscs — Presupuesto Proveedor
  */
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { query, transaction } from "@/lib/db";
 import { requireAuth, requireRole, requireAdmin, authFailureResponse } from "@/lib/api-auth";
@@ -68,7 +69,7 @@ export async function POST(req: Request) {
     if (!body?.projectId || !body?.providerId) {
       return NextResponse.json({ error: "projectId y providerId requeridos" }, { status: 400 });
     }
-    const id = require("crypto").randomUUID();
+    const id = randomUUID();
     const num = `PSC-${Date.now().toString(36).toUpperCase().slice(-6)}`;
     await transaction(async (conn) => {
       await conn.execute(

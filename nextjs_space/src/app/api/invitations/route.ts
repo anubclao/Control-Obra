@@ -3,6 +3,7 @@ export const runtime = 'nodejs';
 /**
  * CRUD: /api/invitations
  */
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { requireAuth, requireRole, requireAdmin, authFailureResponse } from "@/lib/api-auth";
@@ -63,7 +64,7 @@ export async function POST(req: Request) {
     if (!body?.email || !body?.role) {
       return NextResponse.json({ error: "email y role requeridos" }, { status: 400 });
     }
-    const id = require("crypto").randomUUID();
+    const id = randomUUID();
     const code = body.code ?? makeCode();
     const expiresAt = body.expiresAt ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
       .toISOString().slice(0, 19).replace("T", " ");

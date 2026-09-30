@@ -9,6 +9,7 @@ export const runtime = "nodejs";
  *   PUT    → requireRole(idem)
  *   DELETE → requireAdmin
  */
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import {
@@ -96,7 +97,7 @@ export async function POST(req: Request) {
     }
     const pricingMode = pm.value;
 
-    const id = require("crypto").randomUUID();
+    const id = randomUUID();
     const number = body.contractNumber ?? nextContractNumber();
     await query(
       `INSERT INTO contracts

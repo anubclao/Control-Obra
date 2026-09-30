@@ -3,6 +3,7 @@ export const runtime = 'nodejs';
 /**
  * CRUD: /api/quotations
  */
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { query, transaction } from "@/lib/db";
 import { requireAuth, requireRole, requireAdmin, authFailureResponse } from "@/lib/api-auth";
@@ -76,7 +77,7 @@ export async function POST(req: Request) {
     if (!body?.clientId || !body?.title || !body?.validUntil) {
       return NextResponse.json({ error: "clientId, title y validUntil son obligatorios" }, { status: 400 });
     }
-    const id = require("crypto").randomUUID();
+    const id = randomUUID();
     const num = `COT-${Date.now().toString(36).toUpperCase().slice(-6)}`;
     await transaction(async (conn) => {
       await conn.execute(

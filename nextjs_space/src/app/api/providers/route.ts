@@ -3,6 +3,7 @@ export const runtime = 'nodejs';
 /**
  * CRUD: /api/providers
  */
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { requireAuth, requireRole, requireAdmin, authFailureResponse } from "@/lib/api-auth";
@@ -85,7 +86,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const id = require("crypto").randomUUID();
+    const id = randomUUID();
     await query(
       `INSERT INTO providers
         (id, person_type, name, nit, contact, email, email2, phone, phone2,

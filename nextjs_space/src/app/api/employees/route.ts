@@ -3,6 +3,7 @@ export const runtime = 'nodejs';
 /**
  * CRUD: /api/employees — RRHH
  */
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { requireAuth, requireRole, requireAdmin, authFailureResponse } from "@/lib/api-auth";
@@ -64,7 +65,7 @@ export async function POST(req: Request) {
         !body?.department || !body?.contractType || !body?.startDate) {
       return NextResponse.json({ error: "Faltan campos obligatorios" }, { status: 400 });
     }
-    const id = require("crypto").randomUUID();
+    const id = randomUUID();
     const num = `EMP-${Date.now().toString(36).toUpperCase().slice(-6)}`;
     await query(
       `INSERT INTO employees

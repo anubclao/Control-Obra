@@ -3,6 +3,7 @@ export const runtime = 'nodejs';
 /**
  * CRUD: /api/clients
  */
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { requireAuth, requireRole, requireAdmin, authFailureResponse } from "@/lib/api-auth";
@@ -49,7 +50,7 @@ export async function POST(req: Request) {
         !body?.city || !body?.source) {
       return NextResponse.json({ error: "Faltan campos obligatorios" }, { status: 400 });
     }
-    const id = require("crypto").randomUUID();
+    const id = randomUUID();
     const num = `CLI-${Date.now().toString(36).toUpperCase().slice(-6)}`;
     await query(
       `INSERT INTO clients
