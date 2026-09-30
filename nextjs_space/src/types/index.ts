@@ -504,6 +504,53 @@ export interface Budget {
   createdAt: string;
 }
 
+// Control de Cambios del presupuesto (CC-001…). SPEC: docs/specs/budget-change-control.md
+export type ChangeRequestChannel = "ACTA_COMITE" | "MAIL" | "SOLICITUD_VERBAL" | "OTROS";
+export type ChangeOrderStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
+export type ChangeOrderAction = "SUBMIT" | "APPROVE" | "REJECT";
+
+export interface BudgetChangeOrderItem {
+  id?: string;
+  chapterCode?: string; // "6"
+  itemCode?: string; // "6.2"
+  description: string;
+  unit: string;
+  quantity: number;
+  unitPrice: number; // negativo = deducción
+  totalPrice: number; // calculado en servidor
+}
+
+export interface BudgetChangeOrderAiu {
+  administration: number;
+  imprevistos: number;
+  utilidad: number;
+  ivaOnUtility: number;
+}
+
+export interface BudgetChangeOrder {
+  id: string;
+  budgetId: string;
+  number: string; // "CC-001"
+  issueDate: string;
+  requestChannel: ChangeRequestChannel;
+  requestChannelOther?: string;
+  description: string;
+  advisorName?: string;
+  items: BudgetChangeOrderItem[];
+  aiuSnapshot: BudgetChangeOrderAiu;
+  directCost: number;
+  total: number;
+  status: ChangeOrderStatus;
+  rejectionReason?: string;
+  resultingVersionId?: string;
+  createdBy: string;
+  submittedBy?: string;
+  submittedAt?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  createdAt: string;
+}
+
 // AIU - Administración, Imprevistos, Utilidad
 export interface AiuConfig {
   id: string;

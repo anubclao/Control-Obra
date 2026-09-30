@@ -19,6 +19,7 @@ import {
   TrendingUp,
   Trash2,
   Briefcase,
+  GitPullRequestArrow,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -56,14 +57,16 @@ import {
 import { useBudgetsStore } from "@/lib/data-store";
 import { useAiuStore } from "@/lib/data-store";
 import { useProjectsStore } from "@/lib/data-store";
+import { useEnsureLoaded } from "@/lib/use-ensure-loaded";
 import { useIsSuperAdmin } from "@/lib/permissions";
 import {
-  parseExcelContent,
+  parseExcelFile,
   buildBudgetLayers,
-  SAMPLE_EXCEL_DATA,
   type ParsedExcel,
 } from "@/lib/excel-parser";
+import { ChangeOrdersTab } from "@/components/budgets/change-orders-tab";
 import { AiuForm } from "@/components/aiu/aiu-form";
+import { computeAiu, IVA_ON_UTILITY_PCT } from "@/lib/aiu-constants";
 import { formatCurrency, formatDate, formatPercent, cn } from "@/lib/utils";
 import type { BudgetLayer, BudgetItem } from "@/types";
 
@@ -79,11 +82,14 @@ export default function BudgetDetailPage() {
   } = useBudgetsStore();
   const { getConfig } = useAiuStore();
   const { getProject } = useProjectsStore();
+  useEnsureLoaded("projects", "budgets", "aius");
 
   const [newVersionOpen, setNewVersionOpen] = useState(false);
   const [parsed, setParsed] = useState<ParsedExcel | null>(null);
   const [versionNotes, setVersionNotes] = useState("");
   const [versionError, setVersionError] = useState<string | null>(null);
+  const [versionSaving, setVersionSaving] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [unforeseenOpen, setUnforeseenOpen] = useState(false);
 
@@ -130,22 +136,45 @@ export default function BudgetDetailPage() {
 
   function startNewVersion() {
     setVersionError(null);
+    setParsed(null);
     setNewVersionOpen(true);
-    const sample = parseExcelContent(SAMPLE_EXCEL_DATA);
-    setParsed(sample);
   }
 
-  function confirmNewVersion() {
+  async function handleVersionFile(e: React.ChangeEvent<HTMLInputElement>) {
+    setVersionError(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setParsed(await parseExcelFile(file));
+    } catch (err) {
+      setParsed(null);
+      setVersionError(
+        err instanceof Error ? err.message : `No se pudo leer "${file.name}".`,
+      );
+    }
+  }
+
+  async function confirmNewVersion() {
     if (!parsed) return;
     setVersionError(null);
+    setVersionSaving(true);
     const layers = buildBudgetLayers(parsed.rows);
-    const result = createNewVersion(projectId, layers, versionNotes);
+    const result = await createNewVersion(projectId, layers, versionNotes);
+    setVersionSaving(false);
     if (!result.ok) {
       setVersionError(result.error || "Error");
       return;
     }
     setNewVersionOpen(false);
     setVersionNotes("");
+    setParsed(null);
+  }
+
+  async function runBudgetAction(action: () => Promise<{ ok: boolean; error?: string }>) {
+    setActionError(null);
+    const result = await action();
+    if (!result.ok) setActionError(result.error || "Error en el presupuesto");
+    return result.ok;
   }
 
   function exportAs(format: "excel" | "pdf") {
@@ -278,6 +307,14 @@ export default function BudgetDetailPage() {
       )}
 
       {/* Tabs */}
+      {actionError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>No se pudo actualizar el presupuesto</AlertTitle>
+          <AlertDescription>{actionError}</AlertDescription>
+        </Alert>
+      )}
+
       <Tabs defaultValue="cliente" className="space-y-4">
         <TabsList>
           <TabsTrigger value="cliente">
@@ -305,6 +342,10 @@ export default function BudgetDetailPage() {
             <TrendingUp className="mr-1.5 h-4 w-4" />
             AIU
           </TabsTrigger>
+          <TabsTrigger value="control-cambios">
+            <GitPullRequestArrow className="mr-1.5 h-4 w-4" />
+            Control de cambios
+          </TabsTrigger>
           <TabsTrigger value="versiones">
             <History className="mr-1.5 h-4 w-4" />
             Versiones ({budget.versions.length})
@@ -317,8 +358,8 @@ export default function BudgetDetailPage() {
             <CardHeader>
               <CardTitle>Presupuesto Cliente</CardTitle>
               <CardDescription>
-                Lo que el cliente aprobó al inicio del proyecto. Los totales se
-                usan como referencia y no se modifican durante la obra.
+                Lo que el cliente aprobó al inicio del proyecto. Solo cambia con
+                controles de cambios aprobados.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -431,7 +472,9 @@ export default function BudgetDetailPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() =>
-                              removeUnforeseenItem(budget.id, item.id)
+                              runBudgetAction(() =>
+                                removeUnforeseenItem(budget.id, item.id),
+                              )
                             }
                             className="h-7 w-7"
                           >
@@ -463,8 +506,8 @@ export default function BudgetDetailPage() {
             <CardHeader>
               <CardTitle>AIU — Administración, Imprevistos, Utilidad</CardTitle>
               <CardDescription>
-                Configurado a nivel de proyecto. Se aplica sobre el presupuesto
-                base.
+                Configurado a nivel de proyecto. Cada % se aplica sobre el
+                costo directo; el IVA solo sobre la utilidad.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -510,10 +553,36 @@ export default function BudgetDetailPage() {
                       )}
                     </p>
                   </div>
+                  {(() => {
+                    const liq = computeAiu(budget.totalValue, aiuConfig);
+                    return (
+                      <div className="col-span-3 space-y-1 rounded-md border p-3 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Costo directo</span>
+                          <span>{formatCurrency(liq.directCost)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">
+                            IVA {IVA_ON_UTILITY_PCT}% sobre utilidad
+                          </span>
+                          <span>{formatCurrency(liq.iva)}</span>
+                        </div>
+                        <div className="flex justify-between font-semibold">
+                          <span>Total obra</span>
+                          <span>{formatCurrency(liq.total)}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* CONTROL DE CAMBIOS — docs/specs/budget-change-control.md */}
+        <TabsContent value="control-cambios">
+          <ChangeOrdersTab budget={budget} aiuConfig={aiuConfig} />
         </TabsContent>
 
         {/* VERSIONES */}
@@ -583,6 +652,14 @@ export default function BudgetDetailPage() {
               {versionError}
             </div>
           )}
+          <div className="space-y-1.5">
+            <Label>Archivo del presupuesto (.xlsx, .xls o .csv)</Label>
+            <Input
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              onChange={handleVersionFile}
+            />
+          </div>
           {parsed && (
             <div className="space-y-3">
               <p className="text-sm">
@@ -603,7 +680,12 @@ export default function BudgetDetailPage() {
             <Button variant="outline" onClick={() => setNewVersionOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={confirmNewVersion}>Crear nueva versión</Button>
+            <Button
+              onClick={confirmNewVersion}
+              disabled={!parsed || versionSaving}
+            >
+              {versionSaving ? "Creando…" : "Crear nueva versión"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -642,9 +724,11 @@ export default function BudgetDetailPage() {
       <UnforeseenDialog
         open={unforeseenOpen}
         onOpenChange={setUnforeseenOpen}
-        onAdd={(item) => {
-          addUnforeseenItem(budget.id, item);
-          setUnforeseenOpen(false);
+        onAdd={async (item) => {
+          const ok = await runBudgetAction(() =>
+            addUnforeseenItem(budget.id, item),
+          );
+          if (ok) setUnforeseenOpen(false);
         }}
       />
     </div>

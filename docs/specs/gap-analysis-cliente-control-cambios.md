@@ -1,14 +1,16 @@
 # Feature: Gap Analysis — Documentos del Cliente (PDF de prueba)
 
 > **Estado:** ✅ Aprobada el 2026-09-29. §3.1 y §3.3 ya implementadas con sus
-> verifiers verdes. §3.2 queda como spec candidata (`budget-change-control.md`).
+> verifiers verdes. §3.2 ya tiene spec propia pendiente de aprobación:
+> [`budget-change-control.md`](budget-change-control.md), que corrige el diseño
+> de esta sección (el CC trae ítems propios, no es un diff entre versiones).
 > §3.4 sigue como audit pendiente.
 >
 > **Origen del análisis:** el cliente envió un PDF titulado "INFORMACIÓN PARA
 > RUEBA DE APP" (7 páginas) con ejemplos reales de su operación:
 >
 > 1. Cotización inicial (Marzo Triangular → Producomex, $120.273.386)
-> 2. Cotización Control de Cambios 001 (，增减/respecto a v0, motivo Solicitud Verbal)
+> 2. Cotización Control de Cambios 001 (incrementos/reducciones respecto a v0, motivo Solicitud Verbal)
 > 3. Orden de compra inicial + Control de Cambios (formato Oracle-EBS, Carvajal)
 > 4. Captura del flujo "Cargar presupuesto desde Excel" (3 pasos)
 > 5. Contrato de obra civil a todo costo (contrato 000002025-0703)
@@ -91,7 +93,7 @@ La cotización inicial trae un bloque de **condiciones comerciales** que hoy
 Los budgets existentes quedan con `payment_terms_json = NULL` y siguen
 funcionando. Los cortes/pagos no dependen de estos campos.
 
-### 3.2 "Control de Cambios" con，增减/y motivo (nueva entidad)
+### 3.2 "Control de Cambios" con incrementos/reducciones y motivo (nueva entidad)
 
 **Origen:** PDF pág. 2 (Cotización Control de Cambios 001).
 
@@ -99,11 +101,11 @@ El cliente muestra un **addendum a la cotización** donde:
 
 - Aparece un campo **"Marque con una X el medio por el cual se realizó la
   solicitud"** con 4 opciones:
-  - Acto Común
-  - Mal (mal ejecutado)
+  - Acta Comité
+  - Mail
   - **Solicitud Verbal** ← marcado
   - Otros (cuál?)
-- Las **增减/(incrementos/reducciones)** se muestran en **rojo con paréntesis**
+- Las **incrementos/reducciones** se muestran en **rojo con paréntesis**
   y en una columna de **% de variación** respecto a la versión anterior.
 - Al final: `TOTAL COSTOS DIRECTOS → ADMINISTRACIÓN 8% → IMPREVISTOS 5% → UTILIDAD 5% → IVA 19% → TOTAL OBRA`.
 
@@ -116,7 +118,7 @@ esta gap-analysis para no mezclar alcance):
 - Entidad: `budget_revisions` (FK a `budgets`, `version`, `motivo`,
   `motivo_otro_detalle`, `diff_json`, `created_by`, `created_at`).
 - Workflow: `DRAFT → SUBMITTED → APPROVED → MERGED` (mergea al PT vigente).
-- Cálculo: `diff_json` con，增减/por ítem = `vr_total_v(n) − vr_total_v(n-1)`.
+- Cálculo: `diff_json` con incrementos/reducciones por ítem = `vr_total_v(n) − vr_total_v(n-1)`.
 - UI: una pestaña "Revisiones" en `/tecnico/presupuestos/[id]` con
   comparativo lado-a-lado v(n-1) vs v(n) y el motivo seleccionado.
 
@@ -213,7 +215,7 @@ está en `src/components/ui/` (shadcn/ui).
 | #   | Concepto del cliente                               | Acción                                      | Spec                                  | Riesgo de romper                                   |
 | --- | -------------------------------------------------- | ------------------------------------------- | ------------------------------------- | -------------------------------------------------- |
 | 1   | Condiciones comerciales en cotización              | Extender `budgets` con campos opcionales    | Esta spec (§3.1)                      | **Bajo** (campos nuevos opcionales)                |
-| 2   | Control de cambios con，增减/y motivo              | **Spec aparte**, no se implementa aquí      | Candidata: `budget-change-control.md` | **Alto** si se hace mal — necesita su propio flujo |
+| 2   | Control de cambios con incrementos/reducciones y motivo              | **Spec aparte**, no se implementa aquí      | Candidata: `budget-change-control.md` | **Alto** si se hace mal — necesita su propio flujo |
 | 3   | Modalidad "Valor Unitario Fijo" en contrato        | Añadir `pricingMode` opcional en `Contract` | Esta spec (§3.3)                      | **Bajo**                                           |
 | 4   | Datos del contratista visibles en contrato         | Auditar página de detalle; fix si falta     | Bug-spec aparte si aplica             | **Bajo**                                           |
 | 5   | Mockups del PDF (Crear proyecto, PSC, corte, etc.) | **Ya existen** los formularios              | —                                     | Ninguno                                            |
@@ -246,7 +248,7 @@ está en `src/components/ui/` (shadcn/ui).
 - Crear entidad `quotations` (sería duplicar `budgets`).
 - Crear entidad `purchase_orders` (la OC del PDF es externa a ControlObra).
 - Cambiar el branding o la paleta visual de la app.
-- Implementar el "Control de Cambios" con，增减/(queda como spec candidata
+- Implementar el "Control de Cambios" con incrementos/reducciones (queda como spec candidata
   con su propio TDD).
 - Modificar `cuts-workflow.ts` o `payments-workflow.ts`.
 
@@ -254,5 +256,5 @@ está en `src/components/ui/` (shadcn/ui).
 
 ## 8. Approval
 
-**Status:** ⏳ Pending Review — esperando visto bueno del usuario para
-proceder con §3.1 y §3.3 (y abrir la spec candidata §3.2 por separado).
+**Status:** ✅ Aprobada el 2026-09-29 (§3.1 y §3.3 implementadas). §3.2 →
+`budget-change-control.md` (pendiente de aprobación). §3.4 → audit pendiente.
