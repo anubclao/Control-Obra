@@ -40,6 +40,7 @@ import {
 import { useProjectsStore } from "@/lib/data-store";
 import { useProvidersStore } from "@/lib/data-store";
 import { useBudgetsStore } from "@/lib/data-store";
+import { useEnsureLoaded } from "@/lib/use-ensure-loaded";
 import { PSCForm } from "@/components/pscs/psc-form";
 import { PSCDetail } from "@/components/pscs/psc-detail";
 import { formatCurrency, formatPercent, cn } from "@/lib/utils";
@@ -50,6 +51,7 @@ export default function PSCPage() {
   const { projects, getProject } = useProjectsStore();
   const { getProvider } = useProvidersStore();
   const { getBudgetByProject } = useBudgetsStore();
+  useEnsureLoaded("projects", "budgets");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | PSCStatus>("ALL");
   const [projectFilter, setProjectFilter] = useState<string>("ALL");

@@ -340,7 +340,10 @@ CREATE TABLE aiu_configs (
   CONSTRAINT fk_aiu_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
   CONSTRAINT fk_aiu_user    FOREIGN KEY (updated_by) REFERENCES users(id)    ON DELETE SET NULL,
   INDEX idx_aiu_project (project_id),
-  CONSTRAINT chk_aiu_sum CHECK (administration + imprevistos + utilidad = 100)
+  -- % sobre costo directo (ver migrations/008_aiu_percent_over_direct_cost.sql)
+  CONSTRAINT chk_aiu_range CHECK (administration BETWEEN 0 AND 100
+                              AND imprevistos    BETWEEN 0 AND 100
+                              AND utilidad       BETWEEN 0 AND 100)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================================================

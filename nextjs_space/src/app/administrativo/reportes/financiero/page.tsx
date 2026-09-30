@@ -24,6 +24,7 @@ import { useProvidersStore } from "@/lib/data-store";
 import { usePaymentsStore } from "@/lib/data-store";
 import { useCutsStore } from "@/lib/data-store";
 import { useBudgetsStore } from "@/lib/data-store";
+import { useEnsureLoaded } from "@/lib/use-ensure-loaded";
 import { formatCurrency, formatPercent, cn } from "@/lib/utils";
 
 export default function ReportesFinancierosPage() {
@@ -31,6 +32,7 @@ export default function ReportesFinancierosPage() {
   const { payments } = usePaymentsStore();
   const { cuts } = useCutsStore();
   const { getBudgetByProject } = useBudgetsStore();
+  useEnsureLoaded("projects", "budgets", "cuts", "payments");
   const [projectFilter, setProjectFilter] = useState<string>("ALL");
 
   // Cálculo global

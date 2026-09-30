@@ -93,11 +93,9 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
 
   async function onSubmit(data: ProjectFormData) {
     if (project) {
-      // updateProject no devuelve nada; asumimos éxito si no hay error en el store.
-      await updateProject(project.id, data);
-      // Re-leer el error del store tras la mutación.
-      const { error: postError } = useProjectsStore();
-      if (!postError) onSuccess();
+      // updateProject devuelve false si falló; el mensaje queda en storeError.
+      const ok = await updateProject(project.id, data);
+      if (ok) onSuccess();
     } else {
       const created = await addProject({
         ...data,

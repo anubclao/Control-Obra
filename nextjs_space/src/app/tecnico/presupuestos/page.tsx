@@ -30,12 +30,14 @@ import {
 } from "@/components/ui/select";
 import { useBudgetsStore } from "@/lib/data-store";
 import { useProjectsStore } from "@/lib/data-store";
+import { useEnsureLoaded } from "@/lib/use-ensure-loaded";
 import { formatCurrency, formatDate, formatPercent } from "@/lib/utils";
 
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { ModuleExplanationCard } from "@/components/ui/module-explanation-card";
 export default function PresupuestosPage() {
   const { getBudgetByProject, budgets } = useBudgetsStore();
+  useEnsureLoaded("projects", "budgets");
   const { projects } = useProjectsStore();
   const [search, setSearch] = useState("");
   const [createFor, setCreateFor] = useState<string>("");

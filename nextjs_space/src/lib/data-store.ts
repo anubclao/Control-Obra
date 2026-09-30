@@ -40,7 +40,12 @@ import type {
   Invitation,
   Expense,
   Budget,
+  BudgetLayer,
+  BudgetItem,
 } from "@/types";
+
+export type BudgetActionResult = { ok: boolean; error?: string };
+export type UnforeseenItemInput = Pick<BudgetItem, "description" | "unit" | "quantity" | "unitPrice">;
 
 interface Collection<T> {
   items: T[];
@@ -53,25 +58,25 @@ interface DataState {
   projects: Collection<Project> & {
     load: () => Promise<void>;
     add: (p: Partial<Project> & { code?: string }) => Promise<Project | null>;
-    update: (id: string, p: Partial<Project>) => Promise<void>;
+    update: (id: string, p: Partial<Project>) => Promise<boolean>;
     remove: (id: string) => Promise<void>;
   };
   providers: Collection<Provider> & {
     load: () => Promise<void>;
     add: (p: Partial<Provider>) => Promise<Provider | null>;
-    update: (id: string, p: Partial<Provider>) => Promise<void>;
+    update: (id: string, p: Partial<Provider>) => Promise<boolean>;
     remove: (id: string) => Promise<void>;
   };
   contracts: Collection<Contract> & {
     load: () => Promise<void>;
     add: (c: Partial<Contract>) => Promise<Contract | null>;
-    update: (id: string, c: Partial<Contract>) => Promise<void>;
+    update: (id: string, c: Partial<Contract>) => Promise<boolean>;
     remove: (id: string) => Promise<void>;
   };
   cuts: Collection<WorkCut> & {
     load: () => Promise<void>;
     add: (c: Partial<WorkCut>) => Promise<WorkCut | null>;
-    update: (id: string, c: Partial<WorkCut>) => Promise<void>;
+    update: (id: string, c: Partial<WorkCut>) => Promise<boolean>;
     remove: (id: string) => Promise<void>;
     performAction: (
       id: string,
@@ -83,7 +88,7 @@ interface DataState {
   payments: Collection<PaymentRequest> & {
     load: () => Promise<void>;
     add: (p: Partial<PaymentRequest>) => Promise<PaymentRequest | null>;
-    update: (id: string, p: Partial<PaymentRequest>) => Promise<void>;
+    update: (id: string, p: Partial<PaymentRequest>) => Promise<boolean>;
     remove: (id: string) => Promise<void>;
     performAction: (
       id: string,
@@ -95,64 +100,69 @@ interface DataState {
   clients: Collection<Client> & {
     load: () => Promise<void>;
     add: (c: Partial<Client>) => Promise<Client | null>;
-    update: (id: string, c: Partial<Client>) => Promise<void>;
+    update: (id: string, c: Partial<Client>) => Promise<boolean>;
     remove: (id: string) => Promise<void>;
   };
   quotations: Collection<Quotation> & {
     load: () => Promise<void>;
     add: (q: Partial<Quotation>) => Promise<Quotation | null>;
-    update: (id: string, q: Partial<Quotation>) => Promise<void>;
+    update: (id: string, q: Partial<Quotation>) => Promise<boolean>;
     remove: (id: string) => Promise<void>;
   };
   workLogs: Collection<WorkLog> & {
     load: () => Promise<void>;
     add: (l: Partial<WorkLog>) => Promise<WorkLog | null>;
-    update: (id: string, l: Partial<WorkLog>) => Promise<void>;
+    update: (id: string, l: Partial<WorkLog>) => Promise<boolean>;
     remove: (id: string) => Promise<void>;
   };
   employees: Collection<Employee> & {
     load: () => Promise<void>;
     add: (e: Partial<Employee>) => Promise<Employee | null>;
-    update: (id: string, e: Partial<Employee>) => Promise<void>;
+    update: (id: string, e: Partial<Employee>) => Promise<boolean>;
     remove: (id: string) => Promise<void>;
   };
   users: Collection<User> & {
     load: () => Promise<void>;
     add: (u: Partial<User>) => Promise<User | null>;
-    update: (id: string, u: Partial<User>) => Promise<void>;
+    update: (id: string, u: Partial<User>) => Promise<boolean>;
   };
   invitations: Collection<Invitation> & {
     load: () => Promise<void>;
     add: (i: Partial<Invitation>) => Promise<Invitation | null>;
-    update: (id: string, i: Partial<Invitation>) => Promise<void>;
+    update: (id: string, i: Partial<Invitation>) => Promise<boolean>;
     remove: (id: string) => Promise<void>;
   };
   taxes: Collection<TaxConfig> & {
     load: () => Promise<void>;
     add: (t: Partial<TaxConfig>) => Promise<TaxConfig | null>;
-    update: (id: string, t: Partial<TaxConfig>) => Promise<void>;
+    update: (id: string, t: Partial<TaxConfig>) => Promise<boolean>;
     remove: (id: string) => Promise<void>;
   };
   aius: Collection<AiuConfig> & {
     load: () => Promise<void>;
     add: (a: Partial<AiuConfig>) => Promise<AiuConfig | null>;
-    update: (id: string, a: Partial<AiuConfig>) => Promise<void>;
+    update: (id: string, a: Partial<AiuConfig>) => Promise<boolean>;
   };
   budgets: Collection<Budget> & {
     load: () => Promise<void>;
     add: (b: Partial<Budget>) => Promise<Budget | null>;
-    update: (id: string, b: Partial<Budget>) => Promise<void>;
+    update: (id: string, b: Partial<Budget>) => Promise<boolean>;
+    // SPEC: docs/specs/bug-presupuestos-persistencia.md
+    createPT: (projectId: string, layers: BudgetLayer[], notes?: string) => Promise<BudgetActionResult>;
+    createNewVersion: (projectId: string, layers: BudgetLayer[], notes?: string) => Promise<BudgetActionResult>;
+    addUnforeseenItem: (budgetId: string, item: UnforeseenItemInput) => Promise<BudgetActionResult>;
+    removeUnforeseenItem: (budgetId: string, itemId: string) => Promise<BudgetActionResult>;
   };
   pscs: Collection<any> & {
     load: () => Promise<void>;
     add: (p: Partial<any>) => Promise<any | null>;
-    update: (id: string, p: Partial<any>) => Promise<void>;
+    update: (id: string, p: Partial<any>) => Promise<boolean>;
     remove: (id: string) => Promise<void>;
   };
   expenses: Collection<Expense> & {
     load: () => Promise<void>;
     add: (e: Partial<Expense>) => Promise<Expense | null>;
-    update: (id: string, e: Partial<Expense>) => Promise<void>;
+    update: (id: string, e: Partial<Expense>) => Promise<boolean>;
     remove: (id: string) => Promise<void>;
   };
 }
@@ -227,8 +237,14 @@ export const useDataStore = create<DataState>()((set, get) => {
   get2 = get;
 
   // Helper para construir una colección estándar
-  function col<T extends { id: string }>(endpoint: string) {
-    const key = endpointToKey(endpoint);
+  // `stateKey` = propiedad del store donde vive la colección. Por defecto se
+  // deriva del endpoint, pero debe pasarse cuando no coinciden
+  // ("/api/aiu-configs" → aius): si no, load() escribe en una clave huérfana.
+  function col<T extends { id: string }>(
+    endpoint: string,
+    stateKey: string = endpointToKey(endpoint),
+  ) {
+    const key = stateKey;
     const obj: any = {
       items: [] as T[],
       loaded: false,
@@ -261,13 +277,17 @@ export const useDataStore = create<DataState>()((set, get) => {
           return null;
         }
       },
-      async update(id: string, data: Partial<T>) {
+      /** Devuelve true si se guardó; si falla, deja el mensaje en `error`. */
+      async update(id: string, data: Partial<T>): Promise<boolean> {
         try {
           await api.put(endpoint, { id, ...data });
           const items = await api.get<T[]>(endpoint);
-          set((s: any) => ({ [key]: { ...s[key], items } }));
+          set((s: any) => ({ [key]: { ...s[key], items, error: null } }));
+          return true;
         } catch (e: any) {
           console.error(`[${endpoint} update]`, e?.message);
+          set((s: any) => ({ [key]: { ...s[key], error: e?.message ?? "Error al actualizar" } }));
+          return false;
         }
       },
       async remove(id: string) {
@@ -285,6 +305,19 @@ export const useDataStore = create<DataState>()((set, get) => {
       },
     };
     return obj;
+  }
+
+  /** Ejecuta una acción del PT y recarga los presupuestos; nunca lanza. */
+  async function budgetAction(run: () => Promise<unknown>): Promise<BudgetActionResult> {
+    try {
+      await run();
+      const items = await api.get<Budget[]>("/api/budgets");
+      set((s: any) => ({ budgets: { ...s.budgets, items, loaded: true, error: null } }));
+      return { ok: true };
+    } catch (e: any) {
+      console.error("[budgets action]", e?.message);
+      return { ok: false, error: e?.message ?? "Error en el presupuesto" };
+    }
   }
 
   return {
@@ -342,7 +375,7 @@ export const useDataStore = create<DataState>()((set, get) => {
       ...col<Quotation>("/api/quotations"),
     },
     workLogs: {
-      ...col<WorkLog>("/api/work-logs"),
+      ...col<WorkLog>("/api/work-logs", "workLogs"),
     },
     employees: {
       ...col<Employee>("/api/employees"),
@@ -357,10 +390,31 @@ export const useDataStore = create<DataState>()((set, get) => {
       ...col<TaxConfig>("/api/taxes"),
     },
     aius: {
-      ...col<AiuConfig>("/api/aiu-configs"),
+      ...col<AiuConfig>("/api/aiu-configs", "aius"),
     },
     budgets: {
       ...col<Budget>("/api/budgets"),
+      // Acciones del PT (antes vivían en el store legacy budgets-store.ts).
+      async createPT(projectId: string, layers: BudgetLayer[], notes?: string) {
+        return budgetAction(() => api.post("/api/budgets", { projectId, layers, notes }));
+      },
+      async createNewVersion(projectId: string, layers: BudgetLayer[], notes?: string) {
+        const existing = ((get() as any).budgets.items as Budget[]).find((b) => b.projectId === projectId);
+        if (!existing) return { ok: false, error: "No existe un PT previo para este proyecto" };
+        return budgetAction(() =>
+          api.patch("/api/budgets", { id: existing.id, action: "NEW_VERSION", layers, notes }),
+        );
+      },
+      async addUnforeseenItem(budgetId: string, item: UnforeseenItemInput) {
+        return budgetAction(() =>
+          api.patch("/api/budgets", { id: budgetId, action: "ADD_UNFORESEEN", item }),
+        );
+      },
+      async removeUnforeseenItem(budgetId: string, itemId: string) {
+        return budgetAction(() =>
+          api.patch("/api/budgets", { id: budgetId, action: "REMOVE_UNFORESEEN", itemId }),
+        );
+      },
     },
     pscs: {
       ...col<any>("/api/pscs"),
@@ -592,6 +646,23 @@ export const useAiuStore = () => {
     aius: items,
     getAiuByProject: (projectId: string) =>
       items.find((a) => a.projectId === projectId),
+    getConfig: (projectId: string) => items.find((a) => a.projectId === projectId),
+    hasConfig: (projectId: string) => items.some((a) => a.projectId === projectId),
+    /** Crea o actualiza el AIU del proyecto. SPEC: bug-presupuestos-persistencia AC-9 */
+    upsertConfig: async (
+      data: Pick<AiuConfig, "projectId" | "administration" | "imprevistos" | "utilidad"> & { notes?: string },
+    ): Promise<{ ok: boolean; error?: string }> => {
+      const existing = items.find((a) => a.projectId === data.projectId);
+      try {
+        if (existing) await api.put("/api/aiu-configs", { id: existing.id, ...data });
+        else await api.post("/api/aiu-configs", data);
+        const fresh = await api.get<AiuConfig[]>("/api/aiu-configs");
+        useDataStore.setState((st: any) => ({ aius: { ...st.aius, items: fresh, loaded: true, error: null } }));
+        return { ok: true };
+      } catch (e: any) {
+        return { ok: false, error: e?.message ?? "Error al guardar el AIU" };
+      }
+    },
     addAiu: (data: any) => s.add(data),
     updateAiu: (id: string, a: any) => s.update(id, a),
     toggleActive: (id: string, active?: boolean) =>
@@ -608,8 +679,13 @@ export const useBudgetsStore = () => {
     budgets: items,
     getBudgetByProject: (projectId: string) =>
       items.find((b) => b.projectId === projectId),
+    hasBudget: (projectId: string) => items.some((b) => b.projectId === projectId),
     addBudget: (data: any) => s.add(data),
     updateBudget: (id: string, b: any) => s.update(id, b),
+    createPT: s.createPT,
+    createNewVersion: s.createNewVersion,
+    addUnforeseenItem: s.addUnforeseenItem,
+    removeUnforeseenItem: s.removeUnforeseenItem,
     toggleActive: (id: string, active?: boolean) =>
       s.update(id, { isActive: active } as any),
     setStatus: (id: string, status: any) => s.update(id, { status } as any),

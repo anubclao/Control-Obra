@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAiuStore, validateAiu } from "@/lib/data-store";
 import { useBudgetsStore } from "@/lib/data-store";
 import { useProjectsStore } from "@/lib/data-store";
+import { useEnsureLoaded } from "@/lib/use-ensure-loaded";
 import { formatCurrency, formatPercent } from "@/lib/utils";
 
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -23,6 +24,7 @@ export default function AiuOverviewPage() {
   const { getConfig, hasConfig } = useAiuStore();
   const { getBudgetByProject } = useBudgetsStore();
   const { projects } = useProjectsStore();
+  useEnsureLoaded("projects", "budgets", "aius");
 
   const summary = useMemo(() => {
     const withAiu = projects.filter((p) => hasConfig(p.id));
@@ -56,13 +58,10 @@ export default function AiuOverviewPage() {
         icon={TrendingUp}
         variant="guide"
         title="AIU"
-        description="Administracion, Imprevistos, Utilidad. Suma = 100%."
+        description="Administración, Imprevistos y Utilidad como % sobre el costo directo, más IVA 19% sobre la utilidad."
         steps={[
-            { title: "Configurar AIU", description: "Define el % de cada componente." },
-            { title: "Validar", description: "Backend rechaza si no es 100%." },
-          ]}
-          warnings={[
-            "CHECK constraint en BD asegura invariante.",
+            { title: "Configurar AIU", description: "Define el % de cada componente (ej. A 8%, I 5%, U 5%)." },
+            { title: "Validar", description: "Cada componente entre 0% y 100%; el AIU total no puede superar el 100%." },
           ]}
       />
 

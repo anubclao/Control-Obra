@@ -27,6 +27,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { useBudgetsStore } from "@/lib/data-store";
 import { useProjectsStore } from "@/lib/data-store";
+import { useEnsureLoaded } from "@/lib/use-ensure-loaded";
 import {
   parseExcelContent,
   parseExcelFile,
@@ -42,6 +43,7 @@ export default function CargarPresupuestoPage() {
   const projectId = searchParams.get("projectId") || "";
   const { createPT, hasBudget } = useBudgetsStore();
   const { getProject, projects } = useProjectsStore();
+  useEnsureLoaded("projects", "budgets");
 
   const [step, setStep] = useState<"upload" | "preview" | "confirm">("upload");
   const [parsed, setParsed] = useState<ParsedExcel | null>(null);
@@ -77,13 +79,13 @@ export default function CargarPresupuestoPage() {
     }
   }
 
-  function handleConfirm() {
+  async function handleConfirm() {
     if (!parsed || !projectId) return;
     setError(null);
     setSubmitting(true);
 
     const layers = buildBudgetLayers(parsed.rows);
-    const result = createPT(projectId, layers, notes);
+    const result = await createPT(projectId, layers, notes);
 
     if (!result.ok) {
       setError(result.error || "Error al crear el presupuesto");

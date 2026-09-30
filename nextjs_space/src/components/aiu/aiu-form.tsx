@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useAiuStore, validateAiu } from "@/lib/data-store";
+import { computeAiu, IVA_ON_UTILITY_PCT } from "@/lib/aiu-constants";
 import { useProjectsStore } from "@/lib/data-store";
-import { useAuthStore } from "@/lib/auth-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,10 +18,16 @@ interface AiuFormProps {
   onSuccess?: () => void;
 }
 
+const fmt = (n: number) =>
+  new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    maximumFractionDigits: 0,
+  }).format(n);
+
 export function AiuForm({ projectId, existing, onSuccess }: AiuFormProps) {
   const { upsertConfig } = useAiuStore();
   const { getProject } = useProjectsStore();
-  const user = useAuthStore((s) => s.user);
   const project = getProject(projectId);
 
   const [administration, setAdministration] = useState<number>(
@@ -32,35 +38,38 @@ export function AiuForm({ projectId, existing, onSuccess }: AiuFormProps) {
   );
   const [utilidad, setUtilidad] = useState<number>(existing?.utilidad ?? 5);
   const [notes, setNotes] = useState<string>(existing?.notes ?? "");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const total = administration + imprevistos + utilidad;
   const validation = validateAiu(administration, imprevistos, utilidad);
 
-  // Preview de distribución en dinero
+  // Preview en dinero: cada % se aplica sobre el costo directo del proyecto.
   const totalBudget = project?.totalBudget ?? 0;
-  const adminValue = (totalBudget * administration) / 100;
-  const imprevValue = (totalBudget * imprevistos) / 100;
-  const utilValue = (totalBudget * utilidad) / 100;
+  const preview = computeAiu(totalBudget, { administration, imprevistos, utilidad });
+  const adminValue = preview.administration;
+  const imprevValue = preview.imprevistos;
+  const utilValue = preview.utilidad;
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!validation.ok) return;
-    upsertConfig({
+    setSaving(true);
+    setSaveError(null);
+    // updated_by lo toma la API de la sesión.
+    const result = await upsertConfig({
       projectId,
       administration,
       imprevistos,
       utilidad,
       notes: notes || undefined,
-      // FIX Bug #15: usar el usuario autenticado, no un string hardcoded
-      updatedBy: user?.id ?? user?.email ?? "unknown",
     });
+    setSaving(false);
+    if (!result.ok) {
+      setSaveError(result.error ?? "No se pudo guardar el AIU");
+      return;
+    }
     onSuccess?.();
-  }
-
-  function setBalanced() {
-    setAdministration(33.34);
-    setImprevistos(33.33);
-    setUtilidad(33.33);
   }
 
   return (
@@ -162,7 +171,7 @@ export function AiuForm({ projectId, existing, onSuccess }: AiuFormProps) {
 
       <div className="rounded-md border bg-secondary/40 p-3">
         <div className="mb-2 flex items-center justify-between text-sm">
-          <span className="font-medium">Total AIU</span>
+          <span className="font-medium">Total AIU (sobre costo directo)</span>
           <span
             className={`font-bold ${validation.ok ? "text-emerald-600" : "text-red-600"}`}
           >
@@ -188,6 +197,16 @@ export function AiuForm({ projectId, existing, onSuccess }: AiuFormProps) {
           <span>I: {imprevistos.toFixed(2)}%</span>
           <span>U: {utilidad.toFixed(2)}%</span>
         </div>
+        <div className="mt-3 space-y-1 border-t pt-2 text-xs">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">IVA {IVA_ON_UTILITY_PCT}% sobre utilidad</span>
+            <span>{fmt(preview.iva)}</span>
+          </div>
+          <div className="flex justify-between font-semibold">
+            <span>Total obra (CD + AIU + IVA)</span>
+            <span>{fmt(preview.total)}</span>
+          </div>
+        </div>
       </div>
 
       {!validation.ok && (
@@ -198,28 +217,34 @@ export function AiuForm({ projectId, existing, onSuccess }: AiuFormProps) {
         </Alert>
       )}
 
-      {validation.ok && total === 100 && (
+      {saveError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>No se guardó</AlertTitle>
+          <AlertDescription>{saveError}</AlertDescription>
+        </Alert>
+      )}
+
+      {validation.ok && total > 0 && (
         <Alert>
           <CheckCircle2 className="h-4 w-4" />
           <AlertTitle>Configuración válida</AlertTitle>
           <AlertDescription>
-            La suma de AIU es exactamente 100%.
+            AIU de {total.toFixed(2)}% sobre el costo directo, más IVA del{" "}
+            {IVA_ON_UTILITY_PCT}% sobre la utilidad.
           </AlertDescription>
         </Alert>
       )}
 
-      <div className="flex justify-between gap-2 border-t pt-4">
-        <Button type="button" variant="ghost" size="sm" onClick={setBalanced}>
-          Distribuir 33/33/33
-        </Button>
+      <div className="flex justify-end gap-2 border-t pt-4">
         <div className="flex gap-2">
           {onSuccess && (
             <Button type="button" variant="outline" onClick={onSuccess}>
               Cancelar
             </Button>
           )}
-          <Button type="submit" disabled={!validation.ok}>
-            Guardar
+          <Button type="submit" disabled={!validation.ok || saving}>
+            {saving ? "Guardando…" : "Guardar"}
           </Button>
         </div>
       </div>
