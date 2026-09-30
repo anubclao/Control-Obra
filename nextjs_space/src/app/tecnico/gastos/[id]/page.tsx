@@ -17,7 +17,13 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -38,6 +44,8 @@ import {
 import { useProvidersStore } from "@/lib/data-store";
 import { useProjectsStore } from "@/lib/data-store";
 import { useCurrentUser, useIsSuperAdmin } from "@/lib/permissions";
+import { GenerateButton } from "@/components/documents/generate-button";
+import { useDataStore } from "@/lib/data-store";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 export default function ExpenseDetailPage() {
@@ -46,8 +54,14 @@ export default function ExpenseDetailPage() {
   const id = params.id as string;
   const isSuperAdmin = useIsSuperAdmin();
   const user = useCurrentUser();
-  const { getExpense, approve, reject, markPaid, deleteExpense, submitForApproval } =
-    useExpensesStore();
+  const {
+    getExpense,
+    approve,
+    reject,
+    markPaid,
+    deleteExpense,
+    submitForApproval,
+  } = useExpensesStore();
   const { getProvider } = useProvidersStore();
   const { getProject } = useProjectsStore();
   const [rejectOpen, setRejectOpen] = useState(false);
@@ -114,7 +128,11 @@ export default function ExpenseDetailPage() {
           )}
           {expense.status === "PENDING_APPROVAL" && isSuperAdmin && (
             <>
-              <Button onClick={() => setRejectOpen(true)} size="sm" variant="outline">
+              <Button
+                onClick={() => setRejectOpen(true)}
+                size="sm"
+                variant="outline"
+              >
                 <XCircle className="mr-2 h-4 w-4" />
                 Rechazar
               </Button>
@@ -131,7 +149,11 @@ export default function ExpenseDetailPage() {
             </Button>
           )}
           {isSuperAdmin && (
-            <Button onClick={() => setConfirmDelete(true)} size="sm" variant="destructive">
+            <Button
+              onClick={() => setConfirmDelete(true)}
+              size="sm"
+              variant="destructive"
+            >
               <Trash2 className="h-4 w-4" />
             </Button>
           )}
@@ -143,8 +165,12 @@ export default function ExpenseDetailPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="font-mono text-xs text-muted-foreground">{expense.expenseNumber}</p>
-              <Badge variant={variant}>{EXPENSE_STATUS_LABELS[expense.status]}</Badge>
+              <p className="font-mono text-xs text-muted-foreground">
+                {expense.expenseNumber}
+              </p>
+              <Badge variant={variant}>
+                {EXPENSE_STATUS_LABELS[expense.status]}
+              </Badge>
               {expense.hasPolizas && (
                 <Badge variant="info">
                   <Shield className="mr-1 h-3 w-3" />
@@ -152,17 +178,25 @@ export default function ExpenseDetailPage() {
                 </Badge>
               )}
               {expense.advancePercent ? (
-                <Badge variant="outline">Anticipo {expense.advancePercent}%</Badge>
+                <Badge variant="outline">
+                  Anticipo {expense.advancePercent}%
+                </Badge>
               ) : null}
             </div>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">{expense.description}</h1>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+              {expense.description}
+            </h1>
             <p className="text-sm text-muted-foreground">
               {EXPENSE_TYPE_LABELS[expense.type]}
             </p>
           </div>
           <div className="rounded-lg bg-secondary/50 p-4 sm:min-w-[220px]">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">Monto</p>
-            <p className="mt-1 text-2xl font-bold">{formatCurrency(expense.amount)}</p>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">
+              Monto
+            </p>
+            <p className="mt-1 text-2xl font-bold">
+              {formatCurrency(expense.amount)}
+            </p>
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               <Calendar className="h-3 w-3" />
               {formatDate(expense.date)}
@@ -170,6 +204,35 @@ export default function ExpenseDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* F3: Documento generado en SharePoint */}
+      {project && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              Documento generado en SharePoint
+            </CardTitle>
+            <CardDescription>
+              Genera el formato oficial (orden de compra, orden de servicio,
+              legalización, etc.) con los datos de este gasto y archívalo en la
+              carpeta del proyecto en SharePoint.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <GenerateButton
+              entity="expenses"
+              entityId={expense.id}
+              currentUrl={expense.generatedDocumentUrl}
+              onGenerated={() => {
+                useDataStore
+                  .getState()
+                  .expenses.load()
+                  .catch(() => {});
+              }}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Proyecto + Proveedor */}
@@ -196,7 +259,9 @@ export default function ExpenseDetailPage() {
                   href={`/tecnico/proveedores/${provider.id}`}
                   className="font-medium hover:underline"
                 >
-                  {provider.personType === "JURIDICA" ? "" : "(Persona Natural) "}
+                  {provider.personType === "JURIDICA"
+                    ? ""
+                    : "(Persona Natural) "}
                   {provider.name} — {provider.nit}
                 </Link>
               </div>
@@ -227,11 +292,19 @@ export default function ExpenseDetailPage() {
             <CardContent className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Vigencia desde</span>
-                <span className="font-medium">{expense.polizasVigenciaDesde ? formatDate(expense.polizasVigenciaDesde) : "—"}</span>
+                <span className="font-medium">
+                  {expense.polizasVigenciaDesde
+                    ? formatDate(expense.polizasVigenciaDesde)
+                    : "—"}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Vigencia hasta</span>
-                <span className="font-medium">{expense.polizasVigenciaHasta ? formatDate(expense.polizasVigenciaHasta) : "—"}</span>
+                <span className="font-medium">
+                  {expense.polizasVigenciaHasta
+                    ? formatDate(expense.polizasVigenciaHasta)
+                    : "—"}
+                </span>
               </div>
             </CardContent>
           </Card>
@@ -248,11 +321,15 @@ export default function ExpenseDetailPage() {
           <CardContent className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Creado por</span>
-              <span className="font-medium">{expense.createdByName ?? "—"}</span>
+              <span className="font-medium">
+                {expense.createdByName ?? "—"}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Creado</span>
-              <span className="font-medium">{formatDate(expense.createdAt.slice(0, 10))}</span>
+              <span className="font-medium">
+                {formatDate(expense.createdAt.slice(0, 10))}
+              </span>
             </div>
             {expense.approvedByName && (
               <>
@@ -263,7 +340,9 @@ export default function ExpenseDetailPage() {
                 {expense.approvedAt && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Aprobado</span>
-                    <span className="font-medium">{formatDate(expense.approvedAt.slice(0, 10))}</span>
+                    <span className="font-medium">
+                      {formatDate(expense.approvedAt.slice(0, 10))}
+                    </span>
                   </div>
                 )}
               </>
@@ -282,7 +361,8 @@ export default function ExpenseDetailPage() {
         <CardHeader>
           <CardTitle>Ítems del gasto</CardTitle>
           <CardDescription>
-            {expense.type.startsWith("SOLICITUD") || expense.type === "LEGALIZACION_GASTO"
+            {expense.type.startsWith("SOLICITUD") ||
+            expense.type === "LEGALIZACION_GASTO"
               ? "Cada ítem debe incluir soportes (facturas, cuentas de cobro, recibos de caja)."
               : "Detalle de las actividades o productos contratados."}
           </CardDescription>
@@ -307,7 +387,11 @@ export default function ExpenseDetailPage() {
                       {it.attachments && it.attachments.length > 0 && (
                         <div className="mt-1 flex flex-wrap gap-1">
                           {it.attachments.map((a, i) => (
-                            <Badge key={i} variant="outline" className="text-xs">
+                            <Badge
+                              key={i}
+                              variant="outline"
+                              className="text-xs"
+                            >
                               <FileText className="mr-1 h-3 w-3" />
                               {a}
                             </Badge>
@@ -315,9 +399,15 @@ export default function ExpenseDetailPage() {
                         </div>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-center font-mono text-xs">{it.unit}</td>
-                    <td className="px-3 py-2 text-right">{it.quantity.toLocaleString("es-CO")}</td>
-                    <td className="px-3 py-2 text-right">{formatCurrency(it.unitPrice)}</td>
+                    <td className="px-3 py-2 text-center font-mono text-xs">
+                      {it.unit}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {it.quantity.toLocaleString("es-CO")}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {formatCurrency(it.unitPrice)}
+                    </td>
                     <td className="px-3 py-2 text-right font-semibold">
                       {formatCurrency(it.totalPrice)}
                     </td>
@@ -326,7 +416,10 @@ export default function ExpenseDetailPage() {
               </tbody>
               <tfoot>
                 <tr className="border-t bg-secondary/20">
-                  <td colSpan={4} className="px-3 py-2 text-right text-sm font-semibold">
+                  <td
+                    colSpan={4}
+                    className="px-3 py-2 text-right text-sm font-semibold"
+                  >
                     Total
                   </td>
                   <td className="px-3 py-2 text-right text-base font-bold">
@@ -372,7 +465,11 @@ export default function ExpenseDetailPage() {
             <Button variant="outline" onClick={() => setRejectOpen(false)}>
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={doReject} disabled={!rejectReason}>
+            <Button
+              variant="destructive"
+              onClick={doReject}
+              disabled={!rejectReason}
+            >
               Rechazar
             </Button>
           </DialogFooter>
@@ -385,7 +482,8 @@ export default function ExpenseDetailPage() {
           <DialogHeader>
             <DialogTitle>¿Eliminar gasto?</DialogTitle>
             <DialogDescription>
-              Se eliminará <strong>{expense.expenseNumber}</strong> — {expense.description}.
+              Se eliminará <strong>{expense.expenseNumber}</strong> —{" "}
+              {expense.description}.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

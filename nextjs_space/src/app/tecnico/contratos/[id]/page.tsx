@@ -19,7 +19,13 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -49,13 +55,16 @@ import { useProjectsStore } from "@/lib/data-store";
 import { useProvidersStore } from "@/lib/data-store";
 import { useCutsStore } from "@/lib/data-store";
 import { ContractForm } from "@/components/contracts/contract-form";
+import { GenerateButton } from "@/components/documents/generate-button";
+import { useDataStore } from "@/lib/data-store";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import type { ContractDocument, ContractDocumentType } from "@/types";
 
 export default function ContractDetailPage() {
   const params = useParams();
   const id = params.id as string;
-  const { getContract, setStatus, addDocument, removeDocument } = useContractsStore();
+  const { getContract, setStatus, addDocument, removeDocument } =
+    useContractsStore();
   const { getProject } = useProjectsStore();
   const { getProvider } = useProvidersStore();
   const { cuts } = useCutsStore();
@@ -82,10 +91,16 @@ export default function ContractDetailPage() {
 
   const project = getProject(contract.projectId);
   const provider = getProvider(contract.providerId);
-  const myCuts = cuts.filter((c) => c.providerId === contract.providerId && c.projectId === contract.projectId);
+  const myCuts = cuts.filter(
+    (c) =>
+      c.providerId === contract.providerId &&
+      c.projectId === contract.projectId,
+  );
   const variant = CONTRACT_STATUS_VARIANTS[contract.status];
   const docsByType = new Map(contract.documents.map((d) => [d.type, d]));
-  const missingRequired = REQUIRED_CONTRACT_DOCS.filter((t) => !docsByType.has(t));
+  const missingRequired = REQUIRED_CONTRACT_DOCS.filter(
+    (t) => !docsByType.has(t),
+  );
   const retentionAmount = (contract.value * contract.retentionPercent) / 100;
   const advanceAmount = (contract.value * contract.advancePercent) / 100;
 
@@ -109,11 +124,19 @@ export default function ContractDetailPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="font-mono text-xs text-muted-foreground">{contract.contractNumber}</p>
-              <Badge variant={variant}>{CONTRACT_STATUS_LABELS[contract.status]}</Badge>
-              <span className="text-xs text-muted-foreground">{CONTRACT_TYPE_LABELS[contract.type]}</span>
+              <p className="font-mono text-xs text-muted-foreground">
+                {contract.contractNumber}
+              </p>
+              <Badge variant={variant}>
+                {CONTRACT_STATUS_LABELS[contract.status]}
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                {CONTRACT_TYPE_LABELS[contract.type]}
+              </span>
             </div>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">Alcance del contrato</h1>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+              Alcance del contrato
+            </h1>
             <p className="mt-2 text-sm">{contract.scopeOfWork}</p>
             <div className="mt-3 flex flex-col gap-1.5 text-sm text-muted-foreground sm:flex-row sm:flex-wrap sm:gap-4">
               {project && (
@@ -130,20 +153,35 @@ export default function ContractDetailPage() {
               )}
               <p className="flex items-center gap-1.5">
                 <Calendar className="h-4 w-4" />
-                {formatDate(contract.startDate)} → {formatDate(contract.endDate)}
+                {formatDate(contract.startDate)} →{" "}
+                {formatDate(contract.endDate)}
               </p>
             </div>
             {contract.notes && (
-              <p className="mt-3 rounded-md bg-secondary/40 p-2 text-sm">{contract.notes}</p>
+              <p className="mt-3 rounded-md bg-secondary/40 p-2 text-sm">
+                {contract.notes}
+              </p>
             )}
           </div>
 
           <div className="rounded-lg bg-secondary/50 p-4 sm:min-w-[240px]">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">Valor contrato</p>
-            <p className="mt-1 text-2xl font-bold">{formatCurrency(contract.value)}</p>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">
+              Valor contrato
+            </p>
+            <p className="mt-1 text-2xl font-bold">
+              {formatCurrency(contract.value)}
+            </p>
             <div className="mt-3 space-y-1 text-xs">
-              <Row label={`Anticipo (${contract.advancePercent}%)`} value={formatCurrency(advanceAmount)} color="text-amber-600" />
-              <Row label={`Retención (${contract.retentionPercent}%)`} value={formatCurrency(retentionAmount)} color="text-red-600" />
+              <Row
+                label={`Anticipo (${contract.advancePercent}%)`}
+                value={formatCurrency(advanceAmount)}
+                color="text-amber-600"
+              />
+              <Row
+                label={`Retención (${contract.retentionPercent}%)`}
+                value={formatCurrency(retentionAmount)}
+                color="text-red-600"
+              />
             </div>
           </div>
         </div>
@@ -151,31 +189,77 @@ export default function ContractDetailPage() {
         {/* Acciones de estado */}
         <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
           {contract.status === "ACTIVE" && (
-            <Button variant="outline" size="sm" onClick={() => setStatus(contract.id, "SUSPENDED")}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setStatus(contract.id, "SUSPENDED")}
+            >
               <Pause className="mr-2 h-4 w-4" />
               Suspender
             </Button>
           )}
           {contract.status === "SUSPENDED" && (
-            <Button variant="outline" size="sm" onClick={() => setStatus(contract.id, "ACTIVE")}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setStatus(contract.id, "ACTIVE")}
+            >
               <Play className="mr-2 h-4 w-4" />
               Reactivar
             </Button>
           )}
-          {contract.status !== "COMPLETED" && contract.status !== "CANCELLED" && (
-            <Button variant="outline" size="sm" onClick={() => setStatus(contract.id, "COMPLETED")}>
-              <CheckCircle2 className="mr-2 h-4 w-4" />
-              Marcar completado
-            </Button>
-          )}
+          {contract.status !== "COMPLETED" &&
+            contract.status !== "CANCELLED" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setStatus(contract.id, "COMPLETED")}
+              >
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                Marcar completado
+              </Button>
+            )}
           {contract.status !== "CANCELLED" && (
-            <Button variant="destructive" size="sm" onClick={() => setStatus(contract.id, "CANCELLED")}>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setStatus(contract.id, "CANCELLED")}
+            >
               <XCircle className="mr-2 h-4 w-4" />
               Cancelar contrato
             </Button>
           )}
         </div>
       </div>
+
+      {/* F3: Documento generado en SharePoint */}
+      {project && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              Documento generado en SharePoint
+            </CardTitle>
+            <CardDescription>
+              Genera el contrato oficial (precio global, unitario, diseños o
+              laboral) con los datos de este registro y archívalo en la carpeta
+              del proyecto en SharePoint.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <GenerateButton
+              entity="contracts"
+              entityId={contract.id}
+              currentUrl={contract.generatedDocumentUrl}
+              onGenerated={() => {
+                useDataStore
+                  .getState()
+                  .contracts.load()
+                  .catch(() => {});
+              }}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Tabs */}
       <Tabs defaultValue="info" className="space-y-4">
@@ -189,9 +273,7 @@ export default function ContractDetailPage() {
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="cortes">
-            Cortes ({myCuts.length})
-          </TabsTrigger>
+          <TabsTrigger value="cortes">Cortes ({myCuts.length})</TabsTrigger>
         </TabsList>
 
         {/* Info */}
@@ -203,12 +285,21 @@ export default function ContractDetailPage() {
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 <Row label="Tipo" value={CONTRACT_TYPE_LABELS[contract.type]} />
-                <Row label="Estado" value={CONTRACT_STATUS_LABELS[contract.status]} />
+                <Row
+                  label="Estado"
+                  value={CONTRACT_STATUS_LABELS[contract.status]}
+                />
                 <Row label="Inicio" value={formatDate(contract.startDate)} />
                 <Row label="Fin" value={formatDate(contract.endDate)} />
                 <Row label="Valor" value={formatCurrency(contract.value)} />
-                <Row label="Anticipo" value={`${contract.advancePercent}% (${formatCurrency(advanceAmount)})`} />
-                <Row label="Retención" value={`${contract.retentionPercent}% (${formatCurrency(retentionAmount)})`} />
+                <Row
+                  label="Anticipo"
+                  value={`${contract.advancePercent}% (${formatCurrency(advanceAmount)})`}
+                />
+                <Row
+                  label="Retención"
+                  value={`${contract.retentionPercent}% (${formatCurrency(retentionAmount)})`}
+                />
                 <Row label="Creado" value={formatDate(contract.createdAt)} />
               </CardContent>
             </Card>
@@ -223,7 +314,9 @@ export default function ContractDetailPage() {
                     className="block rounded-md border bg-secondary/30 p-3 hover:bg-accent"
                   >
                     <p className="text-xs text-muted-foreground">Proyecto</p>
-                    <p className="font-medium">{project.code} · {project.name}</p>
+                    <p className="font-medium">
+                      {project.code} · {project.name}
+                    </p>
                   </Link>
                 )}
                 {provider && (
@@ -233,7 +326,9 @@ export default function ContractDetailPage() {
                   >
                     <p className="text-xs text-muted-foreground">Contratista</p>
                     <p className="font-medium">{provider.name}</p>
-                    <p className="text-xs text-muted-foreground">NIT {provider.nit}</p>
+                    <p className="text-xs text-muted-foreground">
+                      NIT {provider.nit}
+                    </p>
                   </Link>
                 )}
               </CardContent>
@@ -263,9 +358,13 @@ export default function ContractDetailPage() {
                 <div className="mb-4 flex items-start gap-2 rounded-md border border-amber-500/50 bg-amber-50 p-3 text-sm">
                   <XCircle className="mt-0.5 h-4 w-4 text-amber-600" />
                   <div>
-                    <p className="font-medium text-amber-900">Documentos obligatorios faltantes</p>
+                    <p className="font-medium text-amber-900">
+                      Documentos obligatorios faltantes
+                    </p>
                     <p className="text-amber-800">
-                      {missingRequired.map((t) => CONTRACT_DOCUMENT_TYPE_LABELS[t]).join(", ")}
+                      {missingRequired
+                        .map((t) => CONTRACT_DOCUMENT_TYPE_LABELS[t])
+                        .join(", ")}
                     </p>
                   </div>
                 </div>
@@ -279,11 +378,11 @@ export default function ContractDetailPage() {
                       key={type}
                       className={cn(
                         "flex items-center justify-between rounded-md border p-3",
-                        doc ? "bg-card" : "bg-secondary/20 border-dashed"
+                        doc ? "bg-card" : "bg-secondary/20 border-dashed",
                       )}
                     >
                       <div className="flex items-center gap-3">
-                        {doc as any ? (
+                        {(doc as any) ? (
                           <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                         ) : (
                           <XCircle className="h-4 w-4 text-amber-600" />
@@ -291,15 +390,21 @@ export default function ContractDetailPage() {
                         <div>
                           <p className="text-sm font-medium">
                             {CONTRACT_DOCUMENT_TYPE_LABELS[type]}
-                            <span className="ml-1.5 text-xs text-muted-foreground">(obligatorio)</span>
+                            <span className="ml-1.5 text-xs text-muted-foreground">
+                              (obligatorio)
+                            </span>
                           </p>
-                          {doc as any ? (
+                          {(doc as any) ? (
                             <p className="text-xs text-muted-foreground">
-                              {(doc as any).fileName} · Subido {formatDate((doc as any).uploadedAt)}
-                              {(doc as any).expirationDate && ` · Vence ${formatDate((doc as any).expirationDate)}`}
+                              {(doc as any).fileName} · Subido{" "}
+                              {formatDate((doc as any).uploadedAt)}
+                              {(doc as any).expirationDate &&
+                                ` · Vence ${formatDate((doc as any).expirationDate)}`}
                             </p>
                           ) : (
-                            <p className="text-xs text-muted-foreground">No cargado</p>
+                            <p className="text-xs text-muted-foreground">
+                              No cargado
+                            </p>
                           )}
                         </div>
                       </div>
@@ -307,7 +412,9 @@ export default function ContractDetailPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => removeDocument(contract.id, (doc as any).id)}
+                          onClick={() =>
+                            removeDocument(contract.id, (doc as any).id)
+                          }
                           className="h-7 w-7"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -320,21 +427,30 @@ export default function ContractDetailPage() {
                 {contract.documents
                   .filter((d) => !REQUIRED_CONTRACT_DOCS.includes(d.type))
                   .map((doc) => (
-                    <div key={(doc as any).id} className="flex items-center justify-between rounded-md border p-3">
+                    <div
+                      key={(doc as any).id}
+                      className="flex items-center justify-between rounded-md border p-3"
+                    >
                       <div className="flex items-center gap-3">
                         <FileText className="h-4 w-4 text-blue-600" />
                         <div>
-                          <p className="text-sm font-medium">{CONTRACT_DOCUMENT_TYPE_LABELS[(doc as any).type]}</p>
+                          <p className="text-sm font-medium">
+                            {CONTRACT_DOCUMENT_TYPE_LABELS[(doc as any).type]}
+                          </p>
                           <p className="text-xs text-muted-foreground">
-                            {(doc as any).fileName} · {formatDate((doc as any).uploadedAt)}
-                            {(doc as any).expirationDate && ` · Vence ${formatDate((doc as any).expirationDate)}`}
+                            {(doc as any).fileName} ·{" "}
+                            {formatDate((doc as any).uploadedAt)}
+                            {(doc as any).expirationDate &&
+                              ` · Vence ${formatDate((doc as any).expirationDate)}`}
                           </p>
                         </div>
                       </div>
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => removeDocument(contract.id, (doc as any).id)}
+                        onClick={() =>
+                          removeDocument(contract.id, (doc as any).id)
+                        }
                         className="h-7 w-7"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -369,11 +485,15 @@ export default function ContractDetailPage() {
                       className="flex items-center justify-between rounded-md border p-3 hover:bg-accent"
                     >
                       <div>
-                        <p className="font-mono text-xs text-muted-foreground">{cut.cutNumber}</p>
+                        <p className="font-mono text-xs text-muted-foreground">
+                          {cut.cutNumber}
+                        </p>
                         <p className="text-sm font-medium">{cut.description}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold">{formatCurrency(cut.netValue)}</p>
+                        <p className="font-semibold">
+                          {formatCurrency(cut.netValue)}
+                        </p>
                         <Badge variant="outline" className="mt-1">
                           {cut.status}
                         </Badge>
@@ -394,7 +514,10 @@ export default function ContractDetailPage() {
             <DialogTitle>Editar contrato</DialogTitle>
             <DialogDescription>{contract.contractNumber}</DialogDescription>
           </DialogHeader>
-          <ContractForm contract={contract} onSuccess={() => setEditOpen(false)} />
+          <ContractForm
+            contract={contract}
+            onSuccess={() => setEditOpen(false)}
+          />
         </DialogContent>
       </Dialog>
 
@@ -412,7 +535,15 @@ export default function ContractDetailPage() {
   );
 }
 
-function Row({ label, value, color }: { label: string; value: string; color?: string }) {
+function Row({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string;
+  color?: string;
+}) {
   return (
     <div className="flex items-center justify-between border-b pb-2 last:border-0">
       <span className="text-muted-foreground">{label}</span>
@@ -436,7 +567,9 @@ function AddDocDialog({
   const [fileName, setFileName] = useState("");
   const [expirationDate, setExpirationDate] = useState("");
 
-  const availableTypes = Object.keys(CONTRACT_DOCUMENT_TYPE_LABELS) as ContractDocumentType[];
+  const availableTypes = Object.keys(
+    CONTRACT_DOCUMENT_TYPE_LABELS,
+  ) as ContractDocumentType[];
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -455,18 +588,27 @@ function AddDocDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Agregar documento contractual</DialogTitle>
-          <DialogDescription>Sube o registra un documento del contrato</DialogDescription>
+          <DialogDescription>
+            Sube o registra un documento del contrato
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
             <Label className="mb-1.5 block">Tipo de documento</Label>
-            <Select value={type} onValueChange={(v) => setType(v as ContractDocumentType)}>
+            <Select
+              value={type}
+              onValueChange={(v) => setType(v as ContractDocumentType)}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {availableTypes.map((t) => (
-                  <SelectItem key={t} value={t} disabled={existingTypes.includes(t)}>
+                  <SelectItem
+                    key={t}
+                    value={t}
+                    disabled={existingTypes.includes(t)}
+                  >
                     {CONTRACT_DOCUMENT_TYPE_LABELS[t]}
                     {existingTypes.includes(t) && " (ya existe)"}
                   </SelectItem>
@@ -481,14 +623,24 @@ function AddDocDialog({
               onChange={(e) => setFileName(e.target.value)}
               placeholder="contrato.pdf"
             />
-            <p className="mt-1 text-xs text-muted-foreground">(Mock: la carga real se conectará después)</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              (Mock: la carga real se conectará después)
+            </p>
           </div>
           <div>
             <Label className="mb-1.5 block">Vencimiento (opcional)</Label>
-            <Input type="date" value={expirationDate} onChange={(e) => setExpirationDate(e.target.value)} />
+            <Input
+              type="date"
+              value={expirationDate}
+              onChange={(e) => setExpirationDate(e.target.value)}
+            />
           </div>
           <div className="flex justify-end gap-2 border-t pt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Cancelar
             </Button>
             <Button type="submit">Agregar</Button>

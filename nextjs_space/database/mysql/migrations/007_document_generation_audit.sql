@@ -1,0 +1,20 @@
+-- 007_document_generation_audit.sql
+-- Migración idempotente. Extiende document_generation_log con campos
+-- de auditoría de seguridad (F4):
+--   - ip:              IP del cliente que disparó la generación
+--   - user_agent:      User-Agent del cliente
+--   - attempts:        número de intentos que hizo la subida (post-retry)
+--   - template_version: versión del template (V1, V2, 3.2, [1], etc.)
+--
+-- Cada ALTER usa information_schema guard porque MySQL 8.0.46 NO soporta
+-- ADD COLUMN IF NOT EXISTS. El script apply-migration.mjs detecta y aplica
+-- los ALTER solo si la columna no existe.
+
+-- 1) ALTER con information_schema guard (lo aplica apply-migration.mjs):
+--   ALTER TABLE document_generation_log
+--     ADD COLUMN ip VARCHAR(64) NULL AFTER user_id,
+--     ADD COLUMN user_agent VARCHAR(255) NULL AFTER ip,
+--     ADD COLUMN attempts TINYINT UNSIGNED NULL AFTER user_agent,
+--     ADD COLUMN template_version VARCHAR(16) NULL AFTER attempts;
+--
+-- (Idempotente: si las columnas ya existen, no se vuelve a aplicar.)

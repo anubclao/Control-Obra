@@ -35,3 +35,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# CI / debug logs (scripts/sp-*.txt son outputs de vitest/tsc)
+tsc.log
+vitest.log
+scripts/sp-*.txt
+scripts/sp-*.out
+
+# Plantillas reales de /Formatos (binarios pesados, no se commitean)
+/Formatos/
+/Formatos/**/*

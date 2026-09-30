@@ -16,9 +16,17 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { useLogsStore, WEATHER_LABELS, WEATHER_ICONS } from "@/lib/data-store";
 import { useProjectsStore } from "@/lib/data-store";
+import { GenerateButton } from "@/components/documents/generate-button";
+import { useDataStore } from "@/lib/data-store";
 import { formatDate } from "@/lib/utils";
 
 export default function LogDetailPage() {
@@ -95,7 +103,9 @@ export default function LogDetailPage() {
           <div className="grid grid-cols-2 gap-3 sm:min-w-[260px]">
             <div className="rounded-md bg-secondary/40 p-3">
               <p className="text-xs text-muted-foreground">Trabajadores</p>
-              <p className="mt-0.5 text-2xl font-semibold">{log.workersCount}</p>
+              <p className="mt-0.5 text-2xl font-semibold">
+                {log.workersCount}
+              </p>
             </div>
             <div className="rounded-md bg-secondary/40 p-3">
               <p className="text-xs text-muted-foreground">Temperatura</p>
@@ -107,6 +117,34 @@ export default function LogDetailPage() {
         </div>
       </div>
 
+      {/* F3: Documento generado en SharePoint */}
+      {project && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              Documento generado en SharePoint
+            </CardTitle>
+            <CardDescription>
+              Genera el formato de ausencia laboral a partir de esta bitácora y
+              archívalo en la carpeta del proyecto en SharePoint.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <GenerateButton
+              entity="workLogs"
+              entityId={log.id}
+              currentUrl={log.generatedDocumentUrl}
+              onGenerated={() => {
+                useDataStore
+                  .getState()
+                  .workLogs.load()
+                  .catch(() => {});
+              }}
+            />
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Actividades */}
         <Card className="lg:col-span-2">
@@ -117,7 +155,9 @@ export default function LogDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed">{log.activities}</p>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed">
+              {log.activities}
+            </p>
           </CardContent>
         </Card>
 
@@ -127,12 +167,32 @@ export default function LogDetailPage() {
             <CardTitle className="text-base">Resumen</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
-            <Row icon={CalendarIcon} label="Fecha" value={formatDate(log.date)} />
-            <Row icon={Cloud} label="Clima" value={WEATHER_LABELS[log.weather]} />
-            <Row icon={Users} label="Trabajadores" value={log.workersCount.toString()} />
-            <Row icon={Camera} label="Fotos" value={log.photos.length.toString()} />
+            <Row
+              icon={CalendarIcon}
+              label="Fecha"
+              value={formatDate(log.date)}
+            />
+            <Row
+              icon={Cloud}
+              label="Clima"
+              value={WEATHER_LABELS[log.weather]}
+            />
+            <Row
+              icon={Users}
+              label="Trabajadores"
+              value={log.workersCount.toString()}
+            />
+            <Row
+              icon={Camera}
+              label="Fotos"
+              value={log.photos.length.toString()}
+            />
             {log.temperature !== undefined && (
-              <Row icon={Cloud} label="Temperatura" value={`${log.temperature}°C`} />
+              <Row
+                icon={Cloud}
+                label="Temperatura"
+                value={`${log.temperature}°C`}
+              />
             )}
           </CardContent>
         </Card>
@@ -148,7 +208,9 @@ export default function LogDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed">{log.incidents}</p>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed">
+              {log.incidents}
+            </p>
           </CardContent>
         </Card>
       )}
@@ -163,7 +225,9 @@ export default function LogDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed">{log.materials}</p>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed">
+              {log.materials}
+            </p>
           </CardContent>
         </Card>
       )}
@@ -178,7 +242,9 @@ export default function LogDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed">{log.observations}</p>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed">
+              {log.observations}
+            </p>
           </CardContent>
         </Card>
       )}
@@ -195,13 +261,18 @@ export default function LogDetailPage() {
           <CardContent>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {log.photos.map((p) => (
-                <div key={p.id} className="group relative aspect-square overflow-hidden rounded-md border bg-secondary/30">
+                <div
+                  key={p.id}
+                  className="group relative aspect-square overflow-hidden rounded-md border bg-secondary/30"
+                >
                   <div className="flex h-full flex-col items-center justify-center gap-1 text-muted-foreground">
                     <Camera className="h-8 w-8" />
                     <span className="text-xs">{p.fileName}</span>
                   </div>
                   <div className="absolute inset-x-0 bottom-0 bg-black/70 p-2 text-xs text-white">
-                    {p.caption && <p className="truncate font-medium">{p.caption}</p>}
+                    {p.caption && (
+                      <p className="truncate font-medium">{p.caption}</p>
+                    )}
                     <p className="text-[10px] opacity-70">{p.uploadedAt}</p>
                   </div>
                 </div>

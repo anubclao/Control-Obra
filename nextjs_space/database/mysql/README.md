@@ -8,10 +8,33 @@ Este directorio contiene el **schema inicial** listo para cuando se integre la B
 
 ## Archivos
 
-| Archivo     | Propósito                                                                          |
-| ----------- | ---------------------------------------------------------------------------------- |
-| `init.sql`  | Schema completo de la base de datos. **NO contiene datos de ejemplo** (seed-free). |
-| `README.md` | Este archivo.                                                                      |
+| Archivo                | Propósito                                                                          |
+| ---------------------- | ---------------------------------------------------------------------------------- |
+| `init.sql`             | Schema completo de la base de datos. **NO contiene datos de ejemplo** (seed-free). |
+| `migrations/00X_*.sql` | Migraciones incrementales. Se ejecutan en orden después de `init.sql`.             |
+| `README.md`            | Este archivo.                                                                      |
+
+## Migraciones
+
+Las migraciones son **idempotentes** (usan `CREATE TABLE IF NOT EXISTS` y un
+helper `add_column_if_missing` para columnas). Aplicar en orden:
+
+```bash
+mysql -u root -p control_obra < init.sql
+mysql -u root -p control_obra < migrations/002_user_authorization.sql
+mysql -u root -p control_obra < migrations/003_accounting.sql
+mysql -u root -p control_obra < migrations/004_budget_commercial_terms.sql
+mysql -u root -p control_obra < migrations/005_contract_pricing_mode.sql
+mysql -u root -p control_obra < migrations/006_document_generation.sql
+```
+
+| #   | Migración                         | Añade                                                                       |
+| --- | --------------------------------- | --------------------------------------------------------------------------- |
+| 002 | `002_user_authorization.sql`      | `users.status`, `users.last_login_at`, tabla `user_audit_log`               |
+| 003 | `003_accounting.sql`              | Tabla `accounting_expenses` + reseteo de categorías                         |
+| 004 | `004_budget_commercial_terms.sql` | `budgets.commercial_terms`, `budgets.exclusions`                            |
+| 005 | `005_contract_pricing_mode.sql`   | `contracts.pricing_mode` + validaciones de workflow                         |
+| 006 | `006_document_generation.sql`     | `document_generation_log` + columna `generated_document_url` en 6 entidades |
 
 ## Inicialización
 

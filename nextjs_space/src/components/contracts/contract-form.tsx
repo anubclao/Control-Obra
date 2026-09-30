@@ -19,6 +19,13 @@ import { useContractsStore, CONTRACT_TYPE_LABELS } from "@/lib/data-store";
 import { useProjectsStore } from "@/lib/data-store";
 import { useProvidersStore } from "@/lib/data-store";
 import { useAuthStore } from "@/lib/auth-store";
+import {
+  CONTRACT_PRICING_MODES,
+  CONTRACT_PRICING_MODE_LABELS,
+  CONTRACT_PRICING_MODE_DESCRIPTIONS,
+  type ContractPricingMode,
+  normalizePricingMode,
+} from "@/lib/contracts-constants";
 import type { Contract, ContractType } from "@/types";
 
 const contractSchema = z.object({
@@ -31,7 +38,11 @@ const contractSchema = z.object({
   status: z.enum(["DRAFT", "ACTIVE", "COMPLETED", "CANCELLED", "SUSPENDED"]),
   scopeOfWork: z.string().min(5, "Describe el alcance del contrato"),
   retentionPercent: z.coerce.number().min(0).max(100),
-  advancePercent: z.coerce.number().min(0).max(100),
+  advancePercent: z.coerce.number().min(0).max(100), // Modalidad de contratación (gap-analysis §3.3). Opcional; default UNIT_PRICE.
+  pricingMode: z
+    .enum(["UNIT_PRICE", "LUMP_SUM", "COST_PLUS"])
+    .optional()
+    .default("UNIT_PRICE"),
   notes: z.string().optional(),
 });
 
@@ -72,6 +83,7 @@ export function ContractForm({ contract, onSuccess }: Props) {
           scopeOfWork: contract.scopeOfWork,
           retentionPercent: contract.retentionPercent,
           advancePercent: contract.advancePercent,
+          pricingMode: normalizePricingMode(contract.pricingMode),
           notes: contract.notes ?? "",
         }
       : {
@@ -85,6 +97,7 @@ export function ContractForm({ contract, onSuccess }: Props) {
           scopeOfWork: "",
           retentionPercent: 10,
           advancePercent: 0,
+          pricingMode: "UNIT_PRICE" as ContractPricingMode,
           notes: "",
         },
   });
@@ -189,6 +202,36 @@ export function ContractForm({ contract, onSuccess }: Props) {
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        <div>
+          <Label className="mb-1.5 block">Modalidad de contratación</Label>
+          <Select
+            value={watch("pricingMode") ?? "UNIT_PRICE"}
+            onValueChange={(v) =>
+              setValue("pricingMode", v as ContractPricingMode, {
+                shouldValidate: true,
+              })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CONTRACT_PRICING_MODES.map((m) => (
+                <SelectItem key={m} value={m}>
+                  {CONTRACT_PRICING_MODE_LABELS[m]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {
+              CONTRACT_PRICING_MODE_DESCRIPTIONS[
+                (watch("pricingMode") ?? "UNIT_PRICE") as ContractPricingMode
+              ]
+            }
+          </p>
         </div>
 
         <div>

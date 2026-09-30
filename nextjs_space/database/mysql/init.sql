@@ -169,6 +169,8 @@ CREATE TABLE contracts (
   scope_of_work     TEXT          NOT NULL,
   retention_percent DECIMAL(5,2)  NOT NULL DEFAULT 0,
   advance_percent   DECIMAL(5,2)  NOT NULL DEFAULT 0,
+  -- Modalidad de contratación (gap-analysis §3.3, ver 005_contract_pricing_mode.sql)
+  pricing_mode      ENUM('UNIT_PRICE','LUMP_SUM','COST_PLUS') NULL,
   notes             TEXT,
   created_by        VARCHAR(36),
   created_at        DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -193,6 +195,7 @@ CREATE TABLE contract_documents (
   INDEX idx_cdoc_contract (contract_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
 -- =============================================================================
 -- PRESUPUESTOS (PT)
 -- =============================================================================
@@ -206,6 +209,11 @@ CREATE TABLE budgets (
   client_value        DECIMAL(15,2) NOT NULL DEFAULT 0,
   -- Items no previstos
   unforeseen_value    DECIMAL(15,2) NOT NULL DEFAULT 0,
+  -- Condiciones comerciales (gap-analysis §3.1; ver 004_budget_commercial_terms.sql)
+  payment_terms_json       TEXT       NULL,
+  delivery_days            INT        NULL DEFAULT 0,
+  offer_validity_days      INT        NULL DEFAULT 30,
+  commercial_advisor_json  TEXT       NULL,
   created_at          DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at          DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_budget_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,

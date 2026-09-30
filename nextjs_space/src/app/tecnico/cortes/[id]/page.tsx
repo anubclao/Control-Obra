@@ -28,7 +28,13 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -62,12 +68,10 @@ import {
   ACTION_BUTTONS,
 } from "@/lib/data-store";
 import { CutForm } from "@/components/cuts/cut-form";
+import { GenerateButton } from "@/components/documents/generate-button";
+import { useDataStore } from "@/lib/data-store";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
-import type {
-  WorkCut,
-  WorkCutDocumentType,
-  ApprovalAction,
-} from "@/types";
+import type { WorkCut, WorkCutDocumentType, ApprovalAction } from "@/types";
 
 export default function CutDetailPage() {
   const params = useParams();
@@ -110,25 +114,36 @@ export default function CutDetailPage() {
   const variant = CUT_STATUS_VARIANTS[cut.status];
   const isEditable = cut.status === "DRAFT" || cut.status === "REJECTED";
   const userRole = user?.role ?? "USER";
-  const availableActions: ApprovalAction[] = [...(ACTION_BUTTONS[cut.status] ?? [])];
+  const availableActions: ApprovalAction[] = [
+    ...(ACTION_BUTTONS[cut.status] ?? []),
+  ];
 
   function askAction(action: ApprovalAction) {
     const isReject = action === "REJECT";
     const titles: Record<ApprovalAction, string> = {
-      SUBMIT: cut.status === "REJECTED" ? "Reenviar corte a validacion" : "Enviar corte a validacion",
+      SUBMIT:
+        cut.status === "REJECTED"
+          ? "Reenviar corte a validacion"
+          : "Enviar corte a validacion",
       VALIDATE: "Validar corte",
       APPROVE: "Aprobar corte",
       REJECT: "Rechazar corte",
       PAY: "Marcar corte como pagado",
     };
     const descriptions: Record<ApprovalAction, string> = {
-      SUBMIT: "El corte pasa a SUBMITTED y queda en cola para que el supervisor lo valide.",
+      SUBMIT:
+        "El corte pasa a SUBMITTED y queda en cola para que el supervisor lo valide.",
       VALIDATE: "Confirmas que los items y cantidades del corte son correctos.",
-      APPROVE: "Apruebas el corte para pago. Solo Super Admin puede revertir esto.",
-      REJECT: "Indica el motivo del rechazo. El residente podra re-editar y reenviar.",
+      APPROVE:
+        "Apruebas el corte para pago. Solo Super Admin puede revertir esto.",
+      REJECT:
+        "Indica el motivo del rechazo. El residente podra re-editar y reenviar.",
       PAY: "Confirmas que el pago al contratista fue realizado.",
     };
-    const variants: Record<ApprovalAction, "default" | "danger" | "success" | "info"> = {
+    const variants: Record<
+      ApprovalAction,
+      "default" | "danger" | "success" | "info"
+    > = {
       SUBMIT: "info",
       VALIDATE: "info",
       APPROVE: "success",
@@ -158,7 +173,9 @@ export default function CutDetailPage() {
       confirmText: labels[action],
       onConfirm: async () => {
         if (!user) throw new Error("No hay usuario autenticado");
-        const form = document.getElementById(`action-form-${action}`) as HTMLFormElement | null;
+        const form = document.getElementById(
+          `action-form-${action}`,
+        ) as HTMLFormElement | null;
         let comments = "";
         let motivo = "";
         if (form) {
@@ -191,10 +208,25 @@ export default function CutDetailPage() {
         title="Corte de obra"
         description="Un corte es un avance periodico de obra que el contratista cobra. Pasa por un flujo formal de validacion, aprobacion y pago."
         steps={[
-          { title: "Borrador", description: "El residente crea el corte, agrega items con cantidad ejecutada y precio unitario." },
-          { title: "Validacion", description: "El supervisor revisa cantidades y soportes. Puede aprobar o rechazar con motivo." },
-          { title: "Aprobacion", description: "Gerencia o Super Admin aprueba el corte para pago." },
-          { title: "Pago", description: "Tesoreria marca el corte como pagado y se genera la solicitud de pago correspondiente." },
+          {
+            title: "Borrador",
+            description:
+              "El residente crea el corte, agrega items con cantidad ejecutada y precio unitario.",
+          },
+          {
+            title: "Validacion",
+            description:
+              "El supervisor revisa cantidades y soportes. Puede aprobar o rechazar con motivo.",
+          },
+          {
+            title: "Aprobacion",
+            description: "Gerencia o Super Admin aprueba el corte para pago.",
+          },
+          {
+            title: "Pago",
+            description:
+              "Tesoreria marca el corte como pagado y se genera la solicitud de pago correspondiente.",
+          },
         ]}
         tips={[
           "Cada accion (submit/validate/approve/reject/pay) pide confirmacion con comentarios opcionales.",
@@ -211,7 +243,11 @@ export default function CutDetailPage() {
         </Button>
         <div className="flex gap-2">
           {isEditable && (
-            <Button onClick={() => setEditOpen(true)} variant="outline" size="sm">
+            <Button
+              onClick={() => setEditOpen(true)}
+              variant="outline"
+              size="sm"
+            >
               <Pencil className="mr-2 h-4 w-4" />
               Editar
             </Button>
@@ -224,10 +260,14 @@ export default function CutDetailPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="font-mono text-xs text-muted-foreground">{cut.cutNumber}</p>
+              <p className="font-mono text-xs text-muted-foreground">
+                {cut.cutNumber}
+              </p>
               <Badge variant={variant}>{CUT_STATUS_LABELS[cut.status]}</Badge>
             </div>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">{cut.description}</h1>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+              {cut.description}
+            </h1>
             <div className="mt-3 flex flex-col gap-1.5 text-sm text-muted-foreground sm:flex-row sm:flex-wrap sm:gap-4">
               {project && (
                 <p className="flex items-center gap-1.5">
@@ -259,7 +299,9 @@ export default function CutDetailPage() {
                   onClick={() => askAction(act)}
                 >
                   {act === "SUBMIT" && <Save className="mr-2 h-4 w-4" />}
-                  {act === "VALIDATE" && <CheckCircle2 className="mr-2 h-4 w-4" />}
+                  {act === "VALIDATE" && (
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                  )}
                   {act === "APPROVE" && <ThumbsUp className="mr-2 h-4 w-4" />}
                   {act === "REJECT" && <ThumbsDown className="mr-2 h-4 w-4" />}
                   {act === "PAY" && <Banknote className="mr-2 h-4 w-4" />}
@@ -293,15 +335,46 @@ export default function CutDetailPage() {
         {cut.status === "APPROVED" && (
           <Alert className="mt-4 border-emerald-300 bg-emerald-50">
             <Mail className="h-4 w-4 text-emerald-700" />
-            <AlertTitle className="text-emerald-900">Corte aprobado - listo para enviar al contratista</AlertTitle>
+            <AlertTitle className="text-emerald-900">
+              Corte aprobado - listo para enviar al contratista
+            </AlertTitle>
             <AlertDescription className="text-emerald-800">
-              Una vez aprobado por Gerencia, se debe notificar al Residente de Obra y enviar el
-              corte firmado por correo electronico al proveedor, indicandole que para radicar
-              cuenta debe presentar:
+              Una vez aprobado por Gerencia, se debe notificar al Residente de
+              Obra y enviar el corte firmado por correo electronico al
+              proveedor, indicandole que para radicar cuenta debe presentar:
             </AlertDescription>
           </Alert>
         )}
       </div>
+
+      {/* F3: Documento generado en SharePoint */}
+      {project && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              Documento generado en SharePoint
+            </CardTitle>
+            <CardDescription>
+              Genera el formato oficial de corte y memorias de obra con los
+              datos de este registro y archívalo en la carpeta del proyecto en
+              SharePoint.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <GenerateButton
+              entity="cuts"
+              entityId={cut.id}
+              currentUrl={cut.generatedDocumentUrl}
+              onGenerated={() => {
+                useDataStore
+                  .getState()
+                  .cuts.load()
+                  .catch(() => {});
+              }}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Checklist documental (PDF p.22) */}
       {cut.status === "APPROVED" && (
@@ -312,8 +385,8 @@ export default function CutDetailPage() {
               Checklist documental para radicar cuenta
             </CardTitle>
             <CardDescription>
-              El proveedor debe presentar esta documentacion al momento de radicar la cuenta de
-              cobro.
+              El proveedor debe presentar esta documentacion al momento de
+              radicar la cuenta de cobro.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -376,10 +449,18 @@ export default function CutDetailPage() {
                     {cut.items.map((it) => (
                       <tr key={it.id} className="border-b last:border-0">
                         <td className="px-3 py-2">{it.description}</td>
-                        <td className="px-3 py-2 text-center font-mono text-xs">{it.unit}</td>
-                        <td className="px-3 py-2 text-right">{it.quantity.toLocaleString("es-CO")}</td>
-                        <td className="px-3 py-2 text-right">{formatCurrency(it.unitPrice)}</td>
-                        <td className="px-3 py-2 text-right font-semibold">{formatCurrency(it.totalPrice)}</td>
+                        <td className="px-3 py-2 text-center font-mono text-xs">
+                          {it.unit}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          {it.quantity.toLocaleString("es-CO")}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          {formatCurrency(it.unitPrice)}
+                        </td>
+                        <td className="px-3 py-2 text-right font-semibold">
+                          {formatCurrency(it.totalPrice)}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -397,7 +478,10 @@ export default function CutDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-2 text-sm">
-                <Row label="Valor bruto" value={formatCurrency(cut.grossValue)} />
+                <Row
+                  label="Valor bruto"
+                  value={formatCurrency(cut.grossValue)}
+                />
                 <Row
                   label={`Retencion (${cut.retentionPercent}%)`}
                   value={`-${formatCurrency(cut.retentionValue)}`}
@@ -410,7 +494,9 @@ export default function CutDetailPage() {
                 />
                 <div className="flex items-center justify-between border-t pt-2 text-lg">
                   <span className="font-semibold">Valor neto a pagar</span>
-                  <span className="font-bold text-emerald-600">{formatCurrency(cut.netValue)}</span>
+                  <span className="font-bold text-emerald-600">
+                    {formatCurrency(cut.netValue)}
+                  </span>
                 </div>
               </div>
             </CardContent>
@@ -424,7 +510,9 @@ export default function CutDetailPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle>Documentos soporte</CardTitle>
-                  <CardDescription>Acta, factura, soportes y otros</CardDescription>
+                  <CardDescription>
+                    Acta, factura, soportes y otros
+                  </CardDescription>
                 </div>
                 <Button onClick={() => setAddDocOpen(true)} size="sm">
                   <Plus className="mr-2 h-4 w-4" />
@@ -440,7 +528,10 @@ export default function CutDetailPage() {
               ) : (
                 <div className="space-y-2">
                   {cut.documents.map((doc) => (
-                    <div key={doc.id} className="flex items-center justify-between rounded-md border p-3">
+                    <div
+                      key={doc.id}
+                      className="flex items-center justify-between rounded-md border p-3"
+                    >
                       <div className="flex items-center gap-3">
                         <FileText className="h-4 w-4 text-blue-600" />
                         <div>
@@ -465,7 +556,9 @@ export default function CutDetailPage() {
           <Card>
             <CardHeader>
               <CardTitle>Historial de aprobaciones</CardTitle>
-              <CardDescription>Trazabilidad de cada accion sobre el corte</CardDescription>
+              <CardDescription>
+                Trazabilidad de cada accion sobre el corte
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {cut.approvals.length === 0 ? (
@@ -484,7 +577,10 @@ export default function CutDetailPage() {
                             ? "info"
                             : "warning";
                     return (
-                      <div key={a.id} className="flex gap-3 rounded-md border bg-secondary/20 p-3">
+                      <div
+                        key={a.id}
+                        className="flex gap-3 rounded-md border bg-secondary/20 p-3"
+                      >
                         <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-background">
                           {a.action === "APPROVE" || a.action === "PAY" ? (
                             <CheckCircle2 className="h-4 w-4 text-emerald-600" />
@@ -498,12 +594,18 @@ export default function CutDetailPage() {
                         </div>
                         <div className="flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant={aVariant}>{ACTION_LABELS[a.action]}</Badge>
+                            <Badge variant={aVariant}>
+                              {ACTION_LABELS[a.action]}
+                            </Badge>
                             <p className="text-sm font-medium">{a.userName}</p>
-                            <span className="text-xs text-muted-foreground">({a.userRole})</span>
+                            <span className="text-xs text-muted-foreground">
+                              ({a.userRole})
+                            </span>
                           </div>
                           {a.comments && (
-                            <p className="mt-1 text-sm text-muted-foreground">{a.comments}</p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              {a.comments}
+                            </p>
                           )}
                           <p className="mt-1 text-xs text-muted-foreground">
                             {new Date(a.createdAt).toLocaleString("es-CO")}
@@ -548,13 +650,27 @@ function ActionDetailsForm({
 }) {
   const isReject = action === "REJECT";
   return (
-    <form id={`action-form-${action}`} className="space-y-3" onSubmit={(e) => e.preventDefault()}>
+    <form
+      id={`action-form-${action}`}
+      className="space-y-3"
+      onSubmit={(e) => e.preventDefault()}
+    >
       <div className="space-y-1 text-xs">
-        <p><strong>Corte:</strong> {cut.cutNumber}</p>
-        <p><strong>Proyecto:</strong> {projectName ?? "-"}</p>
-        <p><strong>Contratista:</strong> {providerName ?? "-"}</p>
-        <p><strong>Valor neto:</strong> {formatCurrency(cut.netValue)}</p>
-        <p><strong>Estado actual:</strong> {CUT_STATUS_LABELS[cut.status]}</p>
+        <p>
+          <strong>Corte:</strong> {cut.cutNumber}
+        </p>
+        <p>
+          <strong>Proyecto:</strong> {projectName ?? "-"}
+        </p>
+        <p>
+          <strong>Contratista:</strong> {providerName ?? "-"}
+        </p>
+        <p>
+          <strong>Valor neto:</strong> {formatCurrency(cut.netValue)}
+        </p>
+        <p>
+          <strong>Estado actual:</strong> {CUT_STATUS_LABELS[cut.status]}
+        </p>
       </div>
       {isReject ? (
         <div>
@@ -580,7 +696,15 @@ function ActionDetailsForm({
   );
 }
 
-function Row({ label, value, valueClass }: { label: string; value: string; valueClass?: string }) {
+function Row({
+  label,
+  value,
+  valueClass,
+}: {
+  label: string;
+  value: string;
+  valueClass?: string;
+}) {
   return (
     <div className="flex items-center justify-between">
       <span className="text-muted-foreground">{label}</span>
@@ -604,17 +728,24 @@ function AddDocumentDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Agregar documento</DialogTitle>
-          <DialogDescription>Sube o registra un soporte para el corte</DialogDescription>
+          <DialogDescription>
+            Sube o registra un soporte para el corte
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div>
             <Label className="mb-1.5 block">Tipo de documento</Label>
-            <Select value={type} onValueChange={(v) => setType(v as WorkCutDocumentType)}>
+            <Select
+              value={type}
+              onValueChange={(v) => setType(v as WorkCutDocumentType)}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {(Object.keys(CUT_DOCUMENT_TYPE_LABELS) as WorkCutDocumentType[]).map((t) => (
+                {(
+                  Object.keys(CUT_DOCUMENT_TYPE_LABELS) as WorkCutDocumentType[]
+                ).map((t) => (
                   <SelectItem key={t} value={t}>
                     {CUT_DOCUMENT_TYPE_LABELS[t]}
                   </SelectItem>
@@ -624,12 +755,28 @@ function AddDocumentDialog({
           </div>
           <div>
             <Label className="mb-1.5 block">Nombre del archivo</Label>
-            <Input value={fileName} onChange={(e) => setFileName(e.target.value)} placeholder="acta.pdf" />
-            <p className="mt-1 text-xs text-muted-foreground">(Mock: la carga real se conectara despues)</p>
+            <Input
+              value={fileName}
+              onChange={(e) => setFileName(e.target.value)}
+              placeholder="acta.pdf"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              (Mock: la carga real se conectara despues)
+            </p>
           </div>
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button onClick={() => { setFileName(""); setType("ACTA"); onOpenChange(false); }}>Agregar</Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                setFileName("");
+                setType("ACTA");
+                onOpenChange(false);
+              }}
+            >
+              Agregar
+            </Button>
           </div>
         </div>
       </DialogContent>

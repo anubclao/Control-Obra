@@ -28,15 +28,15 @@ interface Bucket {
 }
 
 interface RateLimitOptions {
-  key: string;            // identificador único del bucket (ej: "request-otp")
-  limit: number;          // número máximo de requests permitidos en windowMs
-  windowMs: number;       // tamaño de la ventana en ms
+  key: string; // identificador único del bucket (ej: "request-otp")
+  limit: number; // número máximo de requests permitidos en windowMs
+  windowMs: number; // tamaño de la ventana en ms
 }
 
 interface RateLimitResult {
   allowed: boolean;
   remaining: number;
-  resetMs: number;        // ms hasta que se libere la próxima ranura
+  resetMs: number; // ms hasta que se libere la próxima ranura
   response?: NextResponse;
 }
 
@@ -46,8 +46,7 @@ declare global {
   var __rateLimitBuckets: Map<string, Bucket> | undefined;
 }
 
-const buckets: Map<string, Bucket> =
-  globalThis.__rateLimitBuckets ?? new Map();
+const buckets: Map<string, Bucket> = globalThis.__rateLimitBuckets ?? new Map();
 if (process.env.NODE_ENV !== "production") {
   globalThis.__rateLimitBuckets = buckets;
 }
@@ -136,4 +135,68 @@ export function rateLimit(
     remaining: opts.limit - bucket.hits.length,
     resetMs: opts.windowMs,
   };
+}
+
+/**
+ * Variante que limita por una identidad arbitraria (ej: userId autenticado).
+ * Útil cuando el rate limit debe ser por usuario y no por IP (ej: endpoint
+ * autenticado donde múltiples usuarios detrás de la misma IP NAT no deben
+ * compartir bucket).
+ *
+ * F4: añadido para /api/documents/generate (cada usuario tiene su propio
+ * budget; un usuario no puede DoSear la API para los demás).
+ */
+export function rateLimitByIdentity(
+  identity: string,
+  opts: RateLimitOptions,
+): RateLimitResult {
+  const bucketKey = `${opts.key}:${identity}`;
+  const now = Date.now();
+  const cutoff = now - opts.windowMs;
+
+  let bucket = buckets.get(bucketKey);
+  if (!bucket) {
+    bucket = { hits: [] };
+    buckets.set(bucketKey, bucket);
+  }
+  bucket.hits = bucket.hits.filter((t) => t > cutoff);
+
+  if (bucket.hits.length >= opts.limit) {
+    const oldest = bucket.hits[0];
+    const resetMs = oldest + opts.windowMs - now;
+    return {
+      allowed: false,
+      remaining: 0,
+      resetMs,
+      response: NextResponse.json(
+        {
+          error: "Demasiadas solicitudes. Intenta de nuevo en unos segundos.",
+          retryAfterMs: resetMs,
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(Math.ceil(resetMs / 1000)),
+            "X-RateLimit-Limit": String(opts.limit),
+            "X-RateLimit-Remaining": "0",
+            "X-RateLimit-Reset": String(Math.ceil(resetMs / 1000)),
+          },
+        },
+      ),
+    };
+  }
+
+  bucket.hits.push(now);
+  return {
+    allowed: true,
+    remaining: opts.limit - bucket.hits.length,
+    resetMs: opts.windowMs,
+  };
+}
+
+/**
+ * SOLO PARA TESTS. Limpia todo el store de rate limit.
+ */
+export function _resetRateLimitForTests(): void {
+  buckets.clear();
 }

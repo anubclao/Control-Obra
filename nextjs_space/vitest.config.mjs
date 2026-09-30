@@ -13,6 +13,11 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./tests/setup.ts"],
     include: ["tests/verifiers/**/*.spec.{ts,tsx}"],
+    // Forzar que vitest NO use caché de transform: cuando reescribimos
+    // fillers, los timestamps cambian pero el hash de vite puede
+    // confundir y dar versiones cacheadas. Con `cache: false` siempre
+    // retransforma.
+    cache: false,
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],

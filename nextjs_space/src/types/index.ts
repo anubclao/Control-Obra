@@ -37,19 +37,23 @@ export interface AuthorizedUser {
   name: string;
   role: Role;
   area: Area;
-  projectId?: string;            // alcance opcional por proyecto
+  projectId?: string; // alcance opcional por proyecto
   status: AuthorizedUserStatus;
   // Auditoría
-  createdBy: string;             // userId del Super Admin que creó el registro
-  createdAt: string;             // ISO
-  authorizedBy?: string;         // userId del Super Admin que activó
+  createdBy: string; // userId del Super Admin que creó el registro
+  createdAt: string; // ISO
+  authorizedBy?: string; // userId del Super Admin que activó
   authorizedAt?: string;
   suspendedBy?: string;
   suspendedAt?: string;
   lastLoginAt?: string;
 }
 
-export type ProjectStatus = "IN_PLANNING" | "IN_EXECUTION" | "PAUSED" | "COMPLETED";
+export type ProjectStatus =
+  | "IN_PLANNING"
+  | "IN_EXECUTION"
+  | "PAUSED"
+  | "COMPLETED";
 
 export interface Project {
   id: string;
@@ -92,7 +96,12 @@ export interface WorkCutDocument {
   uploadedAt: string;
 }
 
-export type ApprovalAction = "SUBMIT" | "VALIDATE" | "APPROVE" | "REJECT" | "PAY";
+export type ApprovalAction =
+  | "SUBMIT"
+  | "VALIDATE"
+  | "APPROVE"
+  | "REJECT"
+  | "PAY";
 
 export interface WorkCutApproval {
   id: string;
@@ -126,6 +135,9 @@ export interface WorkCut {
   approvedAt?: string;
   paidAt?: string;
   rejectionReason?: string;
+  // F3: URL del documento generado en SharePoint (CORTE)
+  generatedDocumentUrl?: string;
+  generatedDocumentAt?: string;
   createdBy: string; // userId
   createdAt: string;
 }
@@ -149,7 +161,13 @@ export interface Client {
   phone: string;
   city: string;
   sector?: string;
-  source: "REFERIDO" | "WEB" | "REDES_SOCIALES" | "FERIA" | "LLAMADA_FRIA" | "OTROS";
+  source:
+    | "REFERIDO"
+    | "WEB"
+    | "REDES_SOCIALES"
+    | "FERIA"
+    | "LLAMADA_FRIA"
+    | "OTROS";
   status: ClientStatus;
 }
 
@@ -236,6 +254,9 @@ export interface WorkLog {
   materials?: string;
   observations?: string;
   photos: WorkLogPhoto[];
+  // F3: URL del documento generado en SharePoint (AUSENCIA)
+  generatedDocumentUrl?: string;
+  generatedDocumentAt?: string;
   createdBy: string;
   createdByName: string;
   createdAt: string;
@@ -252,7 +273,12 @@ export type PaymentType =
 
 export type PaymentPriority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
 
-export type PaymentAction = "APPROVE_L1" | "APPROVE_L2" | "PAY" | "REJECT" | "CANCEL";
+export type PaymentAction =
+  | "APPROVE_L1"
+  | "APPROVE_L2"
+  | "PAY"
+  | "REJECT"
+  | "CANCEL";
 
 export interface PaymentApproval {
   id: string;
@@ -292,6 +318,9 @@ export interface PaymentRequest {
   paidReference?: string;
   paidMethod?: "TRANSFER" | "CHECK" | "CASH";
   rejectionReason?: string;
+  // F3: URL del documento generado en SharePoint (AD-0033, LEG, etc.)
+  generatedDocumentUrl?: string;
+  generatedDocumentAt?: string; // ISO timestamp de la última generación
   createdBy: string;
   createdAt: string;
 }
@@ -326,9 +355,13 @@ export const PROVIDER_SERVICE_SUBCATEGORIES = [
   "OTROS",
 ] as const;
 
-export type ProviderProductSubcategory = (typeof PROVIDER_PRODUCT_SUBCATEGORIES)[number];
-export type ProviderServiceSubcategory = (typeof PROVIDER_SERVICE_SUBCATEGORIES)[number];
-export type ProviderSubcategory = ProviderProductSubcategory | ProviderServiceSubcategory;
+export type ProviderProductSubcategory =
+  (typeof PROVIDER_PRODUCT_SUBCATEGORIES)[number];
+export type ProviderServiceSubcategory =
+  (typeof PROVIDER_SERVICE_SUBCATEGORIES)[number];
+export type ProviderSubcategory =
+  | ProviderProductSubcategory
+  | ProviderServiceSubcategory;
 
 export type ProviderDocumentType =
   | "CEDULA"
@@ -428,6 +461,29 @@ export interface BudgetVersion {
   notes?: string;
 }
 
+// Condiciones comerciales del PT (gap-analysis §3.1, PDF p.1 Marzo Triangular).
+// Toda la sublista es opcional — los budgets viejos siguen funcionando con
+// paymentTerms=null.
+export interface BudgetPaymentTerms {
+  anticipoPct: number;
+  cortesPct: number;
+  contraEntregaPct: number;
+}
+
+export interface BudgetCommercialAdvisor {
+  name: string;
+  role: string;
+  phone: string;
+  email: string;
+}
+
+export interface BudgetCommercialTerms {
+  paymentTerms?: BudgetPaymentTerms | null;
+  deliveryDays?: number | null;
+  offerValidityDays?: number | null;
+  commercialAdvisor?: BudgetCommercialAdvisor | null;
+}
+
 export interface Budget {
   id: string;
   projectId: string;
@@ -443,6 +499,8 @@ export interface Budget {
   // ITEMS NO PREVISTOS — se crean durante la obra y se auto-suman al tope (PDF p.5)
   unforeseenItems: BudgetItem[];
   unforeseenValue: number;
+  // Condiciones comerciales (opcional; ver lib/budgets-validation.ts)
+  commercialTerms?: BudgetCommercialTerms | null;
   createdAt: string;
 }
 
@@ -460,7 +518,16 @@ export interface AiuConfig {
 
 // Contratos
 export type ContractType = "OBRA" | "SUMINISTRO" | "SERVICIOS" | "CONSULTORIA";
-export type ContractStatus = "DRAFT" | "ACTIVE" | "COMPLETED" | "CANCELLED" | "SUSPENDED";
+export type ContractStatus =
+  | "DRAFT"
+  | "ACTIVE"
+  | "COMPLETED"
+  | "CANCELLED"
+  | "SUSPENDED";
+
+// Modalidad de contratación (gap-analysis §3.3, PDF p.5).
+// Opcional y hacia atrás: contratos viejos sin pricingMode se asumen UNIT_PRICE.
+export type ContractPricingMode = "UNIT_PRICE" | "LUMP_SUM" | "COST_PLUS";
 
 export type ContractDocumentType =
   | "CONTRATO_FIRMADO"
@@ -492,7 +559,11 @@ export interface Contract {
   retentionPercent: number;
   advancePercent: number;
   documents: ContractDocument[];
+  pricingMode?: ContractPricingMode;
   notes?: string;
+  // F3: URL del documento generado en SharePoint (CONT_GLOBAL/UNITARIO/DISENOS)
+  generatedDocumentUrl?: string;
+  generatedDocumentAt?: string;
   createdBy?: string;
   createdAt: string;
 }
@@ -581,6 +652,9 @@ export interface Employee {
   status: EmployeeStatus;
   userId?: string; // vínculo con usuario del sistema
   documents: EmployeeDocument[];
+  // F3: URL del documento generado en SharePoint (CONT_LABORAL)
+  generatedDocumentUrl?: string;
+  generatedDocumentAt?: string;
   createdAt: string;
 }
 
@@ -607,7 +681,12 @@ export interface Invitation {
 // PSC - Presupuesto Proveedor (espejo del PT)
 // Cada PSC está vinculado a un PT (projectId) y a un proveedor
 // Contiene los items del PT que ese proveedor cubrirá
-export type PSCStatus = "DRAFT" | "ACTIVE" | "SUSPENDED" | "COMPLETED" | "CANCELLED";
+export type PSCStatus =
+  | "DRAFT"
+  | "ACTIVE"
+  | "SUSPENDED"
+  | "COMPLETED"
+  | "CANCELLED";
 
 export interface PSCItem {
   id: string;
@@ -691,11 +770,11 @@ export interface Expense {
   date: string;
   status: ExpenseStatus;
   // Campos según tipo (PDF p.8-9)
-  advancePercent?: number;          // anticipo del contrato (%)
-  hasPolizas?: boolean;             // si aplica pólizas
-  polizasVigenciaDesde?: string;    // PDF p.9
-  polizasVigenciaHasta?: string;    // PDF p.9
-  cotizacionAprobada?: boolean;     // PDF p.8
+  advancePercent?: number; // anticipo del contrato (%)
+  hasPolizas?: boolean; // si aplica pólizas
+  polizasVigenciaDesde?: string; // PDF p.9
+  polizasVigenciaHasta?: string; // PDF p.9
+  cotizacionAprobada?: boolean; // PDF p.8
   // Items del gasto
   items: ExpenseItem[];
   // Aprobación (solo Super Admin — PDF p.8/21)
@@ -707,6 +786,9 @@ export interface Expense {
   approvedAt?: string;
   rejectedReason?: string;
   notes?: string;
+  // F3: URL del documento generado en SharePoint (OC, OS, AD-0033, LEG según tipo)
+  generatedDocumentUrl?: string;
+  generatedDocumentAt?: string;
 }
 
 // ============================================================
