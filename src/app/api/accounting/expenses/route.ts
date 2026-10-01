@@ -1,0 +1,180 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+/**
+ * CRUD: /api/accounting/expenses — Gastos del módulo contable.
+ * El workflow de 6 estados se valida aquí, no solo en la UI (AC-6..AC-9).
+ *
+ * OJO: es distinto de /api/expenses (gastos de obra con ítems y pólizas).
+ * Aquí se registra el movimiento contable/tesorería.
+ */
+import { NextResponse } from "next/server";
+import { query } from "@/lib/db";
+import { requireAuth, requireRole, requireAdmin, authFailureResponse } from "@/lib/api-auth";
+import {
+  ACCOUNTING_WRITE_ROLES,
+  badRequest,
+  isoDate,
+  money,
+  newId,
+  normalizeProjectId,
+  scopeFilter,
+  serverError,
+} from "@/lib/accounting-api";
+import { canTransitionExpense, validateExpense } from "@/lib/accounting-constants";
+import type { AccountingExpense } from "@/types";
+
+function toDTO(row: any): AccountingExpense {
+  return {
+    id: row.id,
+    date: isoDate(row.date),
+    projectId: row.project_id,
+    costCenter: row.cost_center ?? "",
+    responsible: row.responsible ?? "",
+    providerName: row.provider_name ?? "",
+    concept: row.concept ?? "",
+    detail: row.detail ?? "",
+    amount: money(row.amount),
+    status: row.status,
+    accountId: row.account_id,
+    createdAt: row.created_at,
+  };
+}
+
+export async function GET(req: Request) {
+  const fail = authFailureResponse(await requireAuth());
+  if (fail) return fail;
+  try {
+    const { where, args } = scopeFilter(new URL(req.url).searchParams);
+    const rows = await query<any[]>(
+      `SELECT * FROM accounting_expenses ${where} ORDER BY date DESC, created_at DESC`,
+      args,
+    );
+    return NextResponse.json(rows.map(toDTO));
+  } catch (e) {
+    return serverError("accounting expenses GET", e);
+  }
+}
+
+export async function POST(req: Request) {
+  const fail = authFailureResponse(await requireRole(...ACCOUNTING_WRITE_ROLES));
+  if (fail) return fail;
+  try {
+    const body = await req.json();
+    const draft = {
+      date: body?.date,
+      amount: money(body?.amount),
+      status: body?.status ?? "POR_PAGAR",
+      accountId: body?.accountId || null,
+    };
+    const check = validateExpense(draft);
+    if (!check.ok) return badRequest(check.error!);
+    if (!body?.concept) return badRequest("El concepto es obligatorio");
+
+    const id = newId();
+    await query(
+      `INSERT INTO accounting_expenses
+        (id, date, project_id, cost_center, responsible, provider_name,
+         concept, detail, amount, status, account_id, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        draft.date,
+        normalizeProjectId(body?.projectId),
+        body?.costCenter ?? "",
+        body?.responsible ?? "",
+        body?.providerName ?? "",
+        body.concept,
+        body?.detail ?? null,
+        draft.amount,
+        draft.status,
+        draft.accountId,
+        body?.createdBy ?? null,
+      ],
+    );
+    return NextResponse.json({ id, ...body }, { status: 201 });
+  } catch (e) {
+    return serverError("accounting expenses POST", e);
+  }
+}
+
+export async function PUT(req: Request) {
+  const fail = authFailureResponse(await requireRole(...ACCOUNTING_WRITE_ROLES));
+  if (fail) return fail;
+  try {
+    const body = await req.json();
+    if (!body?.id) return badRequest("ID requerido");
+    const current = await query<any[]>("SELECT * FROM accounting_expenses WHERE id = ?", [
+      body.id,
+    ]);
+    if (!current.length) return NextResponse.json({ error: "No existe" }, { status: 404 });
+    const before = toDTO(current[0]);
+
+    const after: AccountingExpense = {
+      ...before,
+      ...(body.date !== undefined ? { date: body.date } : {}),
+      ...(body.amount !== undefined ? { amount: money(body.amount) } : {}),
+      ...(body.status !== undefined ? { status: body.status } : {}),
+      ...(body.accountId !== undefined ? { accountId: body.accountId || null } : {}),
+    };
+    if (before.status === "PAGADO" && after.status === "PAGADO" && body.status === undefined) {
+      // Edición de datos de un gasto ya pagado: solo ADMIN.
+      const adminFail = authFailureResponse(await requireAdmin());
+      if (adminFail) return adminFail;
+    }
+    if (!canTransitionExpense(before.status, after.status)) {
+      return badRequest(`No se permite pasar de ${before.status} a ${after.status}`);
+    }
+    const check = validateExpense(after);
+    if (!check.ok) return badRequest(check.error!);
+
+    const map: Record<string, string> = {
+      date: "date",
+      costCenter: "cost_center",
+      responsible: "responsible",
+      providerName: "provider_name",
+      concept: "concept",
+      detail: "detail",
+      amount: "amount",
+      status: "status",
+      accountId: "account_id",
+    };
+    const sets: string[] = [];
+    const args: unknown[] = [];
+    for (const [key, col] of Object.entries(map)) {
+      if (body[key] === undefined) continue;
+      sets.push(`${col} = ?`);
+      args.push((after as any)[key] ?? null);
+    }
+    if (body.projectId !== undefined) {
+      sets.push("project_id = ?");
+      args.push(normalizeProjectId(body.projectId));
+    }
+    if (!sets.length) return badRequest("Sin campos a actualizar");
+    args.push(body.id);
+    await query(`UPDATE accounting_expenses SET ${sets.join(", ")} WHERE id = ?`, args);
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    return serverError("accounting expenses PUT", e);
+  }
+}
+
+export async function DELETE(req: Request) {
+  const fail = authFailureResponse(await requireAdmin());
+  if (fail) return fail;
+  try {
+    const id = new URL(req.url).searchParams.get("id");
+    if (!id) return badRequest("ID requerido");
+    const rows = await query<any[]>(
+      "SELECT status FROM accounting_expenses WHERE id = ?",
+      [id],
+    );
+    if (!rows.length) return NextResponse.json({ error: "No existe" }, { status: 404 });
+    if (rows[0].status === "PAGADO") {
+      return badRequest("No se puede eliminar un gasto ya pagado"); // AC-9
+    }
+    await query("DELETE FROM accounting_expenses WHERE id = ?", [id]);
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    return serverError("accounting expenses DELETE", e);
+  }
+}

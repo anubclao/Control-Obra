@@ -1,0 +1,44 @@
+import type { AiuConfig } from "@/types";
+export const MOCK_AIU: AiuConfig[] = [
+  {
+    id: "aiu1",
+    projectId: "p1",
+    administration: 10,
+    imprevistos: 5,
+    utilidad: 8,
+    notes: "AIU estándar para proyectos residenciales",
+    updatedBy: "u2",
+    updatedAt: "2026-01-25",
+  },
+  {
+    id: "aiu2",
+    projectId: "p2",
+    administration: 12,
+    imprevistos: 6,
+    utilidad: 10,
+    notes: "Proyecto comercial grande, AIU elevado",
+    updatedBy: "u2",
+    updatedAt: "2026-02-10",
+  },
+  {
+    id: "aiu3",
+    projectId: "p3",
+    administration: 8,
+    imprevistos: 4,
+    utilidad: 7,
+    notes: "Proyecto industrial, margen ajustado",
+    updatedBy: "u2",
+    updatedAt: "2026-03-20",
+  },
+  {
+    id: "aiu4",
+    projectId: "p4",
+    administration: 10,
+    imprevistos: 5,
+    utilidad: 9,
+    updatedBy: "u2",
+    updatedAt: "2026-05-05",
+  },
+];
+
+// Contratos

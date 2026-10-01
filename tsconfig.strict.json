@@ -1,0 +1,26 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true
+  },
+  "include": [
+    "next-env.d.ts",
+    "src/lib/permissions-matrix.ts",
+    "src/lib/permissions.ts",
+    "src/lib/clients-workflow.ts",
+    "src/lib/taxes-fetcher.ts",
+    "src/lib/cuts-workflow.ts",
+    "src/lib/payments-workflow.ts",
+    "src/lib/session.ts",
+    "src/lib/api-auth.ts",
+    "src/lib/validators/api.ts",
+    "src/lib/validators/numeric.ts",
+    "src/lib/dashboard-stats-compute.ts",
+    "src/lib/dashboard-stats.ts",
+    "src/lib/crypto.ts",
+    "src/lib/advances.ts",
+    "src/lib/account-mask.ts"
+  ]
+}
