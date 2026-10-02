@@ -77,23 +77,22 @@ export async function POST(req: Request) {
     // Generar OTP de 6 digitos
     const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
     const codeHash = hashCode(email, code);
-    // P0 plan 2026-10-02:
-    //  - 30 min (antes 10 min) para absorber latencia entre zonas horarias.
-    //  - Forzamos UTC: `new Date(now + ms)` con `now = Date.now()` siempre
-    //    devuelve un instante absoluto. Lo guardamos como datetime MySQL;
-    //    con `SET time_zone='+00:00'` en la conexion, NOW() y los DATETIME
-    //    se interpretan de forma consistente sin importar la TZ del servidor.
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 min
-
+    // P0 plan 2026-10-02: usamos UTC_TIMESTAMP() del lado de MySQL para
+    // que la fecha sea SIEMPRE UTC, sin importar la zona del servidor.
+    // El codigo se hashea con la sal fija (no depende del tiempo).
     // Eliminar codigos previos del mismo email no usados
     await query(`DELETE FROM auth_otps WHERE email = ? AND used_at IS NULL`, [
       email,
     ]);
 
-    // Insertar nuevo
+    // Insertar nuevo. Usamos DATE_ADD(UTC_TIMESTAMP(), INTERVAL 30 MINUTE)
+    // para que expires_at siempre sea UTC, independiente de la zona del
+    // servidor MySQL. Asi no hay mismatch con Date.now() de Node.
     await query(
-      `INSERT INTO auth_otps (email, code_hash, expires_at, attempts) VALUES (?, ?, ?, 0)`,
-      [email, codeHash, expiresAt],
+      `INSERT INTO auth_otps
+         (email, code_hash, expires_at, attempts, created_at)
+       VALUES (?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 30 MINUTE), 0, UTC_TIMESTAMP())`,
+      [email, codeHash],
     );
 
     // P0 (docs/DOCUMENTACION_TECNICA_Y_MEJORAS.md, seccion 4.4):

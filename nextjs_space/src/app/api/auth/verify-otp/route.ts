@@ -68,10 +68,26 @@ export async function POST(req: Request) {
     }
 
     const otp = otps[0];
+    // P0 plan 2026-10-02: log explicito para diagnosticar zonas horarias.
+    // Como Date.now() es epoch ms UTC, comparamos correctamente.
+    const expiresAtMs = new Date(otp.expires_at).getTime();
+    const nowMs = Date.now();
+    console.log(
+      "[verify-otp]",
+      JSON.stringify({
+        email,
+        nowISO: new Date(nowMs).toISOString(),
+        expiresAtRaw: String(otp.expires_at),
+        expiresAtMs,
+        diffMs: expiresAtMs - nowMs,
+        usedAtRaw: String(otp.used_at),
+        attempts: otp.attempts,
+      }),
+    );
     if (otp.used_at) {
       return NextResponse.json({ error: "Codigo ya usado" }, { status: 401 });
     }
-    if (new Date(otp.expires_at).getTime() < Date.now()) {
+    if (expiresAtMs < nowMs) {
       return NextResponse.json({ error: "Codigo expirado" }, { status: 401 });
     }
     if (otp.attempts >= 5) {
