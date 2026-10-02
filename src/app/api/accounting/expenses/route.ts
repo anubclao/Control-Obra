@@ -9,7 +9,7 @@ export const runtime = "nodejs";
  */
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { requireAuth, requireRole, requireAdmin, authFailureResponse } from "@/lib/api-auth";
+import { requireAuth, requireRole, requireAdmin, authFailureResponse, type AuthSuccess } from "@/lib/api-auth";
 import {
   ACCOUNTING_WRITE_ROLES,
   badRequest,
@@ -19,6 +19,8 @@ import {
   normalizeProjectId,
   scopeFilter,
   serverError,
+  assertAccountActive,
+  assertProjectExists,
 } from "@/lib/accounting-api";
 import { canTransitionExpense, validateExpense } from "@/lib/accounting-constants";
 import type { AccountingExpense } from "@/types";
@@ -56,7 +58,8 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const fail = authFailureResponse(await requireRole(...ACCOUNTING_WRITE_ROLES));
+  const auth = await requireRole(...ACCOUNTING_WRITE_ROLES);
+  const fail = authFailureResponse(auth);
   if (fail) return fail;
   try {
     const body = await req.json();
@@ -70,6 +73,18 @@ export async function POST(req: Request) {
     if (!check.ok) return badRequest(check.error!);
     if (!body?.concept) return badRequest("El concepto es obligatorio");
 
+    // P0 plan 2026-10-02 (Fase 2.1+2.2): validar cuenta y proyecto
+    // ANTES de intentar INSERT (sino: 500 enmascarado).
+    if (draft.accountId) {
+      const okAcc = await assertAccountActive(draft.accountId);
+      if (okAcc.ok === false) return badRequest(okAcc.error);
+    }
+    const projectId = normalizeProjectId(body?.projectId);
+    if (projectId) {
+      const okProj = await assertProjectExists(projectId);
+      if (okProj.ok === false) return badRequest(okProj.error);
+    }
+
     const id = newId();
     await query(
       `INSERT INTO accounting_expenses
@@ -79,7 +94,7 @@ export async function POST(req: Request) {
       [
         id,
         draft.date,
-        normalizeProjectId(body?.projectId),
+        projectId,
         body?.costCenter ?? "",
         body?.responsible ?? "",
         body?.providerName ?? "",
@@ -88,7 +103,8 @@ export async function POST(req: Request) {
         draft.amount,
         draft.status,
         draft.accountId,
-        body?.createdBy ?? null,
+        // P0 plan 2026-10-02 (Fase 1.5): created_by desde sesion.
+        (auth as AuthSuccess).userId,
       ],
     );
     return NextResponse.json({ id, ...body }, { status: 201 });

@@ -923,6 +923,9 @@ export interface AccountingTaxMovement {
   amount: number;
   status: AccountingTaxStatus;
   accountId?: string | null;
+  // P0 plan 2026-10-02: tax_type permite reportar por tipo
+  // (IVA, RETENCION_FUENTE, RETENCION_IVA, RETENCION_ICA, ESTAMPILLAS, OTROS).
+  taxType?: string | null;
   createdAt: string;
 }
 

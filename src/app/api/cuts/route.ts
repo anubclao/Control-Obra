@@ -26,6 +26,7 @@ import {
   isCutEditable,
 } from "@/lib/cuts-workflow";
 import { cutMonetarySchema } from "@/lib/validators/numeric";
+import { syncExpenseOnPayment, syncExpenseOnCutApprove } from "@/lib/accounting-integration";
 import {
   parsePagination,
   pageToLimitOffset,
@@ -541,6 +542,38 @@ export async function PATCH(req: Request) {
          VALUES (UUID(), ?, ?, ?, ?, ?, ?)`,
         [id, action, user.id, user.name, user.role, comments ?? null],
       );
+
+      // P0 plan 2026-10-02 (Fase 1.3): al aprobar un corte, pre-creamos
+      // un movimiento contable en POR_PAGAR para que el panel refleje
+      // el valor ejecutado. Cuando el pago asociado se liquide (Fase
+      // 1.2 en /api/payments), closeExpenseFromPayment() lo pasa a
+      // PAGADO y le asigna la cuenta.
+      if (action === "APPROVE") {
+        const [cutRows] = await conn.execute(
+          `SELECT project_id, period, net_value, contract_id
+             FROM work_cuts WHERE id = ?`,
+          [id],
+        );
+        const cut = (cutRows as any[])[0] ?? {};
+        const sync = await syncExpenseOnCutApprove(
+          {
+            userId: user.id,
+            sourceType: "WORK_CUT",
+            sourceId: id,
+            date: now.slice(0, 10),
+            projectId: cut.project_id ?? null,
+            costCenter: cut.project_id ? "Obra" : "Administracion",
+            responsible: user.name,
+            concept: `Corte ${id.slice(0, 8)} ${cut.period ?? ""}`.trim(),
+            detail: cut.contract_id ? `Contrato ${cut.contract_id}` : null,
+            amount: Number(cut.net_value ?? 0),
+          },
+          conn,
+        );
+        if (sync.ok === false) {
+          return { status: 400 as const, body: { error: sync.error, code: sync.code } };
+        }
+      }
       return { status: 200 as const, body: { ok: true } };
     });
     return NextResponse.json(result.body, { status: result.status });

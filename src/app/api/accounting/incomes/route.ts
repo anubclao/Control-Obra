@@ -6,7 +6,8 @@ export const runtime = "nodejs";
  */
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { requireAuth, requireRole, requireAdmin, authFailureResponse } from "@/lib/api-auth";
+import { requireAuth, requireRole, requireAdmin, authFailureResponse, type AuthSuccess } from "@/lib/api-auth";
+import { assertAccountActive, assertProjectExists } from "@/lib/accounting-api";
 import {
   ACCOUNTING_WRITE_ROLES,
   badRequest,
@@ -55,7 +56,8 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const fail = authFailureResponse(await requireRole(...ACCOUNTING_WRITE_ROLES));
+  const auth = await requireRole(...ACCOUNTING_WRITE_ROLES);
+  const fail = authFailureResponse(auth);
   if (fail) return fail;
   try {
     const body = await req.json();
@@ -70,6 +72,18 @@ export async function POST(req: Request) {
     const check = validateIncome(draft);
     if (!check.ok) return badRequest(check.error!);
 
+    // P0 plan 2026-10-02 (Fase 2.1+2.2): pre-check de FK antes del
+    // INSERT. Antes daba 500 enmascarado.
+    if (draft.accountId) {
+      const okAcc = await assertAccountActive(draft.accountId);
+      if (okAcc.ok === false) return badRequest(okAcc.error);
+    }
+    const projectId = normalizeProjectId(body?.projectId);
+    if (projectId) {
+      const okProj = await assertProjectExists(projectId);
+      if (okProj.ok === false) return badRequest(okProj.error);
+    }
+
     const id = newId();
     const paid =
       draft.status === "PAGADO"
@@ -83,7 +97,7 @@ export async function POST(req: Request) {
       [
         id,
         draft.date,
-        normalizeProjectId(body?.projectId),
+        projectId,
         body?.costCenter ?? "",
         body?.creator ?? "",
         body?.clientName ?? "",
@@ -93,7 +107,9 @@ export async function POST(req: Request) {
         draft.status,
         draft.accountId,
         paid,
-        body?.createdBy ?? null,
+        // P0 plan 2026-10-02 (Fase 1.5): created_by viene de la sesion,
+        // no del body. Antes el cliente podia enviar cualquier userId.
+        (auth as AuthSuccess).userId,
       ],
     );
     return NextResponse.json({ id, ...body }, { status: 201 });

@@ -22,6 +22,7 @@ import {
 import { accountNumberForRole } from "@/lib/account-mask";
 import { paymentAmountSchema } from "@/lib/validators/numeric";
 import { can } from "@/lib/permissions-matrix";
+import { syncExpenseOnPayment, closeExpenseFromPayment } from "@/lib/accounting-integration";
 
 function dto(r: any, viewerRole: string) {
   return {
@@ -433,6 +434,9 @@ export async function PATCH(req: Request) {
       rejectionReason,
       paymentReference,
       paymentMethod,
+      // P0 plan 2026-10-02 (Fase 1.2): cuenta contable donde se paga.
+      // Requerida para accion PAY. La UI la pide en el form de Tesorerol.
+      accountId,
     } = body ?? {};
     if (!id || !action) {
       return NextResponse.json(
@@ -540,6 +544,23 @@ export async function PATCH(req: Request) {
             },
           };
         }
+        // P0 plan 2026-10-02 (Fase 1.2): accountId es requerido para
+        // poder generar el asiento contable (accounting_expenses) en la
+        // misma transaccion. Sin cuenta, no sabemos donde sale el dinero.
+        if (
+          !accountId ||
+          typeof accountId !== "string" ||
+          !accountId.trim()
+        ) {
+          return {
+            status: 400 as const,
+            body: {
+              error:
+                "Indica la cuenta contable donde se realizo el pago",
+              code: "PAYMENT_ACCOUNT_REQUIRED",
+            },
+          };
+        }
       }
       const target = decision.target;
       const now = new Date().toISOString().slice(0, 19).replace("T", " ");
@@ -549,6 +570,7 @@ export async function PATCH(req: Request) {
           paid_at = CASE WHEN ? = 'PAY' THEN ? ELSE paid_at END,
           paid_reference = CASE WHEN ? = 'PAY' THEN ? ELSE paid_reference END,
           paid_method = CASE WHEN ? = 'PAY' THEN ? ELSE paid_method END,
+          account_id = CASE WHEN ? = 'PAY' THEN ? ELSE account_id END,
           current_approval_level = ?,
           rejection_reason = CASE WHEN ? = 'REJECT' THEN ? ELSE rejection_reason END
          WHERE id = ?`,
@@ -560,6 +582,8 @@ export async function PATCH(req: Request) {
           paymentReference ?? null,
           action,
           paymentMethod ?? null,
+          action,
+          accountId ?? null,
           decision.nextApprovalLevel,
           action,
           rejectionReason ?? null,
@@ -581,6 +605,55 @@ export async function PATCH(req: Request) {
             WHERE id = ? AND status = 'APPROVED'`,
           [now, current.work_cut_id],
         );
+      }
+
+      // P0 plan 2026-10-02 (Fase 1.2): al pagar una solicitud, generamos
+      // automaticamente el movimiento contable (accounting_expenses PAGADO)
+      // en la misma transaccion SQL. Asi el modulo /api/accounting/ deja
+      // de estar desarticulado del modulo de pagos: el panel contable
+      // refleja la operacion real.
+      //
+      // El helper valida accountId (activo) y projectId (no eliminado)
+      // y es NO-OP si ya existe un expense para este source. Si falla la
+      // validacion, devuelve 400 con codigo legible (no 500).
+      if (action === "PAY") {
+        const [payInfoRows] = await conn.execute(
+          `SELECT p.project_id, p.amount, p.request_number, p.description,
+                  p.work_cut_id
+             FROM payment_requests p WHERE p.id = ?`,
+          [id],
+        );
+        const payInfo = (payInfoRows as any[])[0] ?? {};
+        const sync = await syncExpenseOnPayment(
+          {
+            userId: user.id,
+            sourceType: "PAYMENT_REQUEST",
+            sourceId: id,
+            date: now.slice(0, 10),
+            projectId: payInfo.project_id ?? null,
+            costCenter: payInfo.project_id ? "Obra" : "Administracion",
+            responsible: user.name,
+            concept: `Pago ${payInfo.request_number ?? id}`,
+            detail: payInfo.description ?? null,
+            amount: Number(payInfo.amount ?? 0),
+            accountId: accountId as string,
+          },
+          conn,
+        );
+        if (sync.ok === false) {
+          return { status: 400 as const, body: { error: sync.error, code: sync.code } };
+        }
+        // Si el pago viene de un corte aprobado (Fase 1.3), el corte
+        // ya tiene un accounting_expense en POR_PAGAR. Lo cerramos a
+        // PAGADO con la misma cuenta.
+        if (payInfo.work_cut_id) {
+          await closeExpenseFromPayment(
+            "WORK_CUT",
+            payInfo.work_cut_id,
+            accountId as string,
+            conn,
+          );
+        }
       }
 
       await conn.execute(

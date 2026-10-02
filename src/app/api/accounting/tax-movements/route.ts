@@ -6,7 +6,7 @@ export const runtime = "nodejs";
  */
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { requireAuth, requireRole, requireAdmin, authFailureResponse } from "@/lib/api-auth";
+import { requireAuth, requireRole, requireAdmin, authFailureResponse, type AuthSuccess } from "@/lib/api-auth";
 import {
   ACCOUNTING_WRITE_ROLES,
   badRequest,
@@ -16,6 +16,8 @@ import {
   normalizeProjectId,
   scopeFilter,
   serverError,
+  assertAccountActive,
+  assertProjectExists,
 } from "@/lib/accounting-api";
 import { canTransitionTaxMovement, validateTaxMovement } from "@/lib/accounting-constants";
 import type { AccountingTaxMovement } from "@/types";
@@ -30,6 +32,8 @@ function toDTO(row: any): AccountingTaxMovement {
     amount: money(row.amount),
     status: row.status,
     accountId: row.account_id,
+    // P0 plan 2026-10-02: exponer tax_type para filtrar/reportes.
+    taxType: row.tax_type ?? null,
     createdAt: row.created_at,
   };
 }
@@ -50,7 +54,8 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const fail = authFailureResponse(await requireRole(...ACCOUNTING_WRITE_ROLES));
+  const auth = await requireRole(...ACCOUNTING_WRITE_ROLES);
+  const fail = authFailureResponse(auth);
   if (fail) return fail;
   try {
     const body = await req.json();
@@ -64,21 +69,35 @@ export async function POST(req: Request) {
     if (!check.ok) return badRequest(check.error!);
     if (!body?.description) return badRequest("La descripción es obligatoria");
 
+    // P0 plan 2026-10-02 (Fase 2.1+2.2): pre-check de FK.
+    if (draft.accountId) {
+      const okAcc = await assertAccountActive(draft.accountId);
+      if (okAcc.ok === false) return badRequest(okAcc.error);
+    }
+    const projectId = normalizeProjectId(body?.projectId);
+    if (projectId) {
+      const okProj = await assertProjectExists(projectId);
+      if (okProj.ok === false) return badRequest(okProj.error);
+    }
+
     const id = newId();
     await query(
       `INSERT INTO accounting_tax_movements
-        (id, date, project_id, authority, description, amount, status, account_id, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, date, project_id, authority, description, tax_type,
+         amount, status, account_id, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         draft.date,
-        normalizeProjectId(body?.projectId),
+        projectId,
         body?.authority ?? "DIAN",
         body.description,
+        body?.taxType ?? null,
         draft.amount,
         draft.status,
         draft.accountId,
-        body?.createdBy ?? null,
+        // P0 plan 2026-10-02 (Fase 1.5): created_by desde sesion.
+        (auth as AuthSuccess).userId,
       ],
     );
     return NextResponse.json({ id, ...body }, { status: 201 });

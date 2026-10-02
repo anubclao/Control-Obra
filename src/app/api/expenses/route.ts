@@ -2,11 +2,19 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 /**
  * CRUD: /api/expenses — Registro de gastos
+ *
+ * P0 plan 2026-10-02 (Fase 1.4): cuando un gasto (OC / OS / LEG) pasa
+ * a status PAGADO, generamos automaticamente un movimiento contable
+ * (accounting_expenses PAGADO). Si la transicion llega SIN cuenta
+ * contable, queda en POR_PAGAR (mismo patron que cortes) para que el
+ * panel contable muestre el gasto ejecutado aunque el pago real este
+ * pendiente.
  */
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { query, transaction } from "@/lib/db";
-import { requireAuth, requireRole, requireAdmin, authFailureResponse } from "@/lib/api-auth";
+import { requireAuth, requireRole, requireAdmin, authFailureResponse, type AuthSuccess } from "@/lib/api-auth";
+import { syncExpenseOnPayment } from "@/lib/accounting-integration";
 
 
 function r(row: any) {
@@ -159,6 +167,50 @@ export async function PUT(req: Request) {
           );
         }
       });
+    }
+
+    // P0 plan 2026-10-02 (Fase 1.4): si la transicion lleva el gasto
+    // a PAGADO, generamos el movimiento contable. Requiere accountId
+    // para imputar el egreso a una cuenta real (FK accounting_accounts).
+    if (body.status === "PAGADO") {
+      const accountId = body.accountId ?? null;
+      if (!accountId) {
+        return NextResponse.json(
+          {
+            error:
+              "Para marcar el gasto como PAGADO debes indicar la cuenta contable de salida",
+            code: "PAYMENT_ACCOUNT_REQUIRED",
+          },
+          { status: 400 },
+        );
+      }
+      const [expRows] = await query<any[]>(
+        `SELECT project_id, amount, description, expense_number
+           FROM expenses WHERE id = ?`,
+        [body.id],
+      );
+      const exp = (expRows as any[])[0] ?? {};
+      const sync = await syncExpenseOnPayment(
+        {
+          userId: (auth as AuthSuccess).userId,
+          sourceType: "EXPENSE",
+          sourceId: body.id,
+          date: new Date().toISOString().slice(0, 10),
+          projectId: exp.project_id ?? null,
+          costCenter: exp.project_id ? "Obra" : "Administracion",
+          responsible: (auth as AuthSuccess).user.name ?? "",
+          concept: `Gasto ${exp.expense_number ?? body.id}`,
+          detail: exp.description ?? null,
+          amount: Number(exp.amount ?? 0),
+          accountId,
+        },
+      );
+      if (sync.ok === false) {
+        return NextResponse.json(
+          { error: sync.error, code: sync.code },
+          { status: 400 },
+        );
+      }
     }
     return NextResponse.json({ ok: true });
   } catch (e: any) {
