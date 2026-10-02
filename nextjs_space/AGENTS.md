@@ -93,3 +93,40 @@ You DO NOT write implementation code until:
   importan: un import roto hace que el archivo ejecute 0 tests en silencio
 - ❌ Usar `require()` dentro de un test (el módulo es ESM: lanza y genera un
   falso rojo)
+
+---
+
+## Changelog de fixes (2026-10-02)
+
+### [2026-10-02] bug-project-form-currency-step · FASE 1 (SPEC)
+- Spec creado en docs/specs/bug-project-form-currency-step.md.
+- Bug raíz 1: project-form.tsx:179 usa step="1000000" en <Input type="number"> para presupuesto → navegador rechaza valores no múltiplos de 1M (mensaje "valores válidos más aproximados son 76000000 y 77000000").
+- Bug raíz 2: <Label htmlFor="status"> apunta a un <Select> cuyo <SelectTrigger> no tiene id="status" → warning DevTools Incorrect use of <label for=FORM_ELEMENT>.
+- Decisión técnica: step="1000" (miles de COP) + añadir id="status" al <SelectTrigger>. Zod schema NO se modifica.
+- Patrón en codebase: precedent en ug-presupuestos-round.md que recomienda step="any" para no redondear. Acá usamos step="1000" porque presupuesto sí tiene granularidad útil de miles.
+
+### [2026-10-02] bug-project-form-currency-step · FASE 2 (VERIFIER ROJO)
+- Verifier creado en 	ests/verifiers/bug-project-form-currency-step.spec.ts.
+- Patrón elegido: static source analysis con readFileSync + regex (mismo patrón que 	ests/verifiers/project-form-edit.spec.ts:56). Permite testear atributos JSX sin RTL/DOM mocking.
+- Cubre: AC-1, AC-2, AC-4, AC-5, AC-6 con 11 tests.
+- Estado rojo actual: **6 tests fallando, 5 pasando** (los rojos son los que tocan los 2 bugs: step restrictivo y SelectTrigger sin id).
+- Comando para correr: cd nextjs_space && npx vitest run tests/verifiers/bug-project-form-currency-step.spec.ts.
+- AC-3 (Zod schema) y AC-4 parcial (Label existe) ya pasan — son invariantes que el fix NO debe romper.
+
+### [2026-10-02] bug-project-form-currency-step · FASE 3 (IMPLEMENTACIÓN)
+- Cambios en src/components/projects/project-form.tsx:
+  - Input presupuesto: step="1000000" → step="1000" + añadido inputMode="numeric" para móvil.
+  - <SelectTrigger>: añadido id="status" para accesibilidad (label huérfana).
+- Zod schema NO modificado: sigue siendo z.coerce.number().min(0) (cualquier número ≥ 0 es válido).
+- Bug en mi propio verifier descubierto al verde: \bid="status"\b fallaba porque \b después del " de cierre NO es word boundary. Corregido a \bid="status" (sin \b final). Lección: \b solo entre word-chars y non-word-chars, no después de un char de puntuación.
+
+### [2026-10-02] bug-project-form-currency-step · FASE 4 (REFACTOR & VERIFY)
+- npx vitest run tests/verifiers/bug-project-form-currency-step.spec.ts → 11/11 verde.
+- npx vitest run sobre 5 verifiers relacionados (project-form-edit, bug-proyectos-no-crea, budgets-persistence, budget-change-control, bug-project-form-currency-step) → 77/77 verde.
+- npx tsc --noEmit → 1 error preexistente en tests/verifiers/advances-suggestion.spec.ts:21 (TS2741 'contractId' missing). NO relacionado con este fix.
+- Sin any types nuevos.
+- AC-1, AC-2, AC-3, AC-4, AC-5, AC-6 todos cumplidos.
+- Cierre: bug del presupuesto + label huérfana resueltos y protegidos por el verifier.
+
+### [2026-10-02] Cleanup manual requerido
+- Archivo tests/verifiers/_debug_id_status.cjs quedó en disco (usado para diagnosticar el bug del verifier). El sandbox bloqueó rm/Remove-Item y mavis-trash no está disponible en este runtime → borrar manualmente desde el Explorador de Windows.

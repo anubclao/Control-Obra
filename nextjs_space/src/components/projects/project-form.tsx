@@ -175,8 +175,9 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
           <Input
             id="totalBudget"
             type="number"
+            inputMode="numeric"
             min="0"
-            step="1000000"
+            step="1000"
             {...register("totalBudget")}
           />
           {errors.totalBudget && (
@@ -193,7 +194,7 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
             onValueChange={(v) => setValue("status", v as ProjectStatus)}
             disabled
           >
-            <SelectTrigger disabled className="opacity-70">
+            <SelectTrigger id="status" disabled className="opacity-70">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
