@@ -36,10 +36,19 @@ export interface ExcelColumnMapping {
 
 // Detección automática: busca en los headers palabras clave
 export function detectColumns(headers: string[]): ExcelColumnMapping {
-  const lower = headers.map((h) => h.toLowerCase().trim());
+  // P0 plan 2026-10-02 (bugfix): normalizar acentos antes de comparar.
+  // Headers como "ÍTEM DE PAGO" o "DESCRIPCIÓN" no matcheaban con keywords
+  // "item" / "descripcion" porque la i/d con tilde son code points distintos.
+  // NFD descompone "í" en "i" + combining acute (U+0301), y la regex
+  // strip combining marks se queda con el caracter base. Asi
+  // "ÍTEM DE PAGO" → "item de pago" y matchea "item".
+  const strip = (s: string) =>
+    s.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const lower = headers.map(strip);
   const find = (...keywords: string[]) => {
     for (const kw of keywords) {
-      const idx = lower.findIndex((h) => h.includes(kw));
+      const normalizedKw = strip(kw);
+      const idx = lower.findIndex((h) => h.includes(normalizedKw));
       if (idx >= 0) return headers[idx];
     }
     return "";
@@ -305,22 +314,56 @@ export async function parseExcelFile(
     throw new Error(`La hoja "${firstSheetName}" no se pudo leer.`);
   }
 
-  // Convertir a array de objetos usando la primera fila como header.
-  const rows = XLSX.utils.sheet_to_json<Record<string, string | number>>(sheet, {
-    defval: "",
-    raw: false, // queremos strings para parsear con parseNumber
-  });
+  // P0 plan 2026-10-02 (bugfix): muchos presupuestos oficiales (ej:
+  // Parques del Valle) tienen una fila de titulo arriba de los headers
+  // reales. sheet_to_json por defecto usa la primera fila como header,
+  // asi que termina leyendo "PRESUPUESTO GENERAL PARQUES DEL VALLE" como
+  // un nombre de columna y todas las detecciones de keywords fallan.
+  //
+  // Estrategia: leer primero con la fila 1 como header. Si
+  // detectColumns no reconoce al menos 3 campos (description +
+  // quantity + unitPrice son los criticos), reintentar saltando 1 fila
+  // (header en fila 2). El umbral bajo evita falsos positivos cuando el
+  // usuario SI tiene headers en fila 1.
+  const REQUIRED_KEYWORDS = ["description", "quantity", "unitPrice"] as const;
+  let normalized: Record<string, string>[] = [];
+  let headerRowUsed = 1;
 
-  // Normalizar keys a string (sheet_to_json ya lo hace, pero defendámonos).
-  const normalized = rows.map((r) => {
-    const out: Record<string, string> = {};
-    for (const [k, v] of Object.entries(r)) {
-      out[String(k)] = v === null || v === undefined ? "" : String(v);
+  for (const skipRows of [0, 1, 2]) {
+    const rows = XLSX.utils.sheet_to_json<
+      Record<string, string | number>
+    >(sheet, {
+      defval: "",
+      raw: false,
+      ...(skipRows > 0 ? { range: skipRows } : {}),
+    });
+    const candidate = rows.map((r) => {
+      const out: Record<string, string> = {};
+      for (const [k, v] of Object.entries(r)) {
+        out[String(k)] = v === null || v === undefined ? "" : String(v);
+      }
+      return out;
+    });
+    if (candidate.length === 0) continue;
+    const detected = detectColumns(Object.keys(candidate[0]));
+    const hits = REQUIRED_KEYWORDS.filter((k) => detected[k]).length;
+    if (hits >= 3) {
+      normalized = candidate;
+      headerRowUsed = skipRows + 1;
+      break;
     }
-    return out;
-  });
+    // guarda el primer intento por si nada matchea, asi devolvemos
+    // warnings utiles en vez de un array vacio.
+    if (skipRows === 0) normalized = candidate;
+  }
 
-  return parseExcelContent(normalized, customMapping);
+  const result = parseExcelContent(normalized, customMapping);
+  if (headerRowUsed > 1) {
+    result.warnings.unshift(
+      `Encabezados detectados en la fila ${headerRowUsed} (la fila 1 contiene un titulo).`,
+    );
+  }
+  return result;
 }
 
 // Datos de ejemplo para "Probar con archivo de muestra"
