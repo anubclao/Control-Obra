@@ -47,8 +47,19 @@ import type { Quotation, QuotationItem, QuotationStatus } from "@/types";
 
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { ModuleExplanationCard } from "@/components/ui/module-explanation-card";
+import { KpiMini } from "@/components/ui/kpi-card";
+import { PanelState } from "@/components/ui/panel-state";
+import { PaginationControl } from "@/components/ui/pagination-control";
 export default function CotizacionesPage() {
-  const { quotations, deleteQuotation, setStatus } = useQuotationsStore();
+  const {
+    quotations,
+    deleteQuotation,
+    setStatus,
+    loadPage,
+    loading: quotationsLoading,
+    error: quotationsError,
+    pagination: quotationsPagination,
+  } = useQuotationsStore();
   const { getClient } = useClientsStore();
   const { user } = useAuthStore();
   const [search, setSearch] = useState("");
@@ -95,20 +106,23 @@ export default function CotizacionesPage() {
 
   return (
     <div className="space-y-6">
-
       <ModuleExplanationCard
         icon={FileSpreadsheet}
         variant="guide"
         title="Cotizaciones"
         description="Cotizaciones con items, IVA, descuentos."
         steps={[
-            { title: "Elige cliente", description: "De la cartera o crea uno nuevo." },
-            { title: "Agrega items", description: "Unidad, cantidad y precio unitario." },
-            { title: "Envia al cliente", description: "Cambia a SENT." },
-          ]}
-          tips={[
-            "ACCEPTED se convierte en Proyecto desde Reportes.",
-          ]}
+          {
+            title: "Elige cliente",
+            description: "De la cartera o crea uno nuevo.",
+          },
+          {
+            title: "Agrega items",
+            description: "Unidad, cantidad y precio unitario.",
+          },
+          { title: "Envia al cliente", description: "Cambia a SENT." },
+        ]}
+        tips={["ACCEPTED se convierte en Proyecto desde Reportes."]}
       />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -198,12 +212,16 @@ export default function CotizacionesPage() {
         </Select>
       </div>
 
-      {filtered.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-12 text-center">
-          <FileSpreadsheet className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-4 text-lg font-semibold">Sin cotizaciones</h3>
-        </div>
-      ) : (
+      <PanelState
+        loading={quotationsLoading && quotations.length === 0}
+        error={quotations.length === 0 ? quotationsError : null}
+        onRetry={() => useQuotationsStore().load()}
+        isEmpty={filtered.length === 0}
+        emptyTitle="Sin cotizaciones"
+        emptyDescription="Crea tu primera cotizacion desde el boton superior."
+        emptyIcon={FileSpreadsheet}
+        skeletonRows={3}
+      >
         <div className="space-y-2">
           {filtered.map((q) => {
             const client = getClient(q.clientId);
@@ -220,6 +238,18 @@ export default function CotizacionesPage() {
             );
           })}
         </div>
+      </PanelState>
+
+      {quotationsPagination && (
+        <PaginationControl
+          page={quotationsPagination.page}
+          totalPages={quotationsPagination.totalPages}
+          total={quotationsPagination.total}
+          limit={quotationsPagination.limit}
+          loading={quotationsLoading}
+          onPageChange={(p) => loadPage(p, quotationsPagination.limit)}
+          noun="cotizaciones"
+        />
       )}
 
       {/* Modal ver detalle */}
@@ -265,15 +295,11 @@ function Kpi({
   icon: React.ComponentType<{ className?: string }>;
   color: string;
 }) {
-  return (
-    <div className="rounded-lg border bg-card p-3">
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Icon className={`h-3.5 w-3.5 ${color}`} />
-        {label}
-      </div>
-      <p className="mt-1 text-xl font-semibold">{value}</p>
-    </div>
-  );
+  // Wrapper compatible con la version previa; reusa `KpiMini` para
+  // tener el mismo look. Cast a `LucideIcon` (ForwardRefExoticComponent)
+  // porque KpiMini exige el tipo estricto de lucide-react.
+  const Lucide = Icon as unknown as Parameters<typeof KpiMini>[0]["icon"];
+  return <KpiMini label={label} value={value} icon={Lucide} color={color} />;
 }
 
 function QuotationRow({

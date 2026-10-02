@@ -79,14 +79,14 @@ export function authFailureResponse(
 export async function requireAuth(): Promise<AuthResult> {
   const jar = await cookies();
   const cookieValue = jar.get(SESSION_COOKIE)?.value;
-  const userId = verifySessionCookie(cookieValue);
-  if (!userId) {
+  // P1 (seccion 4.4): verifySessionCookie ahora valida firma + exp +
+  // fila en user_sessions (no revocada). Si falla cualquiera de las
+  // tres, devolvemos 401 con la misma respuesta (anti-enumeracion).
+  const session = await verifySessionCookie(cookieValue);
+  if (!session) {
     return {
       ok: false,
-      response: NextResponse.json(
-        { error: "No autenticado" },
-        { status: 401 },
-      ),
+      response: NextResponse.json({ error: "No autenticado" }, { status: 401 }),
     };
   }
   // Validar contra BD: user existe y está ACTIVE.
@@ -95,7 +95,7 @@ export async function requireAuth(): Promise<AuthResult> {
        FROM users
       WHERE id = ? AND status = 'ACTIVE'
       LIMIT 1`,
-    [userId],
+    [session.userId],
   );
   if (!rows.length) {
     // Sesión apuntando a user inválido / suspendido → limpiamos cookie.
@@ -133,9 +133,7 @@ export async function requireAdmin(): Promise<AdminResult> {
 /**
  * Verifica que el user tenga alguno de los roles dados.
  */
-export async function requireRole(
-  ...roles: Role[]
-): Promise<AuthResult> {
+export async function requireRole(...roles: Role[]): Promise<AuthResult> {
   const auth = await requireAuth();
   if (!auth.ok) return auth;
   if (!roles.includes(auth.user.role)) {

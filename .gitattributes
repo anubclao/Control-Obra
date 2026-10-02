@@ -1,0 +1,14 @@
+# .gitattributes
+# Normalizar line endings para evitar que CRLF/LF se marquen como diffs
+# en clones de Windows. Los .tsx/.ts/.js/.mjs/.json/.md son LF en el repo;
+# al clonar en Windows se convierten a CRLF automáticamente.
+# Los .docx/.xlsx/.pdf siempre son binarios.
+
+* text=auto eol=lf
+
+*.docx binary
+*.xlsx binary
+*.pdf binary
+*.png binary
+*.jpg binary
+*.gif binary

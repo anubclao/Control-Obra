@@ -1,0 +1,137 @@
+﻿
+=== projects ===
+  id                           varchar(36)                  NOT NULL
+  code                         varchar(40)                  NOT NULL
+  name                         varchar(255)                 NOT NULL
+  client                       varchar(255)                 NOT NULL
+  location                     varchar(255)                 NOT NULL
+  start_date                   date                         NOT NULL
+  estimated_end_date           date                         NOT NULL
+  total_budget                 decimal(15,2)                NOT NULL default=0.00
+  executed_amount              decimal(15,2)                NOT NULL default=0.00
+  status                       enum('IN_PLANNING','IN_EXECUTION','PAUSED','COMPLETED') NOT NULL default=IN_PLANNING
+  description                  text                         NULL
+  created_by                   varchar(36)                  NULL
+  created_at                   datetime                     NOT NULL default=CURRENT_TIMESTAMP
+  updated_at                   datetime                     NOT NULL default=CURRENT_TIMESTAMP
+
+=== payment_requests ===
+  id                           varchar(36)                  NOT NULL
+  request_number               varchar(40)                  NOT NULL
+  project_id                   varchar(36)                  NOT NULL
+  provider_id                  varchar(36)                  NULL
+  work_cut_id                  varchar(36)                  NULL
+  type                         enum('CORTE_OBRA','ANTICIPO','RETENCION','SUMINISTRO','SERVICIOS','HONORARIOS','OTROS') NOT NULL
+  amount                       decimal(15,2)                NOT NULL
+  priority                     enum('LOW','NORMAL','HIGH','URGENT') NOT NULL default=NORMAL
+  status                       enum('PENDING','APPROVED_LEVEL_1','APPROVED_LEVEL_2','APPROVED','REJECTED','PAID','CANCELLED') NOT NULL default=PENDING
+  current_approval_level       int                          NOT NULL default=0
+  required_approval_level      int                          NOT NULL default=1
+  beneficiary_name             varchar(255)                 NOT NULL
+  beneficiary_nit              varchar(40)                  NOT NULL
+  bank_name                    varchar(120)                 NOT NULL
+  account_type                 enum('SAVINGS','CHECKING')   NOT NULL
+  account_number               varchar(60)                  NOT NULL
+  due_date                     date                         NULL
+  description                  text                         NULL
+  paid_at                      datetime                     NULL
+  paid_reference               varchar(255)                 NULL
+  paid_method                  enum('TRANSFER','CHECK','CASH') NULL
+  rejection_reason             text                         NULL
+  created_by                   varchar(36)                  NOT NULL
+  created_at                   datetime                     NOT NULL default=CURRENT_TIMESTAMP
+  updated_at                   datetime                     NOT NULL default=CURRENT_TIMESTAMP
+
+=== expenses ===
+  id                           varchar(36)                  NOT NULL
+  expense_number               varchar(40)                  NOT NULL
+  project_id                   varchar(36)                  NOT NULL
+  provider_id                  varchar(36)                  NOT NULL
+  type                         enum('CONTRATO_OBRA_CIVIL_POLIZAS','CONTRATO_OBRA_CIVIL_SIN_POLIZAS','PRESTACION_SERVICIOS','LABORAL_OBRA','LABORAL_TERMINO_INDEFINIDO','LABORAL_TERMINO_DEFINIDO','ORDEN_SERVICIO_POLIZAS','ORDEN_SERVICIO_SIN_POLIZAS','ORDEN_COMPRA_POLIZAS','ORDEN_COMPRA_SIN_POLIZAS','SOLICITUD_RECURSO','SOLICITUD_REINTEGRO','LEGALIZACION_GASTO') NOT NULL
+  description                  varchar(500)                 NOT NULL
+  amount                       decimal(15,2)                NOT NULL default=0.00
+  date                         date                         NOT NULL
+  status                       enum('DRAFT','PENDING_APPROVAL','APPROVED','REJECTED','PAID') NOT NULL default=DRAFT
+  advance_percent              decimal(5,2)                 NULL
+  has_polizas                  tinyint(1)                   NULL
+  polizas_vigencia_desde       date                         NULL
+  polizas_vigencia_hasta       date                         NULL
+  cotizacion_aprobada          tinyint(1)                   NULL
+  approved_by                  varchar(36)                  NULL
+  approved_by_name             varchar(180)                 NULL
+  approved_at                  datetime                     NULL
+  rejected_reason              text                         NULL
+  created_by                   varchar(36)                  NULL
+  created_by_name              varchar(180)                 NULL
+  created_at                   datetime                     NOT NULL default=CURRENT_TIMESTAMP
+  updated_at                   datetime                     NOT NULL default=CURRENT_TIMESTAMP
+
+=== contracts ===
+  id                           varchar(36)                  NOT NULL
+  contract_number              varchar(40)                  NOT NULL
+  project_id                   varchar(36)                  NOT NULL
+  provider_id                  varchar(36)                  NOT NULL
+  type                         enum('OBRA','SUMINISTRO','SERVICIOS','CONSULTORIA') NOT NULL
+  value                        decimal(15,2)                NOT NULL
+  start_date                   date                         NOT NULL
+  end_date                     date                         NOT NULL
+  status                       enum('DRAFT','ACTIVE','COMPLETED','CANCELLED','SUSPENDED') NOT NULL default=DRAFT
+  scope_of_work                text                         NOT NULL
+  retention_percent            decimal(5,2)                 NOT NULL default=0.00
+  advance_percent              decimal(5,2)                 NOT NULL default=0.00
+  notes                        text                         NULL
+  created_by                   varchar(36)                  NULL
+  created_at                   datetime                     NOT NULL default=CURRENT_TIMESTAMP
+  updated_at                   datetime                     NOT NULL default=CURRENT_TIMESTAMP
+
+=== employees ===
+  id                           varchar(36)                  NOT NULL
+  employee_number              varchar(40)                  NOT NULL
+  full_name                    varchar(255)                 NOT NULL
+  document_id                  varchar(40)                  NOT NULL
+  position                     varchar(120)                 NOT NULL
+  department                   enum('GERENCIA','OPERACIONES','CONTABILIDAD','TESORERIA','HSEQ','COMERCIAL','ADMINISTRATIVO') NOT NULL
+  contract_type                enum('INDEFINIDO','FIJO','OBRA_LABOR','PRESTACION','APRENDIZAJE') NOT NULL
+  start_date                   date                         NOT NULL
+  end_date                     date                         NULL
+  salary                       decimal(15,2)                NULL
+  eps                          varchar(120)                 NULL
+  pension_fund                 varchar(120)                 NULL
+  arl                          varchar(120)                 NULL
+  risk_level                   tinyint                      NULL
+  bank_name                    varchar(120)                 NULL
+  account_type                 enum('SAVINGS','CHECKING')   NULL
+  account_number               varchar(60)                  NULL
+  email                        varchar(180)                 NULL
+  phone                        varchar(60)                  NULL
+  status                       enum('ACTIVE','INACTIVE','ON_LEAVE','TERMINATED') NOT NULL default=ACTIVE
+  user_id                      varchar(36)                  NULL
+  created_at                   datetime                     NOT NULL default=CURRENT_TIMESTAMP
+  updated_at                   datetime                     NOT NULL default=CURRENT_TIMESTAMP
+
+=== work_logs ===
+  id                           varchar(36)                  NOT NULL
+  project_id                   varchar(36)                  NOT NULL
+  date                         date                         NOT NULL
+  weather                      enum('SOLEADO','NUBLADO','LLUVIOSO','TORMENTA','VIENTO','NIEBLA','OTRO') NOT NULL
+  temperature                  decimal(4,1)                 NULL
+  workers_count                int                          NOT NULL default=0
+  activities                   text                         NOT NULL
+  incidents                    text                         NULL
+  materials                    text                         NULL
+  observations                 text                         NULL
+  created_by                   varchar(36)                  NOT NULL
+  created_by_name              varchar(180)                 NOT NULL
+  created_at                   datetime                     NOT NULL default=CURRENT_TIMESTAMP
+
+=== users ===
+  id                           varchar(36)                  NOT NULL
+  email                        varchar(180)                 NOT NULL
+  name                         varchar(180)                 NOT NULL
+  role                         enum('ADMIN','GERENTE','DIRECTOR','RESIDENTE','CONTABILIDAD','TESORERIA','HSEQ','CLIENTE','USER') NOT NULL
+  area                         enum('tecnico','administrativo','ventas') NOT NULL
+  avatar_url                   varchar(500)                 NULL
+  is_active                    tinyint(1)                   NOT NULL default=1
+  last_login_at                datetime                     NULL
+  created_at                   datetime                     NOT NULL default=CURRENT_TIMESTAMP
+  updated_at                   datetime                     NOT NULL default=CURRENT_TIMESTAMP

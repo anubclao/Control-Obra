@@ -57,9 +57,16 @@ describe("Cuts workflow — motivo de rechazo obligatorio", () => {
 
     it("las demás acciones no exigen motivo", () => {
       expect(evaluateCutAction("DRAFT", "SUBMIT", "RESIDENTE").ok).toBe(true);
-      expect(evaluateCutAction("SUBMITTED", "VALIDATE", DIRECTOR).ok).toBe(true);
+      expect(evaluateCutAction("SUBMITTED", "VALIDATE", DIRECTOR).ok).toBe(
+        true,
+      );
       expect(evaluateCutAction("VALIDATED", "APPROVE", "ADMIN").ok).toBe(true);
-      expect(evaluateCutAction("APPROVED", "PAY", "TESORERIA").ok).toBe(true);
+      // P2 (Fase 2.4): la accion PAY del corte fue removida. La fuente
+      // de verdad del estado PAID es la solicitud de pago. Cualquier
+      // intento de PATCH /api/cuts con action=PAY ahora sera rechazado
+      // por la maquina de estados con FORBIDDEN_ROLE (roles vacios) o
+      // INVALID_TRANSITION (APPROVED ya no transiciona a PAID).
+      expect(evaluateCutAction("APPROVED", "PAY", "TESORERIA").ok).toBe(false);
     });
   });
 });

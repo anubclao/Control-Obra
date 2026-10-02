@@ -1,5 +1,9 @@
 // Extraido de cuts-store.ts (constantes + helpers)
-import type { ApprovalAction, WorkCutDocumentType, WorkCutStatus } from "@/types";
+import type {
+  ApprovalAction,
+  WorkCutDocumentType,
+  WorkCutStatus,
+} from "@/types";
 
 export const CUT_STATUS_LABELS: Record<WorkCutStatus, string> = {
   DRAFT: "Borrador",
@@ -41,7 +45,10 @@ export const ACTION_BUTTONS: Record<WorkCutStatus, ApprovalAction[]> = {
   DRAFT: ["SUBMIT"],
   SUBMITTED: ["VALIDATE", "REJECT"],
   VALIDATED: ["APPROVE", "REJECT"],
-  APPROVED: ["PAY"],
+  // P2: el corte ya no tiene su propio boton de pago. Cuando se paga
+  // la solicitud asociada, el handler actualiza work_cuts.status a
+  // PAID. Asi no hay dos fuentes de verdad que se desincronicen.
+  APPROVED: [],
   REJECTED: ["SUBMIT"],
   PAID: [],
 };

@@ -19,6 +19,7 @@ import {
   Banknote,
   Ban,
   BadgeCheck,
+  Copy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -93,6 +94,7 @@ export default function PaymentDetailPage() {
     "TRANSFER",
   );
   const [actionError, setActionError] = useState<string | null>(null);
+  const [actionPending, setActionPending] = useState(false);
 
   const payment = getPayment(id);
 
@@ -123,29 +125,40 @@ export default function PaymentDetailPage() {
   const userRole = user?.role ?? "USER";
   const availableActions = getAvailablePaymentActions(payment as any, userRole);
 
-  function handleAction() {
+  async function handleAction() {
     if (!actionDialog || !user) return;
+    // P1 (docs/DOCUMENTACION_TECNICA_Y_MEJORAS.md, seccion 4.1):
+    //   Antes performAction era async pero NO se esperaba; result.ok
+    //   era undefined, se mostraba "Error desconocido" aunque la
+    //   accion SI se aplicaba, y el reintento fallaba con error de
+    //   transicion. Ahora esperamos la promesa y deshabilitamos el
+    //   boton mientras se procesa.
     setActionError(null);
-    const result = performAction(
-      payment!.id,
-      actionDialog.action,
-      { id: user.id, name: user.name, role: user.role },
-      {
-        comments: actionComments || undefined,
-        rejectionReason:
-          actionDialog.action === "REJECT" ? rejectionReason : undefined,
-        paymentReference: actionDialog.action === "PAY" ? payRef : undefined,
-        paymentMethod: actionDialog.action === "PAY" ? payMethod : undefined,
-      },
-    );
-    if (!result.ok) {
-      setActionError(result.error || "Error desconocido");
-      return;
+    setActionPending(true);
+    try {
+      const result = await performAction(
+        payment!.id,
+        actionDialog.action,
+        { id: user.id, name: user.name, role: user.role },
+        {
+          comments: actionComments || undefined,
+          rejectionReason:
+            actionDialog.action === "REJECT" ? rejectionReason : undefined,
+          paymentReference: actionDialog.action === "PAY" ? payRef : undefined,
+          paymentMethod: actionDialog.action === "PAY" ? payMethod : undefined,
+        },
+      );
+      if (!result.ok) {
+        setActionError(result.error || "Error desconocido");
+        return;
+      }
+      setActionDialog(null);
+      setActionComments("");
+      setRejectionReason("");
+      setPayRef("");
+    } finally {
+      setActionPending(false);
     }
-    setActionDialog(null);
-    setActionComments("");
-    setRejectionReason("");
-    setPayRef("");
   }
 
   return (
@@ -161,6 +174,18 @@ export default function PaymentDetailPage() {
           <Button onClick={() => setEditOpen(true)} variant="outline" size="sm">
             <Pencil className="mr-2 h-4 w-4" />
             Editar
+          </Button>
+        )}
+        {/* P2 plan 2026-10-01 (fase 6.3): si la solicitud esta
+            REJECTED, habilitamos un atajo que redirige al form de
+            crear con ?replaces=<id>. El form pre-rellena los datos
+            y al guardar se persiste `replaces_request_id`. */}
+        {payment.status === "REJECTED" && (
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/administrativo/pagos?replaces=${payment.id}`}>
+              <Copy className="mr-2 h-4 w-4" />
+              Duplicar como nueva
+            </Link>
           </Button>
         )}
       </div>
@@ -656,12 +681,13 @@ export default function PaymentDetailPage() {
               }
               onClick={handleAction}
               disabled={
+                actionPending ||
                 (actionDialog?.action === "REJECT" &&
                   !rejectionReason.trim()) ||
                 (actionDialog?.action === "PAY" && !payRef.trim())
               }
             >
-              Confirmar
+              {actionPending ? "Procesando..." : "Confirmar"}
             </Button>
           </DialogFooter>
         </DialogContent>

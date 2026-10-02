@@ -23,13 +23,17 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ModuleExplanationCard } from "@/components/ui/module-explanation-card";
+import { KpiCard } from "@/components/ui/kpi-card";
+import { PanelState } from "@/components/ui/panel-state";
 import {
   useDataStore,
   useProjectsStore,
   usePaymentsStore,
+  useTaxesStore,
 } from "@/lib/data-store";
 import { useDashboardStats } from "@/lib/dashboard-stats";
-import { formatCurrency } from "@/lib/utils";
+import { resolveTaxRates } from "@/lib/taxes-fetcher";
+import { formatPercent, formatCurrency } from "@/lib/utils";
 
 const paymentStatusConfig = {
   PENDING: { label: "Pendiente", variant: "warning" as const },
@@ -52,22 +56,38 @@ const paymentStatusIcon = {
 };
 
 export default function AdministrativoDashboard() {
-  const { stats, loading } = useDashboardStats();
+  // P1 (docs/DOCUMENTACION_TECNICA_Y_MEJORAS.md, seccion 4.3): el hook
+  //   ya expone loading, error y reload. Antes el dashboard no usaba
+  //   ninguno: mostraba $0 tanto si estaba cargando como si la API
+  //   fallaba, dejando KPIs en silencio.
+  const {
+    stats,
+    loading: statsLoading,
+    error: statsError,
+    reload: reloadStats,
+  } = useDashboardStats();
   const { payments, load: loadPayments } = usePaymentsStore();
   const { projects, load: loadProjects } = useProjectsStore();
+  const { taxes, load: loadTaxes } = useTaxesStore();
 
   useEffect(() => {
     loadPayments();
     loadProjects();
+    loadTaxes();
   }, []);
 
   const recentPayments = payments.slice(0, 6);
   const totalPendingAmount = stats.pendingAmount;
   const totalExecuted = stats.totalExecutedAdmin;
   const totalBudget = stats.totalBudget;
-  // Indicadores derivados — se mantienen como KPIs operacionales
-  const retention = totalExecuted * 0.1;
-  const ivaReference = totalExecuted * 0.19;
+  // P2 (seccion 4.3): retencion/IVA ya no son hardcoded; se leen
+  //   de la tabla tax_configs. Si no hay config activa, caen a los
+  //   defaults (10% / 19%) y `usingDefaults` permite avisar al admin.
+  const taxRates = resolveTaxRates(taxes);
+  const retention = totalExecuted * taxRates.retention;
+  const ivaReference = totalExecuted * taxRates.iva;
+  const paymentsLoading = useDataStore((s: any) => s.payments.loading);
+  const paymentsError = useDataStore((s: any) => s.payments.error);
 
   return (
     <div className="space-y-6">
@@ -100,58 +120,55 @@ export default function AdministrativoDashboard() {
       />
 
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Dashboard Administrativo</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">
+          Dashboard Administrativo
+        </h1>
         <p className="text-sm text-muted-foreground">
           Flujo de pagos, reportes financieros y operaciones administrativas
         </p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Por pagar</CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{formatCurrency(totalPendingAmount)}</div>
-            <p className="text-xs text-muted-foreground">
-              {stats.pendingPayments} solicitudes activas
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total ejecutado</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{formatCurrency(totalExecuted)}</div>
-            <p className="text-xs text-muted-foreground">de {formatCurrency(totalBudget)}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Retención estimada</CardTitle>
-            <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{formatCurrency(retention)}</div>
-            <p className="text-xs text-muted-foreground">10% sobre ejecutado (referencia)</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Empleados activos</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{stats.activeEmployees}</div>
-            <p className="text-xs text-muted-foreground">En RRHH</p>
-          </CardContent>
-        </Card>
+        <KpiCard
+          title="Por pagar"
+          icon={Wallet}
+          value={formatCurrency(totalPendingAmount)}
+          subtitle={`${stats.pendingPayments} solicitudes activas`}
+          loading={statsLoading}
+          error={statsError}
+          onRetry={reloadStats}
+        />
+        <KpiCard
+          title="Total ejecutado"
+          icon={TrendingUp}
+          value={formatCurrency(totalExecuted)}
+          subtitle={`de ${formatCurrency(totalBudget)}`}
+          loading={statsLoading}
+          error={statsError}
+          onRetry={reloadStats}
+        />
+        <KpiCard
+          title="Retención estimada"
+          icon={FileSpreadsheet}
+          value={formatCurrency(retention)}
+          subtitle={
+            taxRates.usingDefaults.retention
+              ? `${formatPercent(taxRates.retention)} sobre ejecutado (default: configura Impuestos)`
+              : `${formatPercent(taxRates.retention)} sobre ejecutado (desde Impuestos)`
+          }
+          loading={statsLoading}
+          error={statsError}
+          onRetry={reloadStats}
+        />
+        <KpiCard
+          title="Empleados activos"
+          icon={Users}
+          value={stats.activeEmployees}
+          subtitle="En RRHH"
+          loading={statsLoading}
+          error={statsError}
+          onRetry={reloadStats}
+        />
       </div>
 
       <Card>
@@ -170,17 +187,19 @@ export default function AdministrativoDashboard() {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            {recentPayments.length === 0 ? (
-              <div className="rounded-lg border border-dashed p-8 text-center">
-                <p className="text-sm font-medium">Sin solicitudes de pago</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Crea una para iniciar el flujo de aprobación multinivel.
-                </p>
-                <Button asChild className="mt-4" size="sm">
-                  <Link href="/administrativo/pagos">Crear solicitud</Link>
-                </Button>
-              </div>
-            ) : (
+            <PanelState
+              loading={paymentsLoading && recentPayments.length === 0}
+              error={recentPayments.length === 0 ? paymentsError : null}
+              onRetry={loadPayments}
+              isEmpty={recentPayments.length === 0}
+              emptyTitle="Sin solicitudes de pago"
+              emptyDescription="Crea una para iniciar el flujo de aprobación multinivel."
+              emptyCta={{
+                label: "Crear solicitud",
+                href: "/administrativo/pagos",
+              }}
+              skeletonRows={3}
+            >
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs uppercase text-muted-foreground">
@@ -194,10 +213,15 @@ export default function AdministrativoDashboard() {
                 </thead>
                 <tbody>
                   {recentPayments.map((payment) => {
-                    const project = projects.find((p) => p.id === payment.projectId);
+                    const project = projects.find(
+                      (p) => p.id === payment.projectId,
+                    );
                     const config = paymentStatusConfig[payment.status];
                     return (
-                      <tr key={payment.id} className="border-b last:border-0 hover:bg-accent">
+                      <tr
+                        key={payment.id}
+                        className="border-b last:border-0 hover:bg-accent"
+                      >
                         <td className="py-3 font-mono text-xs">
                           <Link href={`/administrativo/pagos/${payment.id}`}>
                             {payment.requestNumber}
@@ -205,12 +229,17 @@ export default function AdministrativoDashboard() {
                         </td>
                         <td className="py-3 text-xs">{project?.name ?? "—"}</td>
                         <td className="py-3">{payment.beneficiaryName}</td>
-                        <td className="py-3 text-xs text-muted-foreground">{payment.type}</td>
+                        <td className="py-3 text-xs text-muted-foreground">
+                          {payment.type}
+                        </td>
                         <td className="py-3 text-right font-medium">
                           {formatCurrency(payment.amount)}
                         </td>
                         <td className="py-3">
-                          <Badge variant={config.variant} className="flex w-fit items-center gap-1">
+                          <Badge
+                            variant={config.variant}
+                            className="flex w-fit items-center gap-1"
+                          >
                             {paymentStatusIcon[payment.status]}
                             {config.label}
                           </Badge>
@@ -220,7 +249,7 @@ export default function AdministrativoDashboard() {
                   })}
                 </tbody>
               </table>
-            )}
+            </PanelState>
           </div>
         </CardContent>
       </Card>
@@ -232,10 +261,30 @@ export default function AdministrativoDashboard() {
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
-            { href: "/administrativo/tesoreria", icon: Wallet, title: "Tesorería", desc: "Flujo de caja" },
-            { href: "/administrativo/pagos", icon: ListChecks, title: "Pagos", desc: "Aprobaciones" },
-            { href: "/administrativo/reportes/financiero", icon: FileSpreadsheet, title: "Reportes", desc: "Financiero" },
-            { href: "/administrativo/impuestos", icon: FileSpreadsheet, title: "Impuestos", desc: "Configuración" },
+            {
+              href: "/administrativo/tesoreria",
+              icon: Wallet,
+              title: "Tesorería",
+              desc: "Flujo de caja",
+            },
+            {
+              href: "/administrativo/pagos",
+              icon: ListChecks,
+              title: "Pagos",
+              desc: "Aprobaciones",
+            },
+            {
+              href: "/administrativo/reportes/financiero",
+              icon: FileSpreadsheet,
+              title: "Reportes",
+              desc: "Financiero",
+            },
+            {
+              href: "/administrativo/impuestos",
+              icon: FileSpreadsheet,
+              title: "Impuestos",
+              desc: "Configuración",
+            },
           ].map((item) => {
             const Icon = item.icon;
             return (
@@ -254,8 +303,14 @@ export default function AdministrativoDashboard() {
       </Card>
 
       <p className="text-center text-xs text-muted-foreground">
-        Referencia: la columna &quot;Retención estimada&quot; usa 10% sobre ejecutado.
-        La columna IVA referencia 19% — para cálculo real ve a Impuestos.
+        Referencia: la columna &quot;Retención estimada&quot; usa{" "}
+        {formatPercent(taxRates.retention)} sobre ejecutado
+        {taxRates.usingDefaults.retention
+          ? " (valor por defecto; configura Impuestos)"
+          : " (desde Impuestos)"}
+        . La columna IVA referencia {formatPercent(taxRates.iva)}
+        {taxRates.usingDefaults.iva ? " (default)" : " (configurado)"} — para
+        cálculo real ve a Impuestos.
       </p>
     </div>
   );

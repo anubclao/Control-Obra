@@ -23,6 +23,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ModuleExplanationCard } from "@/components/ui/module-explanation-card";
+import { KpiCard } from "@/components/ui/kpi-card";
+import { PanelState } from "@/components/ui/panel-state";
 import { useProjectsStore, useCutsStore } from "@/lib/data-store";
 import { useDashboardStats } from "@/lib/dashboard-stats";
 import { formatCurrency, formatPercent } from "@/lib/utils";
@@ -42,9 +44,26 @@ const statusIcon = {
 };
 
 export default function TecnicoDashboard() {
-  const { stats, loading } = useDashboardStats();
-  const { projects, load: loadProjects } = useProjectsStore();
-  const { cuts, load: loadCuts } = useCutsStore();
+  // P1 (seccion 4.3): usamos loading/error/reload del hook en vez de
+  //   mostrar $0 silencioso.
+  const {
+    stats,
+    loading: statsLoading,
+    error: statsError,
+    reload: reloadStats,
+  } = useDashboardStats();
+  const {
+    projects,
+    loading: projectsLoading,
+    error: projectsError,
+    load: loadProjects,
+  } = useProjectsStore();
+  const {
+    cuts,
+    loading: cutsLoading,
+    error: cutsError,
+    load: loadCuts,
+  } = useCutsStore();
 
   useEffect(() => {
     loadProjects();
@@ -52,7 +71,9 @@ export default function TecnicoDashboard() {
   }, []);
 
   const activeProjects = projects.filter((p) => p.status === "IN_EXECUTION");
-  const pendingCuts = cuts.filter((c) => ["SUBMITTED", "VALIDATED"].includes(c.status));
+  const pendingCuts = cuts.filter((c) =>
+    ["SUBMITTED", "VALIDATED"].includes(c.status),
+  );
 
   return (
     <div className="space-y-6">
@@ -85,60 +106,51 @@ export default function TecnicoDashboard() {
       />
 
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Dashboard Técnico</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">
+          Dashboard Técnico
+        </h1>
         <p className="text-sm text-muted-foreground">
           Estado de proyectos, presupuestos y avance de obra
         </p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Proyectos activos</CardTitle>
-            <FolderKanban className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{stats.activeProjects}</div>
-            <p className="text-xs text-muted-foreground">
-              de {stats.totalProjects} totales · en ejecución
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Presupuesto total</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{formatCurrency(stats.totalBudget)}</div>
-            <p className="text-xs text-muted-foreground">
-              Ejecutado: {formatPercent(stats.executionPercent)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Cortes pendientes</CardTitle>
-            <Scissors className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{stats.pendingCuts}</div>
-            <p className="text-xs text-muted-foreground">Requieren validación</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Bitácoras (7 días)</CardTitle>
-            <Truck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{stats.recentLogs}</div>
-            <p className="text-xs text-muted-foreground">Registradas recientemente</p>
-          </CardContent>
-        </Card>
+        <KpiCard
+          title="Proyectos activos"
+          icon={FolderKanban}
+          value={stats.activeProjects}
+          subtitle={`de ${stats.totalProjects} totales · en ejecución`}
+          loading={statsLoading}
+          error={statsError}
+          onRetry={reloadStats}
+        />
+        <KpiCard
+          title="Presupuesto total"
+          icon={TrendingUp}
+          value={formatCurrency(stats.totalBudget)}
+          subtitle={`Ejecutado: ${formatPercent(stats.executionPercent)}`}
+          loading={statsLoading}
+          error={statsError}
+          onRetry={reloadStats}
+        />
+        <KpiCard
+          title="Cortes pendientes"
+          icon={Scissors}
+          value={stats.pendingCuts}
+          subtitle="Requieren validación"
+          loading={statsLoading}
+          error={statsError}
+          onRetry={reloadStats}
+        />
+        <KpiCard
+          title="Bitácoras (7 días)"
+          icon={Truck}
+          value={stats.recentLogs}
+          subtitle="Registradas recientemente"
+          loading={statsLoading}
+          error={statsError}
+          onRetry={reloadStats}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -147,7 +159,9 @@ export default function TecnicoDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Proyectos en ejecución</CardTitle>
-                <CardDescription>Estado actual y avance de obra</CardDescription>
+                <CardDescription>
+                  Estado actual y avance de obra
+                </CardDescription>
               </div>
               <Button asChild variant="ghost" size="sm">
                 <Link href="/tecnico/proyectos">
@@ -157,20 +171,17 @@ export default function TecnicoDashboard() {
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            {loading ? (
-              <p className="text-sm text-muted-foreground">Cargando proyectos…</p>
-            ) : activeProjects.length === 0 ? (
-              <div className="rounded-lg border border-dashed p-8 text-center">
-                <p className="text-sm font-medium">Sin proyectos activos</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Crea tu primer proyecto para empezar a gestionar obra.
-                </p>
-                <Button asChild className="mt-4" size="sm">
-                  <Link href="/tecnico/proyectos">Crear proyecto</Link>
-                </Button>
-              </div>
-            ) : (
-              activeProjects.map((project) => {
+            <PanelState
+              loading={projectsLoading && activeProjects.length === 0}
+              error={activeProjects.length === 0 ? projectsError : null}
+              onRetry={loadProjects}
+              isEmpty={activeProjects.length === 0}
+              emptyTitle="Sin proyectos activos"
+              emptyDescription="Crea tu primer proyecto para empezar a gestionar obra."
+              emptyCta={{ label: "Crear proyecto", href: "/tecnico/proyectos" }}
+              skeletonRows={2}
+            >
+              {activeProjects.map((project) => {
                 const percent =
                   project.totalBudget > 0
                     ? (project.executedAmount / project.totalBudget) * 100
@@ -188,9 +199,14 @@ export default function TecnicoDashboard() {
                           {project.code}
                         </p>
                         <p className="font-medium">{project.name}</p>
-                        <p className="text-sm text-muted-foreground">{project.client}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {project.client}
+                        </p>
                       </div>
-                      <Badge variant={config.variant} className="flex items-center gap-1">
+                      <Badge
+                        variant={config.variant}
+                        className="flex items-center gap-1"
+                      >
                         {statusIcon[project.status]}
                         {config.label}
                       </Badge>
@@ -198,7 +214,9 @@ export default function TecnicoDashboard() {
                     <div className="mt-3 space-y-1">
                       <div className="flex justify-between text-xs">
                         <span className="text-muted-foreground">Avance</span>
-                        <span className="font-medium">{formatPercent(percent)}</span>
+                        <span className="font-medium">
+                          {formatPercent(percent)}
+                        </span>
                       </div>
                       <div className="h-2 overflow-hidden rounded-full bg-secondary">
                         <div
@@ -213,8 +231,8 @@ export default function TecnicoDashboard() {
                     </div>
                   </Link>
                 );
-              })
-            )}
+              })}
+            </PanelState>
           </CardContent>
         </Card>
 
@@ -224,10 +242,16 @@ export default function TecnicoDashboard() {
             <CardDescription>Requieren aprobación</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {pendingCuts.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Sin cortes pendientes</p>
-            ) : (
-              pendingCuts.slice(0, 6).map((cut) => {
+            <PanelState
+              loading={cutsLoading && pendingCuts.length === 0}
+              error={pendingCuts.length === 0 ? cutsError : null}
+              onRetry={loadCuts}
+              isEmpty={pendingCuts.length === 0}
+              emptyTitle="Sin cortes pendientes"
+              emptyDescription="Cuando un residente envie un corte aparecera aqui."
+              skeletonRows={2}
+            >
+              {pendingCuts.slice(0, 6).map((cut) => {
                 const project = projects.find((p) => p.id === cut.projectId);
                 return (
                   <Link
@@ -237,19 +261,25 @@ export default function TecnicoDashboard() {
                   >
                     <div className="mb-1 flex items-center justify-between">
                       <p className="font-mono text-xs">{cut.cutNumber}</p>
-                      <Badge variant={cut.status === "SUBMITTED" ? "warning" : "info"}>
+                      <Badge
+                        variant={
+                          cut.status === "SUBMITTED" ? "warning" : "info"
+                        }
+                      >
                         {cut.status === "SUBMITTED" ? "Enviado" : "Validado"}
                       </Badge>
                     </div>
                     <p className="text-sm">{cut.description}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{project?.name}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {project?.name}
+                    </p>
                     <p className="mt-2 text-sm font-semibold">
                       {formatCurrency(cut.netValue)}
                     </p>
                   </Link>
                 );
-              })
-            )}
+              })}
+            </PanelState>
           </CardContent>
         </Card>
       </div>

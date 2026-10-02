@@ -24,6 +24,40 @@
 
 import { create } from "zustand";
 import { api } from "./api";
+import { toastError, toastSuccess } from "@/components/ui/toast-bus";
+
+/**
+ * P2 (seccion 4.2): mensajes user-friendly para los toasts del data-store.
+ *   Si la API falla con ApiError, mostramos su `message`. Si falla
+ *   por red, mostramos "sin conexion" o el mensaje del navegador.
+ */
+function describeError(e: any): string {
+  if (e?.message) return e.message;
+  return "Error desconocido";
+}
+
+/** Convierte /projects a "Proyecto" para los toasts. */
+function humanEndpoint(endpoint: string): string {
+  const map: Record<string, string> = {
+    "/api/projects": "Proyecto",
+    "/api/cuts": "Corte",
+    "/api/payments": "Pago",
+    "/api/clients": "Cliente",
+    "/api/quotations": "Cotización",
+    "/api/contracts": "Contrato",
+    "/api/providers": "Proveedor",
+    "/api/employees": "Empleado",
+    "/api/work-logs": "Bitácora",
+    "/api/budgets": "Presupuesto",
+    "/api/expenses": "Gasto",
+    "/api/pscs": "PSC",
+    "/api/users": "Usuario",
+    "/api/invitations": "Invitación",
+    "/api/taxes": "Impuesto",
+    "/api/aiu-configs": "AIU",
+  };
+  return map[endpoint] ?? "Registro";
+}
 import type {
   Project,
   WorkCut,
@@ -45,13 +79,28 @@ import type {
 } from "@/types";
 
 export type BudgetActionResult = { ok: boolean; error?: string };
-export type UnforeseenItemInput = Pick<BudgetItem, "description" | "unit" | "quantity" | "unitPrice">;
+export type UnforeseenItemInput = Pick<
+  BudgetItem,
+  "description" | "unit" | "quantity" | "unitPrice"
+>;
 
 interface Collection<T> {
   items: T[];
   loaded: boolean;
   loading: boolean;
   error: string | null;
+  /**
+   * Metadata de paginacion cuando el endpoint devuelve `{data, pagination}`.
+   * Sera `null` para endpoints no paginados (array directo) y para
+   * estados previos al primer load.
+   * SPEC: docs/DOCUMENTACION_TECNICA_Y_MEJORAS.md seccion 4.2.
+   */
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  } | null;
 }
 
 interface DataState {
@@ -84,6 +133,15 @@ interface DataState {
       user: any,
       opts?: any,
     ) => Promise<{ ok: boolean; error?: string }>;
+    /**
+     * P1 (seccion 4.3): carga una pagina concreta del listado paginado
+     * (`/api/cuts?page=N&limit=M`). Devuelve `ok: false` con `error`
+     * si la API falla; nunca lanza.
+     */
+    loadPage: (
+      page: number,
+      limit: number,
+    ) => Promise<{ ok: boolean; error?: string }>;
   };
   payments: Collection<PaymentRequest> & {
     load: () => Promise<void>;
@@ -95,6 +153,10 @@ interface DataState {
       action: string,
       user: any,
       opts?: any,
+    ) => Promise<{ ok: boolean; error?: string }>;
+    loadPage: (
+      page: number,
+      limit: number,
     ) => Promise<{ ok: boolean; error?: string }>;
   };
   clients: Collection<Client> & {
@@ -108,6 +170,10 @@ interface DataState {
     add: (q: Partial<Quotation>) => Promise<Quotation | null>;
     update: (id: string, q: Partial<Quotation>) => Promise<boolean>;
     remove: (id: string) => Promise<void>;
+    loadPage: (
+      page: number,
+      limit: number,
+    ) => Promise<{ ok: boolean; error?: string }>;
   };
   workLogs: Collection<WorkLog> & {
     load: () => Promise<void>;
@@ -148,10 +214,24 @@ interface DataState {
     add: (b: Partial<Budget>) => Promise<Budget | null>;
     update: (id: string, b: Partial<Budget>) => Promise<boolean>;
     // SPEC: docs/specs/bug-presupuestos-persistencia.md
-    createPT: (projectId: string, layers: BudgetLayer[], notes?: string) => Promise<BudgetActionResult>;
-    createNewVersion: (projectId: string, layers: BudgetLayer[], notes?: string) => Promise<BudgetActionResult>;
-    addUnforeseenItem: (budgetId: string, item: UnforeseenItemInput) => Promise<BudgetActionResult>;
-    removeUnforeseenItem: (budgetId: string, itemId: string) => Promise<BudgetActionResult>;
+    createPT: (
+      projectId: string,
+      layers: BudgetLayer[],
+      notes?: string,
+    ) => Promise<BudgetActionResult>;
+    createNewVersion: (
+      projectId: string,
+      layers: BudgetLayer[],
+      notes?: string,
+    ) => Promise<BudgetActionResult>;
+    addUnforeseenItem: (
+      budgetId: string,
+      item: UnforeseenItemInput,
+    ) => Promise<BudgetActionResult>;
+    removeUnforeseenItem: (
+      budgetId: string,
+      itemId: string,
+    ) => Promise<BudgetActionResult>;
   };
   pscs: Collection<any> & {
     load: () => Promise<void>;
@@ -250,15 +330,48 @@ export const useDataStore = create<DataState>()((set, get) => {
       loaded: false,
       loading: false,
       error: null as string | null,
+      pagination: null,
+      // P1 (docs/DOCUMENTACION_TECNICA_Y_MEJORAS.md, seccion 4.3):
+      //   Algunos listados (cuts, quotations) devuelven {data, pagination}
+      //   en vez de un array. Esta funcion normaliza la respuesta:
+      //   - si es array, lo guarda como items
+      //   - si es {data, pagination}, guarda items + pagination
+      //   Asi el resto del store (y los consumidores) solo ven items.
+      //   Ademas expone `refresh` para reusar la normalizacion desde
+      //   performAction() tras un PATCH (donde la API tambien devuelve
+      //   la lista paginada, no la entidad).
+      refresh: async () => {
+        const response = await api.get<any>(endpoint);
+        if (response && Array.isArray(response.data)) {
+          set((s: any) => ({
+            [key]: {
+              ...s[key],
+              items: response.data as T[],
+              pagination: response.pagination ?? null,
+              loaded: true,
+              loading: false,
+              error: null,
+            },
+          }));
+        } else {
+          set((s: any) => ({
+            [key]: {
+              ...s[key],
+              items: (response ?? []) as T[],
+              pagination: null,
+              loaded: true,
+              loading: false,
+              error: null,
+            },
+          }));
+        }
+      },
       async load() {
         const self = (get() as any)[key];
         if (self?.loading) return;
         set((s: any) => ({ [key]: { ...s[key], loading: true, error: null } }));
         try {
-          const items = await api.get<T[]>(endpoint);
-          set((s: any) => ({
-            [key]: { ...s[key], items, loaded: true, loading: false },
-          }));
+          await obj.refresh();
         } catch (e: any) {
           console.error(`[${endpoint} load]`, e?.message);
           set((s: any) => ({
@@ -267,30 +380,43 @@ export const useDataStore = create<DataState>()((set, get) => {
         }
       },
       async add(data: Partial<T>) {
+        const name = humanEndpoint(endpoint);
         try {
           await api.post(endpoint, data);
-          const items = await api.get<T[]>(endpoint);
-          set((s: any) => ({ [key]: { ...s[key], items, loaded: true } }));
+          await obj.refresh();
+          toastSuccess(`${name} creado`, undefined);
           return { id: "", ...data } as T;
         } catch (e: any) {
           console.error(`[${endpoint} add]`, e?.message);
+          toastError(
+            `No se pudo crear ${name.toLowerCase()}`,
+            describeError(e),
+          );
           return null;
         }
       },
       /** Devuelve true si se guardó; si falla, deja el mensaje en `error`. */
       async update(id: string, data: Partial<T>): Promise<boolean> {
+        const name = humanEndpoint(endpoint);
         try {
           await api.put(endpoint, { id, ...data });
-          const items = await api.get<T[]>(endpoint);
-          set((s: any) => ({ [key]: { ...s[key], items, error: null } }));
+          await obj.refresh();
+          toastSuccess(`${name} actualizado`, undefined);
           return true;
         } catch (e: any) {
           console.error(`[${endpoint} update]`, e?.message);
-          set((s: any) => ({ [key]: { ...s[key], error: e?.message ?? "Error al actualizar" } }));
+          set((s: any) => ({
+            [key]: { ...s[key], error: e?.message ?? "Error al actualizar" },
+          }));
+          toastError(
+            `No se pudo actualizar ${name.toLowerCase()}`,
+            describeError(e),
+          );
           return false;
         }
       },
       async remove(id: string) {
+        const name = humanEndpoint(endpoint);
         try {
           await api.del(`${endpoint}?id=${encodeURIComponent(id)}`);
           set((s: any) => {
@@ -299,8 +425,13 @@ export const useDataStore = create<DataState>()((set, get) => {
               [key]: { ...c, items: c.items.filter((i: T) => i.id !== id) },
             };
           });
+          toastSuccess(`${name} eliminado`, undefined);
         } catch (e: any) {
           console.error(`[${endpoint} remove]`, e?.message);
+          toastError(
+            `No se pudo eliminar ${name.toLowerCase()}`,
+            describeError(e),
+          );
         }
       },
     };
@@ -308,11 +439,15 @@ export const useDataStore = create<DataState>()((set, get) => {
   }
 
   /** Ejecuta una acción del PT y recarga los presupuestos; nunca lanza. */
-  async function budgetAction(run: () => Promise<unknown>): Promise<BudgetActionResult> {
+  async function budgetAction(
+    run: () => Promise<unknown>,
+  ): Promise<BudgetActionResult> {
     try {
       await run();
       const items = await api.get<Budget[]>("/api/budgets");
-      set((s: any) => ({ budgets: { ...s.budgets, items, loaded: true, error: null } }));
+      set((s: any) => ({
+        budgets: { ...s.budgets, items, loaded: true, error: null },
+      }));
       return { ok: true };
     } catch (e: any) {
       console.error("[budgets action]", e?.message);
@@ -330,50 +465,149 @@ export const useDataStore = create<DataState>()((set, get) => {
     contracts: {
       ...col<Contract>("/api/contracts"),
     },
-    cuts: {
-      ...col<WorkCut>("/api/cuts"),
-      async performAction(
-        id: string,
-        action: string,
-        user: any,
-        opts: any = {},
-      ) {
-        try {
-          await api.patch("/api/cuts", { id, action, user, ...opts });
-          const items = await api.get<WorkCut[]>("/api/cuts");
-          set((s: any) => ({ cuts: { ...(s as any).cuts, items } }));
-          return { ok: true };
-        } catch (e: any) {
-          console.error("[cuts action]", e?.message);
-          return { ok: false, error: e?.message ?? "Error" };
-        }
-      },
-    },
-    payments: {
-      ...col<PaymentRequest>("/api/payments"),
-      async performAction(
-        id: string,
-        action: string,
-        user: any,
-        opts: any = {},
-      ) {
-        try {
-          await api.patch("/api/payments", { id, action, user, ...opts });
-          const items = await api.get<PaymentRequest[]>("/api/payments");
-          set((s: any) => ({ payments: { ...(s as any).payments, items } }));
-          return { ok: true };
-        } catch (e: any) {
-          console.error("[payments action]", e?.message);
-          return { ok: false, error: e?.message ?? "Error" };
-        }
-      },
-    },
+    cuts: (() => {
+      const base = col<WorkCut>("/api/cuts");
+      return {
+        ...base,
+        async performAction(
+          id: string,
+          action: string,
+          user: any,
+          opts: any = {},
+        ) {
+          try {
+            await api.patch("/api/cuts", { id, action, user, ...opts });
+            // P1: reusar la normalizacion paginada del helper col() para
+            //   que el store siga exponiendo items: WorkCut[] aunque la
+            //   API devuelva {data, pagination}.
+            await base.refresh();
+            return { ok: true };
+          } catch (e: any) {
+            console.error("[cuts action]", e?.message);
+            return { ok: false, error: e?.message ?? "Error" };
+          }
+        },
+        /**
+         * P1 (seccion 4.3): carga una pagina concreta del listado paginado.
+         * Reutiliza la misma normalizacion de `refresh` para que el store
+         * exponga `items: WorkCut[]` y `pagination: {total, page, ...}`.
+         */
+        loadPage: async (page: number, limit: number) => {
+          set((s: any) => ({
+            cuts: { ...s.cuts, loading: true, error: null },
+          }));
+          try {
+            const response = await api.get<any>(
+              `/api/cuts?page=${page}&limit=${limit}`,
+            );
+            if (response && Array.isArray(response.data)) {
+              set((s: any) => ({
+                cuts: {
+                  ...s.cuts,
+                  items: response.data,
+                  pagination: response.pagination ?? null,
+                  loaded: true,
+                  loading: false,
+                  error: null,
+                },
+              }));
+            } else {
+              set((s: any) => ({
+                cuts: {
+                  ...s.cuts,
+                  items: response ?? [],
+                  pagination: null,
+                  loaded: true,
+                  loading: false,
+                  error: null,
+                },
+              }));
+            }
+            return { ok: true as const };
+          } catch (e: any) {
+            console.error("[cuts loadPage]", e?.message);
+            set((s: any) => ({
+              cuts: { ...s.cuts, error: e?.message ?? "Error", loading: false },
+            }));
+            return { ok: false as const, error: e?.message ?? "Error" };
+          }
+        },
+      };
+    })(),
+    payments: (() => {
+      const base = col<PaymentRequest>("/api/payments");
+      return {
+        ...base,
+        async performAction(
+          id: string,
+          action: string,
+          user: any,
+          opts: any = {},
+        ) {
+          try {
+            await api.patch("/api/payments", { id, action, user, ...opts });
+            await base.refresh();
+            return { ok: true };
+          } catch (e: any) {
+            console.error("[payments action]", e?.message);
+            return { ok: false, error: e?.message ?? "Error" };
+          }
+        },
+      };
+    })(),
     clients: {
       ...col<Client>("/api/clients"),
     },
-    quotations: {
-      ...col<Quotation>("/api/quotations"),
-    },
+    quotations: (() => {
+      const base = col<Quotation>("/api/quotations");
+      return {
+        ...base,
+        loadPage: async (page: number, limit: number) => {
+          set((s: any) => ({
+            quotations: { ...s.quotations, loading: true, error: null },
+          }));
+          try {
+            const response = await api.get<any>(
+              `/api/quotations?page=${page}&limit=${limit}`,
+            );
+            if (response && Array.isArray(response.data)) {
+              set((s: any) => ({
+                quotations: {
+                  ...s.quotations,
+                  items: response.data,
+                  pagination: response.pagination ?? null,
+                  loaded: true,
+                  loading: false,
+                  error: null,
+                },
+              }));
+            } else {
+              set((s: any) => ({
+                quotations: {
+                  ...s.quotations,
+                  items: response ?? [],
+                  pagination: null,
+                  loaded: true,
+                  loading: false,
+                  error: null,
+                },
+              }));
+            }
+            return { ok: true as const };
+          } catch (e: any) {
+            console.error("[quotations loadPage]", e?.message);
+            set((s: any) => ({
+              quotations: {
+                ...s.quotations,
+                error: e?.message ?? "Error",
+                loading: false,
+              },
+            }));
+            return { ok: false as const, error: e?.message ?? "Error" };
+          }
+        },
+      };
+    })(),
     workLogs: {
       ...col<WorkLog>("/api/work-logs", "workLogs"),
     },
@@ -396,23 +630,48 @@ export const useDataStore = create<DataState>()((set, get) => {
       ...col<Budget>("/api/budgets"),
       // Acciones del PT (antes vivían en el store legacy budgets-store.ts).
       async createPT(projectId: string, layers: BudgetLayer[], notes?: string) {
-        return budgetAction(() => api.post("/api/budgets", { projectId, layers, notes }));
-      },
-      async createNewVersion(projectId: string, layers: BudgetLayer[], notes?: string) {
-        const existing = ((get() as any).budgets.items as Budget[]).find((b) => b.projectId === projectId);
-        if (!existing) return { ok: false, error: "No existe un PT previo para este proyecto" };
         return budgetAction(() =>
-          api.patch("/api/budgets", { id: existing.id, action: "NEW_VERSION", layers, notes }),
+          api.post("/api/budgets", { projectId, layers, notes }),
+        );
+      },
+      async createNewVersion(
+        projectId: string,
+        layers: BudgetLayer[],
+        notes?: string,
+      ) {
+        const existing = ((get() as any).budgets.items as Budget[]).find(
+          (b) => b.projectId === projectId,
+        );
+        if (!existing)
+          return {
+            ok: false,
+            error: "No existe un PT previo para este proyecto",
+          };
+        return budgetAction(() =>
+          api.patch("/api/budgets", {
+            id: existing.id,
+            action: "NEW_VERSION",
+            layers,
+            notes,
+          }),
         );
       },
       async addUnforeseenItem(budgetId: string, item: UnforeseenItemInput) {
         return budgetAction(() =>
-          api.patch("/api/budgets", { id: budgetId, action: "ADD_UNFORESEEN", item }),
+          api.patch("/api/budgets", {
+            id: budgetId,
+            action: "ADD_UNFORESEEN",
+            item,
+          }),
         );
       },
       async removeUnforeseenItem(budgetId: string, itemId: string) {
         return budgetAction(() =>
-          api.patch("/api/budgets", { id: budgetId, action: "REMOVE_UNFORESEEN", itemId }),
+          api.patch("/api/budgets", {
+            id: budgetId,
+            action: "REMOVE_UNFORESEEN",
+            itemId,
+          }),
         );
       },
     },
@@ -431,11 +690,13 @@ export const useProjectsStore = () => {
   const s = useDataStore((x) => x.projects);
   const projectsAll = useDataStore((x) => x.projects.items) as Project[];
   const error = useDataStore((x) => x.projects.error);
+  const pagination = useDataStore((x) => x.projects.pagination);
   return {
     projects: projectsAll,
     loaded: s.loaded,
     loading: s.loading,
     error,
+    pagination,
     addProject: async (data: any) => s.add(data),
     updateProject: async (id: string, p: any) => s.update(id, p),
     deleteProject: async (id: string) => s.remove(id),
@@ -491,9 +752,16 @@ export const useContractsStore = () => {
 export const useCutsStore = () => {
   const s = useDataStore((x) => x.cuts);
   const items = useDataStore((x) => x.cuts.items) as WorkCut[];
+  const error = useDataStore((x) => x.cuts.error);
+  const pagination = useDataStore((x) => x.cuts.pagination);
   return {
     cuts: items,
+    loaded: s.loaded,
+    loading: s.loading,
+    error,
+    pagination,
     addCut: (data: any, _projectCode: string) => s.add(data),
+    loadPage: s.loadPage,
     updateCut: (id: string, c: any) => s.update(id, c),
     deleteCut: (id: string) => s.remove(id),
     getCut: (id: string) => items.find((c) => c.id === id),
@@ -524,9 +792,16 @@ export const useCutsStore = () => {
 export const usePaymentsStore = () => {
   const s = useDataStore((x) => x.payments);
   const items = useDataStore((x) => x.payments.items) as PaymentRequest[];
+  const error = useDataStore((x) => x.payments.error);
+  const pagination = useDataStore((x) => x.payments.pagination);
   return {
     payments: items,
+    loaded: s.loaded,
+    loading: s.loading,
+    error,
+    pagination,
     addPayment: (data: any) => s.add(data),
+    loadPage: s.loadPage,
     updatePayment: (id: string, p: any) => s.update(id, p),
     deletePayment: (id: string) => s.remove(id),
     getPayment: (id: string) => items.find((p) => p.id === id),
@@ -542,8 +817,12 @@ export const usePaymentsStore = () => {
 export const useClientsStore = () => {
   const s = useDataStore((x) => x.clients);
   const items = useDataStore((x) => x.clients.items) as Client[];
+  const error = useDataStore((x) => x.clients.error);
   return {
     clients: items,
+    loaded: s.loaded,
+    loading: s.loading,
+    error,
     addClient: (data: any) => s.add(data),
     updateClient: (id: string, c: any) => s.update(id, c),
     deleteClient: (id: string) => s.remove(id),
@@ -558,9 +837,16 @@ export const useClientsStore = () => {
 export const useQuotationsStore = () => {
   const s = useDataStore((x) => x.quotations);
   const items = useDataStore((x) => x.quotations.items) as Quotation[];
+  const error = useDataStore((x) => x.quotations.error);
+  const pagination = useDataStore((x) => x.quotations.pagination);
   return {
     quotations: items,
+    loaded: s.loaded,
+    loading: s.loading,
+    error,
+    pagination,
     addQuotation: (data: any) => s.add(data),
+    loadPage: s.loadPage,
     updateQuotation: (id: string, q: any) => s.update(id, q),
     deleteQuotation: (id: string) => s.remove(id),
     getQuotation: (id: string) => items.find((q) => q.id === id),
@@ -646,18 +932,26 @@ export const useAiuStore = () => {
     aius: items,
     getAiuByProject: (projectId: string) =>
       items.find((a) => a.projectId === projectId),
-    getConfig: (projectId: string) => items.find((a) => a.projectId === projectId),
-    hasConfig: (projectId: string) => items.some((a) => a.projectId === projectId),
+    getConfig: (projectId: string) =>
+      items.find((a) => a.projectId === projectId),
+    hasConfig: (projectId: string) =>
+      items.some((a) => a.projectId === projectId),
     /** Crea o actualiza el AIU del proyecto. SPEC: bug-presupuestos-persistencia AC-9 */
     upsertConfig: async (
-      data: Pick<AiuConfig, "projectId" | "administration" | "imprevistos" | "utilidad"> & { notes?: string },
+      data: Pick<
+        AiuConfig,
+        "projectId" | "administration" | "imprevistos" | "utilidad"
+      > & { notes?: string },
     ): Promise<{ ok: boolean; error?: string }> => {
       const existing = items.find((a) => a.projectId === data.projectId);
       try {
-        if (existing) await api.put("/api/aiu-configs", { id: existing.id, ...data });
+        if (existing)
+          await api.put("/api/aiu-configs", { id: existing.id, ...data });
         else await api.post("/api/aiu-configs", data);
         const fresh = await api.get<AiuConfig[]>("/api/aiu-configs");
-        useDataStore.setState((st: any) => ({ aius: { ...st.aius, items: fresh, loaded: true, error: null } }));
+        useDataStore.setState((st: any) => ({
+          aius: { ...st.aius, items: fresh, loaded: true, error: null },
+        }));
         return { ok: true };
       } catch (e: any) {
         return { ok: false, error: e?.message ?? "Error al guardar el AIU" };
@@ -679,7 +973,8 @@ export const useBudgetsStore = () => {
     budgets: items,
     getBudgetByProject: (projectId: string) =>
       items.find((b) => b.projectId === projectId),
-    hasBudget: (projectId: string) => items.some((b) => b.projectId === projectId),
+    hasBudget: (projectId: string) =>
+      items.some((b) => b.projectId === projectId),
     addBudget: (data: any) => s.add(data),
     updateBudget: (id: string, b: any) => s.update(id, b),
     createPT: s.createPT,

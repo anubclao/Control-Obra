@@ -17,8 +17,21 @@ export const CUT_TRANSITIONS: Record<WorkCutStatus, WorkCutStatus[]> = {
   DRAFT: ["SUBMITTED"],
   SUBMITTED: ["VALIDATED", "REJECTED"],
   VALIDATED: ["APPROVED", "REJECTED"],
-  APPROVED: ["PAID"],
-  REJECTED: ["DRAFT"],
+  // P2 (docs/DOCUMENTACION_TECNICA_Y_MEJORAS.md, seccion 4.2):
+  //   Antes existian dos acciones PAY independientes (una sobre el
+  //   corte y otra sobre la solicitud de pago). Ahora el corte pasa a
+  //   PAID solo cuando el pago asociado se paga (ver PATCH /api/payments
+  //   en Fase 1.3). Por eso APPROVED ya no transiciona a PAID desde el
+  //   workflow: el estado solo lo cambia el handler de pagos.
+  APPROVED: [],
+  // P0 (docs/DOCUMENTACION_TECNICA_Y_MEJORAS.md, seccion 4.1):
+  //   Antes un corte rechazado solo podia pasar a DRAFT y ninguna accion del
+  //   workflow llevaba a DRAFT, asi que el boton "Reenviar" de la UI siempre
+  //   respondia 400 INVALID_TRANSITION. La UI ya esperaba SUBMIT desde
+  //   REJECTED (cuts-constants.ts -> ACTION_BUTTONS), asi que alineamos el
+  //   workflow con esa expectativa: tras corregir, el residente hace SUBMIT y
+  //   el corte vuelve a SUBMITTED para una nueva revision.
+  REJECTED: ["SUBMITTED"],
   PAID: [],
 };
 
@@ -27,7 +40,12 @@ export const CUT_ACTION_ROLES: Record<ApprovalAction, string[]> = {
   VALIDATE: ["DIRECTOR", "ADMIN"],
   APPROVE: ["ADMIN"],
   REJECT: ["ADMIN", "DIRECTOR", "GERENTE"],
-  PAY: ["TESORERIA", "ADMIN"],
+  // P2: la accion PAY del corte queda deshabilitada. La fuente de
+  // verdad del estado PAID es la solicitud de pago (PATCH /api/payments
+  // con action=PAY). Si alguien intenta PATCH /api/cuts con action=PAY,
+  // el handler de pagos es el unico que podra mover work_cuts.status
+  // a PAID.
+  PAY: [],
 };
 
 export const CUT_ACTION_TARGET: Record<ApprovalAction, WorkCutStatus> = {

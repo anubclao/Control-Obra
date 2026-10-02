@@ -12,7 +12,8 @@
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "type-check:strict": "tsc --noEmit -p tsconfig.strict.json"
   },
   "dependencies": {
     "@azure/msal-node": "^3.8.10",

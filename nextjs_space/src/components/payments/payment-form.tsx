@@ -3,8 +3,9 @@
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useEffect } from "react";
-import { Building2, AlertCircle, Link2 } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
+import { Building2, AlertCircle, Link2, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -60,11 +61,20 @@ interface Props {
 }
 
 export function PaymentForm({ payment, onSuccess }: Props) {
-  const { addPayment, updatePayment } = usePaymentsStore();
+  const { addPayment, updatePayment, getPayment } = usePaymentsStore();
   const { projects } = useProjectsStore();
   const { providers, getProvider } = useProvidersStore();
   const { cuts, getCut } = useCutsStore();
   const { user } = useAuthStore();
+  // P2 plan 2026-10-01 (fase 6.3): si el form se abrio con
+  // ?replaces=<id>, copiamos los datos de la solicitud rechazada
+  // y mandamos `replacesRequestId` al crear. Asi el usuario no
+  // tiene que reescribir todo a mano.
+  const search = useSearchParams();
+  const replacesId = search?.get("replaces") ?? null;
+  const replacesFrom = replacesId ? getPayment(replacesId) : undefined;
+  const replacesRequestId = replacesId ?? undefined;
+  const replacesHinted = useRef(false);
   const isEditing = !!payment;
   const isEditable = !payment || payment.status === "PENDING";
 
@@ -116,6 +126,37 @@ export function PaymentForm({ payment, onSuccess }: Props) {
     if (payment) reset(payment as unknown as FormData);
   }, [payment, reset]);
 
+  // P2 plan 2026-10-01 (fase 6.3): si llegamos con ?replaces=<id>,
+  // pre-rellenamos el form con los datos de la solicitud original.
+  // Solo se aplica cuando NO estamos editando (modo crear) y la
+  // solicitud original esta en REJECTED (la ruta POST lo revalidara).
+  useEffect(() => {
+    if (payment || replacesHinted.current) return;
+    if (!replacesFrom) return;
+    if (replacesFrom.status !== "REJECTED") return;
+    replacesHinted.current = true;
+    setValue("projectId", replacesFrom.projectId);
+    setValue("providerId", replacesFrom.providerId ?? "");
+    setValue("workCutId", replacesFrom.workCutId ?? "");
+    setValue("type", replacesFrom.type);
+    setValue("amount", replacesFrom.amount);
+    setValue("priority", replacesFrom.priority);
+    setValue("requiredApprovalLevel", replacesFrom.requiredApprovalLevel);
+    setValue("beneficiaryName", replacesFrom.beneficiaryName);
+    setValue("beneficiaryNit", replacesFrom.beneficiaryNit);
+    setValue("bankName", replacesFrom.bankName);
+    setValue("accountType", replacesFrom.accountType);
+    setValue("accountNumber", replacesFrom.accountNumber);
+    setValue("dueDate", replacesFrom.dueDate ?? "");
+    setValue(
+      "description",
+      (replacesFrom.description ?? "") +
+        (replacesFrom.rejectionReason
+          ? `\n[Reemplaza a ${replacesFrom.requestNumber}: ${replacesFrom.rejectionReason}]`
+          : ""),
+    );
+  }, [replacesFrom, payment, setValue]);
+
   const projectId = watch("projectId");
   const providerId = watch("providerId");
   const type = watch("type");
@@ -165,6 +206,9 @@ export function PaymentForm({ payment, onSuccess }: Props) {
     } else {
       addPayment({
         ...payload,
+        // P2 plan 2026-10-01 (fase 6.3): si veníamos de ?replaces=...
+        // vinculamos la nueva solicitud a la original rechazada.
+        replacesRequestId,
         createdBy: user?.id ?? "unknown",
       } as Omit<
         PaymentRequest,

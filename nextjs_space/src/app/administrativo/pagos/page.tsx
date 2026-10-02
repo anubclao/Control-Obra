@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   Plus,
   Search,
@@ -55,12 +56,25 @@ export default function PagosPage() {
   const { projects, getProject, load: loadProjects } = useProjectsStore();
   const { getProvider, load: loadProviders } = useProvidersStore();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | PaymentStatus>("ALL");
-  const [priorityFilter, setPriorityFilter] = useState<"ALL" | PaymentPriority>("ALL");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | PaymentStatus>(
+    "ALL",
+  );
+  const [priorityFilter, setPriorityFilter] = useState<"ALL" | PaymentPriority>(
+    "ALL",
+  );
   const [projectFilter, setProjectFilter] = useState<string>("ALL");
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<PaymentRequest | null>(null);
   const confirmDel = useConfirm();
+  // P2 plan 2026-10-01 (fase 6.3): si llegamos con ?replaces=<id>
+  // (porque el usuario toco "Duplicar como nueva" en la pagina de
+  // detalle), abrimos el Dialog automaticamente. El PaymentForm lee
+  // el mismo query param para pre-rellenar y mandar
+  // `replacesRequestId` al POST.
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    if (searchParams?.get("replaces")) setCreateOpen(true);
+  }, [searchParams]);
 
   useEffect(() => {
     load();
@@ -77,23 +91,36 @@ export default function PagosPage() {
         p.beneficiaryName.toLowerCase().includes(search.toLowerCase()) ||
         (project?.name.toLowerCase().includes(search.toLowerCase()) ?? false);
       const matchStatus = statusFilter === "ALL" || p.status === statusFilter;
-      const matchPriority = priorityFilter === "ALL" || p.priority === priorityFilter;
-      const matchProject = projectFilter === "ALL" || p.projectId === projectFilter;
+      const matchPriority =
+        priorityFilter === "ALL" || p.priority === priorityFilter;
+      const matchProject =
+        projectFilter === "ALL" || p.projectId === projectFilter;
       return matchSearch && matchStatus && matchPriority && matchProject;
     });
-  }, [payments, search, statusFilter, priorityFilter, projectFilter, getProject]);
+  }, [
+    payments,
+    search,
+    statusFilter,
+    priorityFilter,
+    projectFilter,
+    getProject,
+  ]);
 
   const stats = useMemo(() => {
     const pending = payments.filter((p) => p.status === "PENDING").length;
     const inApproval = payments.filter(
-      (p) => p.status === "APPROVED_LEVEL_1" || p.status === "APPROVED_LEVEL_2"
+      (p) => p.status === "APPROVED_LEVEL_1" || p.status === "APPROVED_LEVEL_2",
     ).length;
     const approved = payments.filter((p) => p.status === "APPROVED").length;
     const paid = payments.filter((p) => p.status === "PAID").length;
     const pendingAmount = payments
-      .filter((p) => ["PENDING", "APPROVED_LEVEL_1", "APPROVED_LEVEL_2"].includes(p.status))
+      .filter((p) =>
+        ["PENDING", "APPROVED_LEVEL_1", "APPROVED_LEVEL_2"].includes(p.status),
+      )
       .reduce((s, p) => s + p.amount, 0);
-    const paidAmount = payments.filter((p) => p.status === "PAID").reduce((s, p) => s + p.amount, 0);
+    const paidAmount = payments
+      .filter((p) => p.status === "PAID")
+      .reduce((s, p) => s + p.amount, 0);
     return { pending, inApproval, approved, paid, pendingAmount, paidAmount };
   }, [payments]);
 
@@ -101,20 +128,36 @@ export default function PagosPage() {
     const project = getProject(p.projectId);
     confirmDel.open({
       title: "Eliminar solicitud de pago?",
-      description: "Vas a eliminar la solicitud y su historial. Esta accion NO se puede deshacer.",
+      description:
+        "Vas a eliminar la solicitud y su historial. Esta accion NO se puede deshacer.",
       details: (
         <div className="space-y-1 text-xs">
-          <p><strong>Numero:</strong> {p.requestNumber}</p>
-          <p><strong>Beneficiario:</strong> {p.beneficiaryName}</p>
-          <p><strong>Tipo:</strong> {PAYMENT_TYPE_LABELS[p.type] ?? p.type}</p>
-          <p><strong>Proyecto:</strong> {project?.code ?? "-"} - {project?.name ?? "-"}</p>
-          <p><strong>Monto:</strong> {formatCurrency(p.amount)}</p>
-          <p><strong>Estado:</strong> {PAYMENT_STATUS_LABELS[p.status]}</p>
+          <p>
+            <strong>Numero:</strong> {p.requestNumber}
+          </p>
+          <p>
+            <strong>Beneficiario:</strong> {p.beneficiaryName}
+          </p>
+          <p>
+            <strong>Tipo:</strong> {PAYMENT_TYPE_LABELS[p.type] ?? p.type}
+          </p>
+          <p>
+            <strong>Proyecto:</strong> {project?.code ?? "-"} -{" "}
+            {project?.name ?? "-"}
+          </p>
+          <p>
+            <strong>Monto:</strong> {formatCurrency(p.amount)}
+          </p>
+          <p>
+            <strong>Estado:</strong> {PAYMENT_STATUS_LABELS[p.status]}
+          </p>
         </div>
       ),
       variant: "danger",
       confirmText: "Eliminar solicitud",
-      onConfirm: async () => { await deletePayment(p.id); },
+      onConfirm: async () => {
+        await deletePayment(p.id);
+      },
     });
   }
 
@@ -126,10 +169,26 @@ export default function PagosPage() {
         title="Pagos"
         description="Solicitudes de pago a contratistas y proveedores. Pasan por un flujo de aprobacion multinivel antes del desembolso."
         steps={[
-          { title: "Crea la solicitud", description: "Define beneficiario, monto, tipo, prioridad y datos bancarios." },
-          { title: "Aprobacion N1 + N2", description: "Pasa por dos niveles de aprobacion: residente/administrativo y gerencia." },
-          { title: "Aprobacion final", description: "Gerencia/Super Admin aprueban para que quede lista para pago." },
-          { title: "Pago", description: "Tesoreria registra el pago real y la solicitud pasa a PAID." },
+          {
+            title: "Crea la solicitud",
+            description:
+              "Define beneficiario, monto, tipo, prioridad y datos bancarios.",
+          },
+          {
+            title: "Aprobacion N1 + N2",
+            description:
+              "Pasa por dos niveles de aprobacion: residente/administrativo y gerencia.",
+          },
+          {
+            title: "Aprobacion final",
+            description:
+              "Gerencia/Super Admin aprueban para que quede lista para pago.",
+          },
+          {
+            title: "Pago",
+            description:
+              "Tesoreria registra el pago real y la solicitud pasa a PAID.",
+          },
         ]}
         tips={[
           "Solo se pueden editar solicitudes en estado PENDING.",
@@ -141,7 +200,8 @@ export default function PagosPage() {
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Pagos</h1>
           <p className="text-sm text-muted-foreground">
-            {payments.length} solicitudes - {stats.pending} pendientes - {stats.paid} pagados
+            {payments.length} solicitudes - {stats.pending} pendientes -{" "}
+            {stats.paid} pagados
           </p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -165,20 +225,48 @@ export default function PagosPage() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <KpiMini label="Pendientes" value={stats.pending} icon={Clock} color="text-amber-600" />
-        <KpiMini label="En aprobacion" value={stats.inApproval} icon={AlertCircle} color="text-blue-600" />
-        <KpiMini label="Aprobados" value={stats.approved} icon={CheckCircle2} color="text-emerald-600" />
-        <KpiMini label="Pagados" value={stats.paid} icon={Banknote} color="text-emerald-700" />
+        <KpiMini
+          label="Pendientes"
+          value={stats.pending}
+          icon={Clock}
+          color="text-amber-600"
+        />
+        <KpiMini
+          label="En aprobacion"
+          value={stats.inApproval}
+          icon={AlertCircle}
+          color="text-blue-600"
+        />
+        <KpiMini
+          label="Aprobados"
+          value={stats.approved}
+          icon={CheckCircle2}
+          color="text-emerald-600"
+        />
+        <KpiMini
+          label="Pagados"
+          value={stats.paid}
+          icon={Banknote}
+          color="text-emerald-700"
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="rounded-lg border bg-card p-4">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground">Por pagar (en flujo)</p>
-          <p className="mt-1 text-2xl font-semibold text-amber-600">{formatCurrency(stats.pendingAmount)}</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground">
+            Por pagar (en flujo)
+          </p>
+          <p className="mt-1 text-2xl font-semibold text-amber-600">
+            {formatCurrency(stats.pendingAmount)}
+          </p>
         </div>
         <div className="rounded-lg border bg-card p-4">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground">Total pagado</p>
-          <p className="mt-1 text-2xl font-semibold text-emerald-600">{formatCurrency(stats.paidAmount)}</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground">
+            Total pagado
+          </p>
+          <p className="mt-1 text-2xl font-semibold text-emerald-600">
+            {formatCurrency(stats.paidAmount)}
+          </p>
         </div>
       </div>
 
@@ -206,7 +294,10 @@ export default function PagosPage() {
             ))}
           </SelectContent>
         </Select>
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
+        <Select
+          value={statusFilter}
+          onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}
+        >
           <SelectTrigger className="w-full lg:w-[180px]">
             <SelectValue placeholder="Estado" />
           </SelectTrigger>
@@ -219,7 +310,10 @@ export default function PagosPage() {
             ))}
           </SelectContent>
         </Select>
-        <Select value={priorityFilter} onValueChange={(v) => setPriorityFilter(v as typeof priorityFilter)}>
+        <Select
+          value={priorityFilter}
+          onValueChange={(v) => setPriorityFilter(v as typeof priorityFilter)}
+        >
           <SelectTrigger className="w-full lg:w-[160px]">
             <SelectValue placeholder="Prioridad" />
           </SelectTrigger>
@@ -240,7 +334,10 @@ export default function PagosPage() {
           <Wallet className="mx-auto h-12 w-12 text-muted-foreground" />
           <h3 className="mt-4 text-lg font-semibold">No hay solicitudes</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            {search || statusFilter !== "ALL" || priorityFilter !== "ALL" || projectFilter !== "ALL"
+            {search ||
+            statusFilter !== "ALL" ||
+            priorityFilter !== "ALL" ||
+            projectFilter !== "ALL"
               ? "Intenta con otros filtros"
               : "Crea la primera solicitud de pago"}
           </p>
@@ -249,7 +346,9 @@ export default function PagosPage() {
         <div className="space-y-2">
           {filtered.map((p) => {
             const project = getProject(p.projectId);
-            const provider = p.providerId ? getProvider(p.providerId) : undefined;
+            const provider = p.providerId
+              ? getProvider(p.providerId)
+              : undefined;
             return (
               <PaymentRow
                 key={p.id}
@@ -272,7 +371,9 @@ export default function PagosPage() {
             <DialogTitle>Editar solicitud de pago</DialogTitle>
             <DialogDescription>{editing?.requestNumber}</DialogDescription>
           </DialogHeader>
-          {editing && <PaymentForm payment={editing} onSuccess={() => setEditing(null)} />}
+          {editing && (
+            <PaymentForm payment={editing} onSuccess={() => setEditing(null)} />
+          )}
         </DialogContent>
       </Dialog>
 
@@ -332,14 +433,21 @@ function PaymentRow({
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="font-mono text-xs text-muted-foreground">{p.requestNumber}</p>
+            <p className="font-mono text-xs text-muted-foreground">
+              {p.requestNumber}
+            </p>
             <Badge variant={variant}>{PAYMENT_STATUS_LABELS[p.status]}</Badge>
-            <Badge variant={priorityVariant}>{PAYMENT_PRIORITY_LABELS[p.priority]}</Badge>
+            <Badge variant={priorityVariant}>
+              {PAYMENT_PRIORITY_LABELS[p.priority]}
+            </Badge>
             <span className="text-xs text-muted-foreground">
               {PAYMENT_TYPE_LABELS[p.type] ?? p.type}
             </span>
           </div>
-          <Link href={`/administrativo/pagos/${p.id}`} className="mt-0.5 block font-medium hover:underline">
+          <Link
+            href={`/administrativo/pagos/${p.id}`}
+            className="mt-0.5 block font-medium hover:underline"
+          >
             {p.beneficiaryName}
           </Link>
           <p className="text-xs text-muted-foreground">
@@ -353,12 +461,19 @@ function PaymentRow({
           <p className="text-xs text-muted-foreground">Monto</p>
           <p className="text-lg font-semibold">{formatCurrency(p.amount)}</p>
           {p.workCutId && (
-            <p className="mt-0.5 text-xs text-muted-foreground">de corte {p.workCutId}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              de corte {p.workCutId}
+            </p>
           )}
         </div>
 
         <div className="relative">
-          <Button variant="ghost" size="icon" onClick={() => setMenuOpen(!menuOpen)} className="h-8 w-8">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="h-8 w-8"
+          >
             <MoreVertical className="h-4 w-4" />
           </Button>
           {menuOpen && (

@@ -94,14 +94,39 @@ describe("Cuts workflow — validación de la transición REJECT", () => {
     });
 
     it("la matriz completa de transiciones está documentada", () => {
+      // P2 (Fase 2.4): APPROVED ya no transiciona a PAID desde el
+      // workflow del corte. La fuente de verdad del estado PAID es la
+      // solicitud de pago (PATCH /api/payments con action=PAY), que
+      // actualiza work_cuts.status en la misma transaccion. Asi no
+      // hay dos acciones PAY independientes.
       expect(CUT_TRANSITIONS).toEqual({
         DRAFT: ["SUBMITTED"],
         SUBMITTED: ["VALIDATED", "REJECTED"],
         VALIDATED: ["APPROVED", "REJECTED"],
-        APPROVED: ["PAID"],
-        REJECTED: ["DRAFT"],
+        APPROVED: [],
+        REJECTED: ["SUBMITTED"],
         PAID: [],
       });
+    });
+  });
+
+  // P0 (docs/DOCUMENTACION_TECNICA_Y_MEJORAS.md, seccion 4.1):
+  //   Antes este caso fallaba con INVALID_TRANSITION. Con el fix, REJECTED
+  //   admite SUBMIT (rol RESIDENTE/DIRECTOR/ADMIN) y vuelve a SUBMITTED.
+  describe("AC-5: REJECTED puede reenviarse a SUBMITTED (fix P0)", () => {
+    it.each(["RESIDENTE", "DIRECTOR", "ADMIN"] as const)(
+      "rol %s puede hacer SUBMIT desde REJECTED",
+      (role) => {
+        const result = evaluateCutAction("REJECTED", "SUBMIT", role);
+        expect(result.ok).toBe(true);
+        if (result.ok) expect(result.target).toBe("SUBMITTED");
+      },
+    );
+
+    it("roles sin permiso para SUBMIT siguen bloqueados desde REJECTED", () => {
+      const result = evaluateCutAction("REJECTED", "SUBMIT", "CONTABILIDAD");
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.code).toBe("FORBIDDEN_ROLE");
     });
   });
 });

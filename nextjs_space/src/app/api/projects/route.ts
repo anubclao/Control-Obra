@@ -10,7 +10,14 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { requireAuth, requireRole, requireAdmin, authFailureResponse } from "@/lib/api-auth";
+import type { ResultSetHeader } from "mysql2";
+import {
+  requireAuth,
+  requireRole,
+  requireAdmin,
+  authFailureResponse,
+} from "@/lib/api-auth";
+import { can } from "@/lib/permissions-matrix";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -25,7 +32,13 @@ function rowToDTO(r: any) {
     startDate: r.start_date,
     estimatedEndDate: r.estimated_end_date,
     totalBudget: Number(r.total_budget ?? 0),
+    // P1: `executedAmount` ahora viene derivado de cortes
+    // APPROVED/PAID (ver GET handler). `manualExecutedAmount` conserva
+    // el valor crudo de la BD para detectar drift.
     executedAmount: Number(r.executed_amount ?? 0),
+    manualExecutedAmount: Number(
+      r.manual_executed_amount ?? r.executed_amount ?? 0,
+    ),
     status: r.status,
     description: r.description ?? "",
     createdAt: r.created_at,
@@ -37,15 +50,64 @@ export async function GET(req: Request) {
   const auth = await requireAuth();
   const fail = authFailureResponse(auth);
   if (fail) return fail;
+  // P0 (docs/DOCUMENTACION_TECNICA_Y_MEJORAS.md, seccion 4.4):
+  //   Antes cualquier usuario autenticado (incluso CLIENTE/USER) podia
+  //   ver la lista de proyectos. Ahora la matriz decide: CLIENTE/USER
+  //   no tienen permisos de lectura y reciben 403.
+  if (!can((auth as any).user.role, "projects", "read")) {
+    return NextResponse.json(
+      { error: "No tienes permisos para ver proyectos" },
+      { status: 403 },
+    );
+  }
   try {
     const url = new URL(req.url);
     const status = url.searchParams.get("status");
-    const where = status ? "WHERE status = ?" : "";
-    const args = status ? [status] : [];
+    // P0 (docs/DOCUMENTACION_TECNICA_Y_MEJORAS.md, seccion 4.2):
+    //   Con soft delete, los proyectos archivados NO deben aparecer en los
+    //   listados por defecto. `?includeArchived=1` los trae (uso admin).
+    const includeArchived = url.searchParams.get("includeArchived") === "1";
+    const conds: string[] = [];
+    const args: any[] = [];
+    if (!includeArchived) conds.push("deleted_at IS NULL");
+    if (status) {
+      conds.push("status = ?");
+      args.push(status);
+    }
+    const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
     const rows = await query<any[]>(
       `SELECT * FROM projects ${where} ORDER BY created_at DESC`,
       args,
     );
+
+    // P1 (docs/DOCUMENTACION_TECNICA_Y_MEJORAS.md, seccion 4.1):
+    //   `executedAmount` antes era un campo manual que podia no
+    //   coincidir con los cortes aprobados. Lo derivamos en lectura
+    //   sumando los net_value de los cortes en APPROVED/PAID. Se
+    //   mantiene `manualExecutedAmount` con el valor crudo de la BD
+    //   para detectar drift; en una siguiente fase se quita del
+    //   formulario de edicion.
+    if (rows.length) {
+      const ids = rows.map((r) => r.id);
+      const placeholders = ids.map(() => "?").join(",");
+      const totals = await query<any[]>(
+        `SELECT project_id, COALESCE(SUM(net_value), 0) AS executed
+           FROM work_cuts
+          WHERE project_id IN (${placeholders})
+            AND status IN ('APPROVED','PAID')
+            AND deleted_at IS NULL
+          GROUP BY project_id`,
+        ids,
+      );
+      const totalsByProject: Record<string, number> = {};
+      for (const t of totals) {
+        totalsByProject[t.project_id] = Number(t.executed ?? 0);
+      }
+      for (const r of rows) {
+        r.manual_executed_amount = Number(r.executed_amount ?? 0);
+        r.executed_amount = totalsByProject[r.id] ?? 0;
+      }
+    }
     return NextResponse.json(rows.map(rowToDTO));
   } catch (e: any) {
     console.error("[projects GET]", e?.code, e?.message);
@@ -54,18 +116,19 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const auth = await requireRole(
-    "ADMIN",
-    "GERENTE",
-    "DIRECTOR",
-    "RESIDENTE",
-  );
+  const auth = await requireRole("ADMIN", "GERENTE", "DIRECTOR", "RESIDENTE");
   const fail = authFailureResponse(auth);
   if (fail) return fail;
   try {
     const body = await req.json();
-    if (!body?.name || !body?.code || !body?.client || !body?.location ||
-        !body?.startDate || !body?.estimatedEndDate) {
+    if (
+      !body?.name ||
+      !body?.code ||
+      !body?.client ||
+      !body?.location ||
+      !body?.startDate ||
+      !body?.estimatedEndDate
+    ) {
       return NextResponse.json(
         { error: "Faltan campos obligatorios" },
         { status: 400 },
@@ -100,17 +163,15 @@ export async function POST(req: Request) {
         { status: 409 },
       );
     }
-    return NextResponse.json({ error: "Error al crear proyecto" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Error al crear proyecto" },
+      { status: 500 },
+    );
   }
 }
 
 export async function PUT(req: Request) {
-  const auth = await requireRole(
-    "ADMIN",
-    "GERENTE",
-    "DIRECTOR",
-    "RESIDENTE",
-  );
+  const auth = await requireRole("ADMIN", "GERENTE", "DIRECTOR", "RESIDENTE");
   const fail = authFailureResponse(auth);
   if (fail) return fail;
   try {
@@ -134,11 +195,18 @@ export async function PUT(req: Request) {
     for (const [k, vCol] of Object.entries(map)) {
       if (body[k] !== undefined) {
         sets.push(`${vCol} = ?`);
-        args.push(k === "totalBudget" || k === "executedAmount" ? Number(body[k]) : body[k]);
+        args.push(
+          k === "totalBudget" || k === "executedAmount"
+            ? Number(body[k])
+            : body[k],
+        );
       }
     }
     if (sets.length === 0) {
-      return NextResponse.json({ error: "Nada que actualizar" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Nada que actualizar" },
+        { status: 400 },
+      );
     }
     args.push(body.id);
     await query(`UPDATE projects SET ${sets.join(", ")} WHERE id = ?`, args);
@@ -159,8 +227,31 @@ export async function DELETE(req: Request) {
     if (!id) {
       return NextResponse.json({ error: "ID requerido" }, { status: 400 });
     }
-    await query("DELETE FROM projects WHERE id = ?", [id]);
-    return NextResponse.json({ ok: true });
+
+    // P0 (docs/DOCUMENTACION_TECNICA_Y_MEJORAS.md, seccion 4.2):
+    //   Antes esto hacia DELETE fisico y, por las FK en CASCADE de
+    //   payment_requests y work_cuts, se llevaba puesto todo el historial
+    //   financiero del proyecto (pagos PAID inclusive). Ahora hacemos
+    //   soft delete: marcamos deleted_at y las FK en RESTRICT (ver
+    //   migracion 010) impiden el borrado fisico mientras existan hijos.
+    //   El proyecto deja de aparecer en los listados pero conserva su
+    //   trazabilidad contable.
+    const userId = (auth as { userId: string }).userId;
+    const result = await query<ResultSetHeader>(
+      `UPDATE projects
+         SET deleted_at = CURRENT_TIMESTAMP,
+             deleted_by = ?
+       WHERE id = ? AND deleted_at IS NULL`,
+      [userId, id],
+    );
+    const affected = result.affectedRows ?? 0;
+    if (affected === 0) {
+      return NextResponse.json(
+        { error: "Proyecto no encontrado o ya estaba archivado" },
+        { status: 404 },
+      );
+    }
+    return NextResponse.json({ ok: true, softDeleted: true });
   } catch (e: any) {
     console.error("[projects DELETE]", e?.code, e?.message);
     return NextResponse.json({ error: "Error al eliminar" }, { status: 500 });

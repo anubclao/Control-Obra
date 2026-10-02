@@ -208,3 +208,77 @@ export function evaluatePaymentAction(
 export function isPaymentEditable(status: PaymentStatus | string): boolean {
   return status === "PENDING";
 }
+
+// =============================================================================
+// UI: etiquetas y acciones disponibles por estado y rol (single source of truth)
+// P1 (docs/DOCUMENTACION_TECNICA_Y_MEJORAS.md, seccion 4.3):
+//   Antes existian dos copias de la tabla rol->accion de pagos (la del
+//   servidor en `payments-workflow.ts` y la de la UI en
+//   `payments-constants.ts`) y ya divergian: la UI no ofrecia CANCEL
+//   en APPROVED aunque el servidor lo permite. Aqui consolidamos todo:
+//   los labels de UI, el mapa rol->accion y el helper que decide que
+//   botones renderizar viven en el mismo archivo que la maquina de
+//   estados y se re-exportan desde `payments-constants.ts` para
+//   compatibilidad.
+// =============================================================================
+
+export const PAYMENT_ACTION_LABELS: Record<PaymentAction, string> = {
+  APPROVE_L1: "Aprobar N1",
+  APPROVE_L2: "Aprobar N2",
+  PAY: "Pagar",
+  REJECT: "Rechazar",
+  CANCEL: "Cancelar",
+};
+
+export interface PaymentActionButton {
+  action: PaymentAction;
+  label: string;
+  variant: "default" | "info" | "warning" | "destructive";
+}
+
+/**
+ * Acciones permitidas por estado. Se deriva de `PAYMENT_TRANSITIONS`
+ * pero es la fuente de verdad para la UI: si una transicion existe
+ * pero no debe estar en el UI (por ejemplo CANCEL solo en estados
+ * no terminales), se filtra aqui.
+ *
+ * El servidor SIEMPRE valida con `evaluatePaymentAction` y la tabla
+ * de transiciones; este mapa es solo la pista de que botones mostrar.
+ */
+const PAYMENT_STATUS_ACTIONS: Record<PaymentStatus, PaymentAction[]> = {
+  PENDING: ["APPROVE_L1", "REJECT", "CANCEL"],
+  APPROVED_LEVEL_1: ["APPROVE_L2", "REJECT", "CANCEL"],
+  // APPROVED_LEVEL_2 no es alcanzable desde la maquina de estados
+  // actual (L1 + L2 salta directo a APPROVED), pero existe en la DB
+  // por datos heredados. Mostramos REJECT/CANCEL para coherencia
+  // con la transicion real, sin PAY (que responderia 400).
+  APPROVED_LEVEL_2: ["REJECT", "CANCEL"],
+  APPROVED: ["PAY", "CANCEL"],
+  REJECTED: [],
+  PAID: [],
+  CANCELLED: [],
+};
+
+/**
+ * Devuelve la lista de botones que la UI debe mostrar, ya filtrados por
+ * rol y combinados con su label y variant. Si `userRole` es ADMIN, ve
+ * todos los botones disponibles para el estado.
+ */
+export function getAvailablePaymentActions(
+  payment: { status: PaymentStatus | string },
+  userRole: string | undefined,
+): PaymentActionButton[] {
+  const status = payment.status as PaymentStatus;
+  const actions = PAYMENT_STATUS_ACTIONS[status] ?? [];
+  return actions
+    .filter((a) => {
+      if (userRole === "ADMIN") return true;
+      return !!userRole && PAYMENT_ACTION_ROLES[a].includes(userRole);
+    })
+    .map((a) => ({
+      action: a,
+      label: PAYMENT_ACTION_LABELS[a],
+      variant:
+        a === "REJECT" ? "destructive" : a === "CANCEL" ? "warning" : "default",
+    }));
+}

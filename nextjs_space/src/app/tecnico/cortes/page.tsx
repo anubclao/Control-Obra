@@ -38,22 +38,39 @@ import {
 } from "@/components/ui/dialog";
 import { ConfirmDialog, useConfirm } from "@/components/ui/confirm-dialog";
 import { ModuleExplanationCard } from "@/components/ui/module-explanation-card";
-import { useCutsStore, useProjectsStore, useProvidersStore } from "@/lib/data-store";
+import { KpiMini } from "@/components/ui/kpi-card";
+import { PanelState } from "@/components/ui/panel-state";
+import { PaginationControl } from "@/components/ui/pagination-control";
+import {
+  useCutsStore,
+  useProjectsStore,
+  useProvidersStore,
+} from "@/lib/data-store";
 import { useAuthStore } from "@/lib/auth-store";
 import { CUT_STATUS_LABELS, CUT_STATUS_VARIANTS } from "@/lib/data-store";
 import { useIsSuperAdmin } from "@/lib/permissions";
 import { CutForm } from "@/components/cuts/cut-form";
-import { formatCurrency, formatDate, cn } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import type { WorkCut, WorkCutStatus } from "@/types";
 
 export default function CortesPage() {
-  const { cuts, deleteCut, load: loadCuts } = useCutsStore();
+  const {
+    cuts,
+    deleteCut,
+    load: loadCuts,
+    loadPage,
+    loading: cutsLoading,
+    error: cutsError,
+    pagination: cutsPagination,
+  } = useCutsStore();
   const { projects, getProject, load: loadProjects } = useProjectsStore();
   const { providers, getProvider, load: loadProviders } = useProvidersStore();
   const { user } = useAuthStore();
   const isSuperAdmin = useIsSuperAdmin();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | WorkCutStatus>("ALL");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | WorkCutStatus>(
+    "ALL",
+  );
   const [projectFilter, setProjectFilter] = useState<string>("ALL");
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<WorkCut | null>(null);
@@ -72,13 +89,18 @@ export default function CortesPage() {
   }, [cuts, projectFilter]);
 
   const groupedByProvider = useMemo(() => {
-    const groups: Record<string, { providerName: string; cuts: WorkCut[]; gross: number; net: number }> = {};
+    const groups: Record<
+      string,
+      { providerName: string; cuts: WorkCut[]; gross: number; net: number }
+    > = {};
     for (const c of projectCuts) {
       const provider = getProvider(c.providerId);
       if (!groups[c.providerId]) {
         groups[c.providerId] = {
           providerName: provider?.name ?? "(Proveedor no encontrado)",
-          cuts: [], gross: 0, net: 0,
+          cuts: [],
+          gross: 0,
+          net: 0,
         };
       }
       groups[c.providerId].cuts.push(c);
@@ -107,7 +129,9 @@ export default function CortesPage() {
     const gross = projectCuts.reduce((s, c) => s + c.grossValue, 0);
     const net = projectCuts.reduce((s, c) => s + c.netValue, 0);
     return {
-      total: projectCuts.length, gross, net,
+      total: projectCuts.length,
+      gross,
+      net,
       draft: projectCuts.filter((c) => c.status === "DRAFT").length,
       submitted: projectCuts.filter((c) => c.status === "SUBMITTED").length,
       validated: projectCuts.filter((c) => c.status === "VALIDATED").length,
@@ -124,9 +148,15 @@ export default function CortesPage() {
       description: `El corte ${c.cutNumber} se eliminará permanentemente. Esta acción NO se puede deshacer.`,
       details: (
         <div className="space-y-1 text-xs">
-          <p><strong>Proyecto:</strong> {getProject(c.projectId)?.name}</p>
-          <p><strong>Proveedor:</strong> {getProvider(c.providerId)?.name}</p>
-          <p><strong>Valor neto:</strong> {formatCurrency(c.netValue)}</p>
+          <p>
+            <strong>Proyecto:</strong> {getProject(c.projectId)?.name}
+          </p>
+          <p>
+            <strong>Proveedor:</strong> {getProvider(c.providerId)?.name}
+          </p>
+          <p>
+            <strong>Valor neto:</strong> {formatCurrency(c.netValue)}
+          </p>
         </div>
       ),
       variant: "danger",
@@ -149,15 +179,18 @@ export default function CortesPage() {
         steps={[
           {
             title: "Crea el corte",
-            description: "Define proyecto, contratista, período y los ítems ejecutados con sus cantidades.",
+            description:
+              "Define proyecto, contratista, período y los ítems ejecutados con sus cantidades.",
           },
           {
             title: "Envía a validación",
-            description: "El residente envía → Director valida → Admin aprueba → Tesorería paga.",
+            description:
+              "El residente envía → Director valida → Admin aprueba → Tesorería paga.",
           },
           {
             title: "Vincula al pago",
-            description: "Cuando el corte está APROBADO, Tesorería puede generar la solicitud de pago asociada.",
+            description:
+              "Cuando el corte está APROBADO, Tesorería puede generar la solicitud de pago asociada.",
           },
         ]}
         warnings={[
@@ -168,7 +201,9 @@ export default function CortesPage() {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Cortes de Obra</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">
+            Cortes de Obra
+          </h1>
           <p className="text-sm text-muted-foreground">
             {projectFilter === "ALL"
               ? `${stats.total} cortes · Vista general`
@@ -185,7 +220,8 @@ export default function CortesPage() {
             <DialogHeader>
               <DialogTitle>Crear corte de obra</DialogTitle>
               <DialogDescription>
-                Define el período, ítems ejecutados y descuentos. El valor se calcula de las actividades.
+                Define el período, ítems ejecutados y descuentos. El valor se
+                calcula de las actividades.
               </DialogDescription>
             </DialogHeader>
             <CutForm onSuccess={() => setCreateOpen(false)} />
@@ -194,22 +230,60 @@ export default function CortesPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
-        <KpiMini label="Borrador" value={stats.draft} icon={FileText} color="text-muted-foreground" />
-        <KpiMini label="Enviados" value={stats.submitted} icon={Clock} color="text-amber-600" />
-        <KpiMini label="Validados" value={stats.validated} icon={CheckCircle2} color="text-blue-600" />
-        <KpiMini label="Aprobados" value={stats.approved} icon={CheckCircle2} color="text-emerald-600" />
-        <KpiMini label="Rechazados" value={stats.rejected} icon={XCircle} color="text-red-600" />
-        <KpiMini label="Pagados" value={stats.paid} icon={CheckCircle2} color="text-emerald-700" />
+        <KpiMini
+          label="Borrador"
+          value={stats.draft}
+          icon={FileText}
+          color="text-muted-foreground"
+        />
+        <KpiMini
+          label="Enviados"
+          value={stats.submitted}
+          icon={Clock}
+          color="text-amber-600"
+        />
+        <KpiMini
+          label="Validados"
+          value={stats.validated}
+          icon={CheckCircle2}
+          color="text-blue-600"
+        />
+        <KpiMini
+          label="Aprobados"
+          value={stats.approved}
+          icon={CheckCircle2}
+          color="text-emerald-600"
+        />
+        <KpiMini
+          label="Rechazados"
+          value={stats.rejected}
+          icon={XCircle}
+          color="text-red-600"
+        />
+        <KpiMini
+          label="Pagados"
+          value={stats.paid}
+          icon={CheckCircle2}
+          color="text-emerald-700"
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="rounded-lg border bg-card p-4">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground">Valor bruto</p>
-          <p className="mt-1 text-2xl font-semibold">{formatCurrency(stats.gross)}</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground">
+            Valor bruto
+          </p>
+          <p className="mt-1 text-2xl font-semibold">
+            {formatCurrency(stats.gross)}
+          </p>
         </div>
         <div className="rounded-lg border bg-card p-4">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground">Valor neto</p>
-          <p className="mt-1 text-2xl font-semibold text-emerald-600">{formatCurrency(stats.net)}</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground">
+            Valor neto
+          </p>
+          <p className="mt-1 text-2xl font-semibold text-emerald-600">
+            {formatCurrency(stats.net)}
+          </p>
         </div>
       </div>
 
@@ -237,78 +311,113 @@ export default function CortesPage() {
             ))}
           </SelectContent>
         </Select>
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
+        <Select
+          value={statusFilter}
+          onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}
+        >
           <SelectTrigger className="w-full sm:w-[200px]">
             <SelectValue placeholder="Estado" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">Todos los estados</SelectItem>
             {Object.entries(CUT_STATUS_LABELS).map(([k, v]) => (
-              <SelectItem key={k} value={k}>{v}</SelectItem>
+              <SelectItem key={k} value={k}>
+                {v}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
 
-      {filtered.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-12 text-center">
-          <Scissors className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-4 text-lg font-semibold">No hay cortes</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {projectFilter !== "ALL"
-              ? "Selecciona otro proyecto o crea el primer corte para este."
-              : search || statusFilter !== "ALL"
+      <PanelState
+        loading={cutsLoading && cuts.length === 0}
+        error={cuts.length === 0 ? cutsError : null}
+        onRetry={loadCuts}
+        isEmpty={filtered.length === 0}
+        emptyTitle="No hay cortes"
+        emptyDescription={
+          projectFilter !== "ALL"
+            ? "Selecciona otro proyecto o crea el primer corte para este."
+            : search || statusFilter !== "ALL"
               ? "Intenta con otros filtros"
-              : "Crea el primer corte de obra"}
-          </p>
-        </div>
-      ) : projectFilter === "ALL" ? (
-        <div className="space-y-2">
-          {filtered.map((c) => (
-            <CutRow
-              key={c.id} cut={c}
-              projectName={getProject(c.projectId)?.name}
-              projectCode={getProject(c.projectId)?.code}
-              providerName={getProvider(c.providerId)?.name}
-              isSuperAdmin={isSuperAdmin}
-              onEdit={() => setEditing(c)}
-              onDelete={() => openDeleteConfirm(c)}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {groupedByProvider
-            .filter(([, g]) => g.cuts.some((c) => filtered.includes(c)))
-            .map(([providerId, group]) => (
-              <CardWrapper key={providerId}>
-                <div className="flex items-center justify-between border-b bg-secondary/30 p-3">
-                  <div className="flex items-center gap-2">
-                    <Truck className="h-4 w-4 text-muted-foreground" />
-                    <p className="font-semibold">{group.providerName}</p>
-                    <Badge variant="outline">{group.cuts.length} corte{group.cuts.length === 1 ? "" : "s"}</Badge>
-                  </div>
-                  <div className="text-right text-sm">
-                    <p className="font-semibold">{formatCurrency(group.net)}</p>
-                    <p className="text-xs text-muted-foreground">Neto acumulado</p>
-                  </div>
-                </div>
-                <div className="divide-y">
-                  {group.cuts.filter((c) => filtered.includes(c)).map((c) => (
-                    <CutRow
-                      key={c.id} cut={c}
-                      projectName={getProject(c.projectId)?.name}
-                      projectCode={getProject(c.projectId)?.code}
-                      providerName={getProvider(c.providerId)?.name}
-                      isSuperAdmin={isSuperAdmin}
-                      onEdit={() => setEditing(c)}
-                      onDelete={() => openDeleteConfirm(c)}
-                    />
-                  ))}
-                </div>
-              </CardWrapper>
+              : "Crea el primer corte de obra"
+        }
+        emptyIcon={Scissors}
+        skeletonRows={3}
+      >
+        {projectFilter === "ALL" ? (
+          <div className="space-y-2">
+            {filtered.map((c) => (
+              <CutRow
+                key={c.id}
+                cut={c}
+                projectName={getProject(c.projectId)?.name}
+                projectCode={getProject(c.projectId)?.code}
+                providerName={getProvider(c.providerId)?.name}
+                isSuperAdmin={isSuperAdmin}
+                onEdit={() => setEditing(c)}
+                onDelete={() => openDeleteConfirm(c)}
+              />
             ))}
-        </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {groupedByProvider
+              .filter(([, g]) => g.cuts.some((c) => filtered.includes(c)))
+              .map(([providerId, group]) => (
+                <CardWrapper key={providerId}>
+                  <div className="flex items-center justify-between border-b bg-secondary/30 p-3">
+                    <div className="flex items-center gap-2">
+                      <Truck className="h-4 w-4 text-muted-foreground" />
+                      <p className="font-semibold">{group.providerName}</p>
+                      <Badge variant="outline">
+                        {group.cuts.length} corte
+                        {group.cuts.length === 1 ? "" : "s"}
+                      </Badge>
+                    </div>
+                    <div className="text-right text-sm">
+                      <p className="font-semibold">
+                        {formatCurrency(group.net)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Neto acumulado
+                      </p>
+                    </div>
+                  </div>
+                  <div className="divide-y">
+                    {group.cuts
+                      .filter((c) => filtered.includes(c))
+                      .map((c) => (
+                        <CutRow
+                          key={c.id}
+                          cut={c}
+                          projectName={getProject(c.projectId)?.name}
+                          projectCode={getProject(c.projectId)?.code}
+                          providerName={getProvider(c.providerId)?.name}
+                          isSuperAdmin={isSuperAdmin}
+                          onEdit={() => setEditing(c)}
+                          onDelete={() => openDeleteConfirm(c)}
+                        />
+                      ))}
+                  </div>
+                </CardWrapper>
+              ))}
+          </div>
+        )}
+      </PanelState>
+
+      {/* P1 (seccion 4.2/4.3): control de paginacion para que la UI
+          navegue el listado paginado del backend. */}
+      {cutsPagination && (
+        <PaginationControl
+          page={cutsPagination.page}
+          totalPages={cutsPagination.totalPages}
+          total={cutsPagination.total}
+          limit={cutsPagination.limit}
+          loading={cutsLoading}
+          onPageChange={(p) => loadPage(p, cutsPagination.limit)}
+          noun="cortes"
+        />
       )}
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
@@ -317,7 +426,9 @@ export default function CortesPage() {
             <DialogTitle>Editar corte</DialogTitle>
             <DialogDescription>{editing?.cutNumber}</DialogDescription>
           </DialogHeader>
-          {editing && <CutForm cut={editing} onSuccess={() => setEditing(null)} />}
+          {editing && (
+            <CutForm cut={editing} onSuccess={() => setEditing(null)} />
+          )}
         </DialogContent>
       </Dialog>
 
@@ -327,30 +438,19 @@ export default function CortesPage() {
 }
 
 function CardWrapper({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-lg border bg-card overflow-hidden">{children}</div>;
-}
-
-function KpiMini({
-  label, value, icon: Icon, color,
-}: {
-  label: string;
-  value: number;
-  icon: React.ComponentType<{ className?: string }>;
-  color: string;
-}) {
   return (
-    <div className="rounded-lg border bg-card p-3">
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Icon className={cn("h-3.5 w-3.5", color)} />
-        {label}
-      </div>
-      <p className="mt-1 text-xl font-semibold">{value}</p>
-    </div>
+    <div className="rounded-lg border bg-card overflow-hidden">{children}</div>
   );
 }
 
 function CutRow({
-  cut: c, projectName, projectCode, providerName, isSuperAdmin, onEdit, onDelete,
+  cut: c,
+  projectName,
+  projectCode,
+  providerName,
+  isSuperAdmin,
+  onEdit,
+  onDelete,
 }: {
   cut: WorkCut;
   projectName?: string;
@@ -373,13 +473,18 @@ function CutRow({
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="font-mono text-xs text-muted-foreground">{c.cutNumber}</p>
+            <p className="font-mono text-xs text-muted-foreground">
+              {c.cutNumber}
+            </p>
             <Badge variant={variant}>{CUT_STATUS_LABELS[c.status]}</Badge>
             <span className="text-xs text-muted-foreground">
               {formatDate(c.periodStart)} → {formatDate(c.periodEnd)}
             </span>
           </div>
-          <Link href={`/tecnico/cortes/${c.id}`} className="mt-0.5 block font-medium hover:underline">
+          <Link
+            href={`/tecnico/cortes/${c.id}`}
+            className="mt-0.5 block font-medium hover:underline"
+          >
             {c.description}
           </Link>
           <p className="text-xs text-muted-foreground">
@@ -391,11 +496,18 @@ function CutRow({
         <div className="hidden text-right sm:block">
           <p className="text-xs text-muted-foreground">Bruto</p>
           <p className="font-semibold">{formatCurrency(c.grossValue)}</p>
-          <p className="mt-1 text-xs text-emerald-600">Neto: {formatCurrency(c.netValue)}</p>
+          <p className="mt-1 text-xs text-emerald-600">
+            Neto: {formatCurrency(c.netValue)}
+          </p>
         </div>
 
         <div className="relative">
-          <Button variant="ghost" size="icon" onClick={() => setMenuOpen(!menuOpen)} className="h-8 w-8">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="h-8 w-8"
+          >
             <MoreVertical className="h-4 w-4" />
           </Button>
           {menuOpen && (
@@ -411,7 +523,10 @@ function CutRow({
               </Link>
               {isEditable && (
                 <button
-                  onClick={() => { setMenuOpen(false); onEdit(); }}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onEdit();
+                  }}
                   className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent"
                 >
                   <Pencil className="h-4 w-4" /> Editar
@@ -419,7 +534,10 @@ function CutRow({
               )}
               {isSuperAdmin && (
                 <button
-                  onClick={() => { setMenuOpen(false); onDelete(); }}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onDelete();
+                  }}
                   className="flex w-full items-center gap-2 rounded-b-md px-3 py-2 text-sm text-destructive hover:bg-accent"
                 >
                   <Trash2 className="h-4 w-4" /> Eliminar
