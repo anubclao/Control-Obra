@@ -259,7 +259,7 @@ export function ContractForm({ contract, onSuccess }: Props) {
 
         <div>
           <Label className="mb-1.5 block">Valor del contrato (COP) *</Label>
-          <Input type="number" min="0" step="1000000" {...register("value")} />
+          <Input type="number" min="0" step="any" {...register("value")} />
           {errors.value && (
             <p className="mt-1 text-xs text-destructive">
               {errors.value.message}

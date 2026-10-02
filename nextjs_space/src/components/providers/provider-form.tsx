@@ -430,7 +430,7 @@ export function ProviderForm({ provider, onSuccess }: Props) {
             <Input
               type="number"
               min="0"
-              step="1000000"
+              step="any"
               {...register("reportedIncome")}
             />
           </Field>

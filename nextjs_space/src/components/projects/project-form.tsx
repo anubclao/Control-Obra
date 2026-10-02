@@ -177,7 +177,7 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
             type="number"
             inputMode="numeric"
             min="0"
-            step="1000"
+            step="any"
             {...register("totalBudget")}
           />
           {errors.totalBudget && (

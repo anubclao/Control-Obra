@@ -404,7 +404,7 @@ export function CutForm({ cut, onSuccess }: Props) {
           <Input
             type="number"
             min="0"
-            step="1000"
+            step="any"
             {...register("advanceDeduction")}
           />
         </div>

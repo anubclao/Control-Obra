@@ -349,7 +349,7 @@ export function ExpenseForm({ onSuccess }: Props) {
                 <div className="sm:col-span-3">
                   <Input
                     type="number"
-                    step="1000"
+                    step="any"
                     {...register(`items.${idx}.unitPrice`)}
                     placeholder="Vr Unit"
                   />

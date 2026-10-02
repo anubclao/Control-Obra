@@ -346,7 +346,7 @@ export function PaymentForm({ payment, onSuccess }: Props) {
 
         <div>
           <Label className="mb-1.5 block">Monto (COP) *</Label>
-          <Input type="number" min="0" step="1000" {...register("amount")} />
+          <Input type="number" min="0" step="any" {...register("amount")} />
           {errors.amount && (
             <p className="mt-1 text-xs text-destructive">
               {errors.amount.message}
