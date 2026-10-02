@@ -19,6 +19,10 @@ import { useProjectsStore, PROJECT_STATUS_LABELS } from "@/lib/data-store";
 import type { Project, ProjectStatus } from "@/types";
 
 const projectSchema = z.object({
+  code: z.string()
+    .min(2, "Mínimo 2 caracteres")
+    .max(40, "Máximo 40 caracteres")
+    .regex(/^[A-Za-z0-9_-]+$/, "Solo letras, números, guion y guion bajo"),
   name: z.string().min(3, "Mínimo 3 caracteres").max(120),
   client: z.string().min(2, "Mínimo 2 caracteres"),
   location: z.string().min(2, "Mínimo 2 caracteres"),
@@ -53,6 +57,7 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
     resolver: projectResolver,
     defaultValues: project
       ? {
+          code: project.code,
           name: project.name,
           client: project.client,
           location: project.location,
@@ -63,6 +68,7 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
           description: project.description ?? "",
         }
       : {
+          code: "",
           name: "",
           client: "",
           location: "",
@@ -77,6 +83,7 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
   useEffect(() => {
     if (project)
       reset({
+        code: project.code,
         name: project.name,
         client: project.client,
         location: project.location,
@@ -117,6 +124,33 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
           />
           {errors.name && (
             <p className="text-xs text-destructive">{errors.name.message}</p>
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="code">
+            Codigo unico *
+            {isEditing && (
+              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                (no se puede modificar)
+              </span>
+            )}
+          </Label>
+          <Input
+            id="code"
+            {...register("code")}
+            placeholder="PROY-001"
+            disabled={isEditing}
+            readOnly={isEditing}
+            className={isEditing ? "font-mono opacity-70" : "font-mono"}
+          />
+          {errors.code && (
+            <p className="text-xs text-destructive">{errors.code.message}</p>
+          )}
+          {!isEditing && (
+            <p className="text-xs text-muted-foreground">
+              Identificador corto y unico (letras, numeros, guion y guion bajo). Lo veras en listados y reportes.
+            </p>
           )}
         </div>
 
