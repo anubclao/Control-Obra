@@ -131,14 +131,43 @@ export async function POST(req: Request) {
     // sesion en BD. createSession() inserta fila en user_sessions y
     // devuelve cookie en formato `${userId}|${exp}|${tokenId}.${sig}`
     // que verifySessionCookie valida correctamente.
+    //
+    // P0 plan 2026-10-02 (bugfix): si la tabla user_sessions NO existe
+    // todavia en la BD (ej: Hostinger prod sin haber corrido la
+    // migracion 015), createSession lanza ER_NO_SUCH_TABLE y bloquea el
+    // login. Caemos al formato legacy signSession() para no romper el
+    // login, y dejamos un warning visible para que el operador sepa que
+    // debe correr database/mysql/migrations/015_user_sessions.sql.
     const ip =
       req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
       req.headers.get("x-real-ip") ??
       null;
     const ua = req.headers.get("user-agent") ?? null;
-    const session = await createSession(user.id, { ip, userAgent: ua });
     const jar = await cookies();
-    jar.set(SESSION_COOKIE, session.cookieValue, {
+    let cookieValue: string;
+    try {
+      const session = await createSession(user.id, { ip, userAgent: ua });
+      cookieValue = session.cookieValue;
+    } catch (sessionErr: any) {
+      const code = sessionErr?.code ?? "";
+      const msg = String(sessionErr?.message ?? "");
+      const missingTable =
+        code === "ER_NO_SUCH_TABLE" ||
+        msg.includes("user_sessions") ||
+        /Table .* doesn't exist/i.test(msg);
+      if (missingTable) {
+        console.warn(
+          "[auth verify-otp] user_sessions no existe en BD — usando " +
+            "signSession() legacy. Ejecutar database/mysql/migrations/" +
+            "015_user_sessions.sql para activar revocacion server-side.",
+        );
+        const { signSession } = await import("@/lib/session");
+        cookieValue = signSession(user.id);
+      } else {
+        throw sessionErr;
+      }
+    }
+    jar.set(SESSION_COOKIE, cookieValue, {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
