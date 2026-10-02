@@ -95,6 +95,13 @@ export async function POST(req: Request) {
       [email, codeHash],
     );
 
+    // P0 plan 2026-10-02 (debug): log explicito del codigo generado para
+    // que el operador pueda compararlo con lo que recibio en su bandeja.
+    // Si LOG_OTP_PLAIN=true, el codigo se imprime en texto plano.
+    if (process.env.LOG_OTP_PLAIN === "true") {
+      console.log(`[request-otp] email=${email} code=${code}`);
+    }
+
     // P0 (docs/DOCUMENTACION_TECNICA_Y_MEJORAS.md, seccion 4.4):
     //   En produccion, el OTP NUNCA puede devolverse en la respuesta: si el
     //   SMTP cae, alguien que conozca un email registrado podria iniciar
