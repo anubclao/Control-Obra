@@ -39,6 +39,26 @@ export async function POST(req: Request) {
       [email, hashCode(email, code)],
     );
 
+    // P0 plan 2026-10-02 (debug): log explicito para diagnosticar 401.
+    // Si el codigo no valida, veras en runtime logs por que.
+    if (process.env.DEBUG_OTP === "true") {
+      const allOtpsForEmail = await query<any[]>(
+        `SELECT id, LEFT(code_hash, 16) AS hash_prefix, expires_at, used_at
+           FROM auth_otps WHERE email = ? ORDER BY id DESC LIMIT 5`,
+        [email],
+      );
+      console.log(
+        "[verify-otp DEBUG]",
+        JSON.stringify({
+          email,
+          receivedCode: code,
+          receivedHashPrefix: String(hashCode(email, code)).slice(0, 16),
+          matchFound: otps.length,
+          recentOtps: allOtpsForEmail,
+        }, null, 2),
+      );
+    }
+
     if (otps.length === 0) {
       await query(
         `UPDATE auth_otps SET attempts = attempts + 1 WHERE email = ?`,
