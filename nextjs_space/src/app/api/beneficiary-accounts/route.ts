@@ -193,8 +193,13 @@ export async function DELETE(req: Request) {
  * Helper interno: descifra la cuenta principal de un proveedor. Pensado
  * para ser llamado desde otras rutas de servidor que necesiten el numero
  * completo (por ejemplo, al construir el comprobante de pago).
+ *
+ * P0 plan 2026-10-02 (fix build): NO se exporta desde este Route Handler
+ * porque Next.js 15 exige que los unicos exports sean los metodos HTTP
+ * (GET, POST, etc). Si otra ruta necesita este helper, debe moverse a
+ * src/lib/beneficiary-accounts.ts.
  */
-export async function decryptDefaultAccount(
+async function decryptDefaultAccount(
   providerId: string,
 ): Promise<string | null> {
   const rows = await query<any[]>(
