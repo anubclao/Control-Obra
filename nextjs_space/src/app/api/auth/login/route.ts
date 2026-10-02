@@ -24,8 +24,13 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const jar = await cookies();
   const cookieValue = jar.get(SESSION_COOKIE)?.value;
-  const userId = verifySessionCookie(cookieValue);
-  if (!userId) {
+  // P0 plan 2026-10-02 (bugfix): verifySessionCookie es async y devuelve
+  // un VerifiedSession { userId, ... } o null. Antes faltaba el `await` y
+  // el destructuring, por lo que `userId` quedaba siendo el Promise
+  // (truthy) y la query se ejecutaba con un objeto como parámetro —
+  // siempre devolvia user:null aunque la cookie fuera valida.
+  const session = await verifySessionCookie(cookieValue);
+  if (!session) {
     return NextResponse.json({ user: null }, { status: 200 });
   }
   try {
@@ -36,7 +41,7 @@ export async function GET() {
          FROM users
         WHERE id = ? AND status = 'ACTIVE'
         LIMIT 1`,
-      [userId],
+      [session.userId],
     );
     return NextResponse.json({ user: rows[0] ?? null }, { status: 200 });
   } catch (e: any) {

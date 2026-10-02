@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import crypto from "node:crypto";
 import { query } from "@/lib/db";
-import { signSession, SESSION_COOKIE } from "@/lib/session";
+import { createSession, SESSION_COOKIE } from "@/lib/session";
 import { rateLimit } from "@/lib/rate-limit";
 
 function hashCode(email: string, code: string): string {
@@ -125,9 +125,20 @@ export async function POST(req: Request) {
       [user.id],
     );
 
-    // Crear sesión FIRMADA con HMAC (security fix)
+    // Crear sesión FIRMADA con HMAC (security fix) y registrar fila en
+    // user_sessions para revocación server-side. Antes se usaba
+    // signSession() legacy (sin tokenId) que no permite invalidar la
+    // sesion en BD. createSession() inserta fila en user_sessions y
+    // devuelve cookie en formato `${userId}|${exp}|${tokenId}.${sig}`
+    // que verifySessionCookie valida correctamente.
+    const ip =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+      req.headers.get("x-real-ip") ??
+      null;
+    const ua = req.headers.get("user-agent") ?? null;
+    const session = await createSession(user.id, { ip, userAgent: ua });
     const jar = await cookies();
-    jar.set(SESSION_COOKIE, signSession(user.id), {
+    jar.set(SESSION_COOKIE, session.cookieValue, {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
