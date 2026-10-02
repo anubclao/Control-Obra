@@ -321,6 +321,7 @@ export default function CargarPresupuestoPage() {
                 <thead>
                   <tr className="border-b bg-secondary/30 text-left text-xs uppercase text-muted-foreground">
                     <th className="px-3 py-2">Fila</th>
+                    <th className="px-3 py-2">Clasificacion</th>
                     <th className="px-3 py-2">Código</th>
                     <th className="px-3 py-2">Descripción</th>
                     <th className="px-3 py-2 text-center">Tipo</th>
@@ -331,42 +332,67 @@ export default function CargarPresupuestoPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {parsed.rows.map((row) => (
-                    <tr key={row.rowNumber} className="border-b last:border-0">
-                      <td className="px-3 py-1.5 text-muted-foreground text-xs">
-                        {row.rowNumber}
-                      </td>
-                      <td className="px-3 py-1.5 font-mono text-xs">
-                        {row.code}
-                      </td>
-                      <td className="px-3 py-1.5">{row.description}</td>
-                      <td className="px-3 py-1.5 text-center">
-                        {row.layerType === "CHAPTER" ? (
-                          <Badge variant="info" className="text-[10px]">
-                            CAP
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-[10px]">
-                            ITEM
-                          </Badge>
-                        )}
-                      </td>
-                      <td className="px-3 py-1.5 text-center font-mono text-xs">
-                        {row.unit}
-                      </td>
-                      <td className="px-3 py-1.5 text-right">
-                        {row.quantity
-                          ? row.quantity.toLocaleString("es-CO")
-                          : "—"}
-                      </td>
-                      <td className="px-3 py-1.5 text-right">
-                        {row.unitPrice ? formatCurrency(row.unitPrice) : "—"}
-                      </td>
-                      <td className="px-3 py-1.5 text-right font-semibold">
-                        {row.totalPrice ? formatCurrency(row.totalPrice) : "—"}
-                      </td>
-                    </tr>
-                  ))}
+                  {parsed.rows.map((row) => {
+                    const effectiveTotal =
+                      row.totalPrice || row.computedTotal || 0;
+                    return (
+                      <tr
+                        key={row.rowNumber}
+                        className="border-b last:border-0"
+                      >
+                        <td className="px-3 py-1.5 text-muted-foreground text-xs">
+                          {row.rowNumber}
+                        </td>
+                        <td className="px-3 py-1.5 text-xs text-muted-foreground">
+                          {row.classification || "—"}
+                        </td>
+                        <td className="px-3 py-1.5 font-mono text-xs">
+                          {row.code}
+                        </td>
+                        <td className="px-3 py-1.5">{row.description}</td>
+                        <td className="px-3 py-1.5 text-center">
+                          {row.layerType === "CHAPTER" ? (
+                            <Badge variant="info" className="text-[10px]">
+                              CAP
+                            </Badge>
+                          ) : row.layerType === "SUBCHAPTER" ? (
+                            <Badge variant="secondary" className="text-[10px]">
+                              SUB
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px]">
+                              ITEM
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="px-3 py-1.5 text-center font-mono text-xs">
+                          {row.unit}
+                        </td>
+                        <td className="px-3 py-1.5 text-right">
+                          {row.quantity
+                            ? row.quantity.toLocaleString("es-CO")
+                            : "—"}
+                        </td>
+                        <td className="px-3 py-1.5 text-right">
+                          {row.unitPrice
+                            ? formatCurrency(row.unitPrice)
+                            : "—"}
+                        </td>
+                        <td
+                          className={
+                            "px-3 py-1.5 text-right font-semibold " +
+                            (row.layerType !== "ITEM" && row.computedTotal
+                              ? "text-primary"
+                              : "")
+                          }
+                        >
+                          {effectiveTotal
+                            ? formatCurrency(effectiveTotal)
+                            : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

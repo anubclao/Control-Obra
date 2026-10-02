@@ -15,6 +15,8 @@ export interface ParsedExcelRow {
   totalPrice: number;
   layerType: BudgetLayerType;
   layerName?: string;
+  classification?: string;
+  computedTotal?: number;
 }
 
 export interface ParsedExcel {
@@ -32,6 +34,7 @@ export interface ExcelColumnMapping {
   quantity: string;
   unitPrice: string;
   totalPrice: string;
+  classification?: string;
 }
 
 // Detección automática: busca en los headers palabras clave
@@ -91,6 +94,14 @@ export function detectColumns(headers: string[]): ExcelColumnMapping {
       "precio",
     ),
     totalPrice: find("total", "valor total", "importe", "subtotal", "v. total"),
+    classification: find(
+      "clasificación",
+      "clasificacion",
+      "categoria",
+      "categoría",
+      "capitulo",
+      "capítulo",
+    ),
   };
 }
 
@@ -133,20 +144,19 @@ function detectRowType(
   const description = (row[mapping.description] || "").trim();
   const quantity = parseNumber(row[mapping.quantity]);
   const unitPrice = parseNumber(row[mapping.unitPrice]);
+  const dots = (code.match(/\./g) || []).length;
 
-  // Si no hay cantidad ni precio, es un capítulo
+  // P0 plan 2026-10-02 (bugfix): si la fila no tiene cantidad ni precio,
+  // es un encabezado (capitulo o subcapitulo). Antes toda fila sin cant/
+  // precio quedaba como CHAPTER, asi que '1.1 PRELIMINARES' aparecia como
+  // CAP y no como SUB. Ahora: 1+ puntos en el codigo = SUBCHAPTER.
   if (!quantity && !unitPrice && description) {
+    if (dots >= 1) return { type: "SUBCHAPTER", layerName: description };
     return { type: "CHAPTER", layerName: description };
   }
 
-  // Si el código tiene puntos (1.1, 1.1.1) es subcapítulo o item
-  const dots = (code.match(/\./g) || []).length;
-  if (dots >= 2) {
-    return { type: "ITEM" };
-  } else if (dots === 1) {
-    return { type: "SUBCHAPTER", layerName: description };
-  }
-
+  // Fila con cant/precio: es un item (puede tener 0, 1 o 2+ puntos en el
+  // codigo, p.ej. '1', '1.1' o '1,1,1' en presupuestos municipales).
   return { type: "ITEM" };
 }
 
@@ -194,15 +204,50 @@ export function parseExcelContent(
       totalPrice: total,
       layerType: type,
       layerName,
+      classification: mapping.classification
+        ? (raw[mapping.classification] || "").trim() || undefined
+        : undefined,
     };
   });
 
+  // P0 plan 2026-10-02 (espejo del Excel): calcular el TOTAL de cada
+  // capitulo/subcapitulo sumando los items que vienen debajo hasta el
+  // proximo encabezado. En presupuestos municipales, la celda de total
+  // de los encabezados esta vacia — el usuario espera ver la suma
+  // acumulada (asi figura en la planilla original). Tambien detectamos
+  // cuando la Clasificacion cambia: si lo hace sin haber encontrado un
+  // encabezado con codigo "1", "2", etc., forzamos el row como CHAPTER.
+  let currentClassification = "";
+  for (let i = 0; i < parsedRows.length; i++) {
+    const row = parsedRows[i];
+    if (row.classification && row.classification !== currentClassification) {
+      // Cambio de clasificacion = nuevo capitulo logico
+      if (currentClassification !== "" && row.layerType === "ITEM") {
+        row.layerType = "CHAPTER";
+        row.layerName = row.classification;
+      }
+      currentClassification = row.classification;
+    }
+
+    if (row.layerType !== "CHAPTER" && row.layerType !== "SUBCHAPTER") continue;
+    let sum = 0;
+    for (let j = i + 1; j < parsedRows.length; j++) {
+      const next = parsedRows[j];
+      if (
+        next.layerType === "CHAPTER" ||
+        next.layerType === "SUBCHAPTER"
+      ) break;
+      sum += next.totalPrice;
+    }
+    row.computedTotal = sum;
+  }
+
   const totalValue = parsedRows.reduce((s, r) => s + r.totalPrice, 0);
   const chapterCount = parsedRows.filter(
-    (r) => r.layerType === "CHAPTER",
+    (r) => r.layerType === "CHAPTER" || r.layerType === "SUBCHAPTER",
   ).length;
   const itemCount = parsedRows.filter(
-    (r) => r.layerType === "ITEM" || r.layerType === "SUBCHAPTER",
+    (r) => r.layerType === "ITEM",
   ).length;
 
   return { rows: parsedRows, totalValue, chapterCount, itemCount, warnings };
