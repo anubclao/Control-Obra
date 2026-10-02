@@ -2,6 +2,9 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 /**
  * CRUD: /api/quotations
+ *
+ * Fase 6: la maquina de estados + recálculo de totales vive en
+ * `lib/quotations-workflow.ts`. Aqui solo aplicamos los helpers.
  */
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
@@ -20,6 +23,11 @@ import {
   groupByIds,
 } from "@/lib/validators/api";
 import { can } from "@/lib/permissions-matrix";
+import {
+  computeQuotationTotals,
+  evaluateQuotationAction,
+} from "@/lib/quotations-workflow";
+import { nextSequence } from "@/lib/counters";
 
 function r(row: any) {
   return {
@@ -138,10 +146,46 @@ export async function POST(req: Request) {
     // P1 (docs/DOCUMENTACION_TECNICA_Y_MEJORAS.md, seccion 4.2):
     //   `body.createdBy` venia del cliente. Ahora SIEMPRE sale de la
     //   sesion; el body se ignora para este campo.
-    const { userId } = auth as AuthSuccess;
+    const { userId, user } = auth as AuthSuccess;
     const id = randomUUID();
-    const num = `COT-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+    // P1 (seccion 4.1): el servidor recalcula TODOS los totales. El
+    //   navegador puede mandar subtotal/ivaAmount/total pero se
+    //   ignoran — los items son la unica fuente de verdad.
+    const totals = computeQuotationTotals({
+      items: (body.items ?? []).map((it: any) => ({
+        quantity: Number(it.quantity ?? 0),
+        unitPrice: Number(it.unitPrice ?? 0),
+      })),
+      discountPercent: Number(body.discountPercent ?? 0),
+      ivaPercent: Number(body.ivaPercent ?? 19),
+    });
+    // El numero consecutivo se calcula dentro del mismo transaction()
+    // para que use `conn.execute` y el INSERT y el counter sean
+    // atomicos. P2 (seccion 4.1): consecutivos con tabla counters
+    // (sin colisiones entre PIDs concurrentes).
+    let num = "";
+    // Estado inicial validado contra el workflow (solo DRAFT/CANCELLED
+    // son origenes validos para una cotizacion nueva).
+    const requestedStatus = (body.status ?? "DRAFT") as
+      | "DRAFT"
+      | "SENT"
+      | "VIEWED"
+      | "ACCEPTED"
+      | "REJECTED"
+      | "EXPIRED"
+      | "CANCELLED";
+    if (requestedStatus !== "DRAFT" && requestedStatus !== "CANCELLED") {
+      return NextResponse.json(
+        {
+          error:
+            "El estado inicial de una cotizacion solo puede ser DRAFT o CANCELLED",
+        },
+        { status: 400 },
+      );
+    }
     await transaction(async (conn) => {
+      const seq = await nextSequence(conn, "COT");
+      num = seq.number;
       await conn.execute(
         `INSERT INTO quotations
          (id, quotation_number, client_id, title, description, status,
@@ -155,13 +199,13 @@ export async function POST(req: Request) {
           body.clientId,
           body.title,
           body.description ?? null,
-          body.status ?? "DRAFT",
-          Number(body.subtotal ?? 0),
+          requestedStatus,
+          totals.subtotal,
           Number(body.discountPercent ?? 0),
-          Number(body.discountAmount ?? 0),
-          Number(body.ivaPercent ?? 0),
-          Number(body.ivaAmount ?? 0),
-          Number(body.total ?? 0),
+          totals.discountAmount,
+          Number(body.ivaPercent ?? 19),
+          totals.ivaAmount,
+          totals.total,
           body.validUntil,
           body.paymentTerms ?? null,
           body.deliveryTerms ?? null,
@@ -188,7 +232,16 @@ export async function POST(req: Request) {
       }
     });
     return NextResponse.json(
-      { id, ...body, quotationNumber: num, createdBy: userId },
+      {
+        id,
+        ...body,
+        quotationNumber: num,
+        createdBy: userId,
+        subtotal: totals.subtotal,
+        discountAmount: totals.discountAmount,
+        ivaAmount: totals.ivaAmount,
+        total: totals.total,
+      },
       { status: 201 },
     );
   } catch (e: any) {
@@ -216,18 +269,41 @@ export async function PUT(req: Request) {
     const body = await req.json();
     if (!body?.id)
       return NextResponse.json({ error: "ID requerido" }, { status: 400 });
-    const { userId } = auth as AuthSuccess;
+    const { userId, user } = auth as AuthSuccess;
+    // P1 (seccion 4.1): si la peticion cambia el status, validamos
+    // la transicion contra el workflow. Tambien bloqueamos pasar a
+    // EXPIRED (eso lo hace el cron via evaluateQuotationExpiry).
+    if (body.status !== undefined) {
+      const current = await query<any[]>(
+        `SELECT status FROM quotations WHERE id = ?`,
+        [body.id],
+      );
+      if (!current.length) {
+        return NextResponse.json(
+          { error: "Cotizacion no existe" },
+          { status: 404 },
+        );
+      }
+      const fromStatus = current[0].status;
+      if (fromStatus !== body.status) {
+        const evaluation = evaluateQuotationAction(
+          fromStatus,
+          body.status,
+          (auth as AuthSuccess).user.role,
+        );
+        if (!evaluation.ok) {
+          return NextResponse.json(
+            { error: evaluation.error, code: evaluation.code },
+            { status: evaluation.status },
+          );
+        }
+      }
+    }
     const m: Record<string, string> = {
       clientId: "client_id",
       title: "title",
       description: "description",
       status: "status",
-      subtotal: "subtotal",
-      discountPercent: "discount_percent",
-      discountAmount: "discount_amount",
-      ivaPercent: "iva_percent",
-      ivaAmount: "iva_amount",
-      total: "total",
       validUntil: "valid_until",
       paymentTerms: "payment_terms",
       deliveryTerms: "delivery_terms",
@@ -239,19 +315,53 @@ export async function PUT(req: Request) {
     for (const [k, c] of Object.entries(m)) {
       if (body[k] !== undefined) {
         sets.push(`${c} = ?`);
-        args.push(
-          [
-            "subtotal",
-            "discountPercent",
-            "discountAmount",
-            "ivaPercent",
-            "ivaAmount",
-            "total",
-          ].includes(k)
-            ? Number(body[k])
-            : body[k],
-        );
+        args.push(body[k]);
       }
+    }
+    // P1 (seccion 4.1): si vienen items en el PUT, recalculamos
+    // TODOS los totales desde cero. El navegador no puede inflar el
+    // total aunque mande subtotal/ivaAmount/total en el body —
+    // ignoramos esos campos explicitamente.
+    let totals: ReturnType<typeof computeQuotationTotals> | null = null;
+    if (Array.isArray(body.items)) {
+      totals = computeQuotationTotals({
+        items: body.items.map((it: any) => ({
+          quantity: Number(it.quantity ?? 0),
+          unitPrice: Number(it.unitPrice ?? 0),
+        })),
+        discountPercent: Number(
+          body.discountPercent ??
+            (
+              await query<any[]>(
+                `SELECT discount_percent FROM quotations WHERE id = ?`,
+                [body.id],
+              )
+            )[0]?.discount_percent ??
+            0,
+        ),
+        ivaPercent: Number(
+          body.ivaPercent ??
+            (
+              await query<any[]>(
+                `SELECT iva_percent FROM quotations WHERE id = ?`,
+                [body.id],
+              )
+            )[0]?.iva_percent ??
+            19,
+        ),
+      });
+      sets.push(
+        "subtotal = ?",
+        "discount_amount = ?",
+        "iva_amount = ?",
+        "total = ?",
+      );
+      args.push(
+        totals.subtotal,
+        totals.discountAmount,
+        totals.ivaAmount,
+        totals.total,
+      );
     }
     // P1: registrar quien edita la cotizacion.
     sets.push("updated_by = ?");
@@ -286,13 +396,22 @@ export async function PUT(req: Request) {
         }
       });
     }
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, totals });
   } catch (e: any) {
     console.error("[quotations PUT]", e?.code, e?.message);
     return NextResponse.json({ error: "Error al actualizar" }, { status: 500 });
   }
 }
 
+/**
+ * P1 (seccion 4.1): cron de expiracion de cotizaciones. Recorre las
+ * cotizaciones activas (DRAFT/SENT/VIEWED) cuya `valid_until` ya
+ * vencio y las pasa a EXPIRED. Pensado para llamarse desde un cron
+ * externo (cron-job.org, GitHub Actions, etc.) una vez al dia.
+ *
+ * Protegido por DEBUG_TOKEN (mismo patron que /api/auth/debug) o
+ * por rol ADMIN. Asi nadie lo llama por accidente.
+ */
 export async function DELETE(req: Request) {
   const auth = await requireAdmin();
   const fail = authFailureResponse(auth);

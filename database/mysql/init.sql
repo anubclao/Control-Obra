@@ -699,6 +699,7 @@ CREATE TABLE payment_requests (
   project_id              VARCHAR(36)   NOT NULL,
   provider_id             VARCHAR(36),
   work_cut_id             VARCHAR(36),
+  replaces_request_id     VARCHAR(36)   NULL,
   type                    ENUM('CORTE_OBRA','ANTICIPO','RETENCION','SUMINISTRO','SERVICIOS','HONORARIOS','OTROS') NOT NULL,
   amount                  DECIMAL(15,2) NOT NULL,
   priority                ENUM('LOW','NORMAL','HIGH','URGENT') NOT NULL DEFAULT 'NORMAL',
@@ -726,7 +727,12 @@ CREATE TABLE payment_requests (
   INDEX idx_pay_project (project_id),
   INDEX idx_pay_provider (provider_id),
   INDEX idx_pay_cut (work_cut_id),
-  INDEX idx_pay_status (status)
+INDEX idx_pay_status (status),
+    -- 016: indice + FK al padre (solo se setea si la solicitud original
+    -- esta REJECTED; lo valida la aplicacion)
+    INDEX idx_pay_replaces (replaces_request_id),
+    CONSTRAINT fk_pay_replaces FOREIGN KEY (replaces_request_id)
+      REFERENCES payment_requests(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE payment_approvals (

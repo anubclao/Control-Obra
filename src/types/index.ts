@@ -299,6 +299,9 @@ export interface PaymentRequest {
   projectId: string;
   providerId?: string;
   workCutId?: string; // Si viene de un corte aprobado
+  // P2 plan 2026-10-01 (fase 6.3): si esta solicitud reemplaza a una
+  // REJECTED, el id va aqui. La ruta POST /api/payments lo valida.
+  replacesRequestId?: string;
   type: PaymentType;
   amount: number;
   priority: PaymentPriority;
@@ -505,7 +508,11 @@ export interface Budget {
 }
 
 // Control de Cambios del presupuesto (CC-001…). SPEC: docs/specs/budget-change-control.md
-export type ChangeRequestChannel = "ACTA_COMITE" | "MAIL" | "SOLICITUD_VERBAL" | "OTROS";
+export type ChangeRequestChannel =
+  | "ACTA_COMITE"
+  | "MAIL"
+  | "SOLICITUD_VERBAL"
+  | "OTROS";
 export type ChangeOrderStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
 export type ChangeOrderAction = "SUBMIT" | "APPROVE" | "REJECT";
 

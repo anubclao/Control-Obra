@@ -19,6 +19,7 @@ import {
   Banknote,
   Ban,
   BadgeCheck,
+  Copy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -173,6 +174,18 @@ export default function PaymentDetailPage() {
           <Button onClick={() => setEditOpen(true)} variant="outline" size="sm">
             <Pencil className="mr-2 h-4 w-4" />
             Editar
+          </Button>
+        )}
+        {/* P2 plan 2026-10-01 (fase 6.3): si la solicitud esta
+            REJECTED, habilitamos un atajo que redirige al form de
+            crear con ?replaces=<id>. El form pre-rellena los datos
+            y al guardar se persiste `replaces_request_id`. */}
+        {payment.status === "REJECTED" && (
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/administrativo/pagos?replaces=${payment.id}`}>
+              <Copy className="mr-2 h-4 w-4" />
+              Duplicar como nueva
+            </Link>
           </Button>
         )}
       </div>

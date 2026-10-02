@@ -6,6 +6,7 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { query, transaction } from "@/lib/db";
 import { randomUUID } from "node:crypto";
+import { nextSequence } from "@/lib/counters";
 import {
   requireAuth,
   requireRole,
@@ -50,6 +51,11 @@ function dto(r: any, viewerRole: string) {
     paidReference: r.paid_reference ?? "",
     paidMethod: r.paid_method,
     rejectionReason: r.rejection_reason ?? "",
+    // P2 plan 2026-10-01 (fase 6.3): cuando esta solicitud fue creada
+    // para corregir y reenviar una REJECTED, aqui viene el id del
+    // padre. Sirve para que la UI pueda mostrar "Reemplaza a PAG-..."
+    // y enlazar al historial.
+    replacesRequestId: r.replaces_request_id ?? undefined,
     createdBy: r.created_by,
     createdAt: r.created_at,
   };
@@ -207,36 +213,79 @@ export async function POST(req: Request) {
       }
     }
     const id = randomUUID();
-    const num = `PAG-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase().slice(-5)}`;
-    await query(
-      `INSERT INTO payment_requests
-       (id, request_number, project_id, provider_id, work_cut_id, type, amount,
-        priority, status, current_approval_level, required_approval_level,
-        beneficiary_name, beneficiary_nit, bank_name, account_type, account_number,
-        due_date, description, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        id,
-        num,
-        body.projectId,
-        body.providerId ?? null,
-        body.workCutId ?? null,
-        body.type,
-        Number(body.amount),
-        body.priority ?? "NORMAL",
-        requiredApprovalLevel,
-        body.beneficiaryName,
-        body.beneficiaryNit,
-        body.bankName,
-        body.accountType ?? "CHECKING",
-        body.accountNumber,
-        body.dueDate ?? null,
-        body.description ?? null,
-        (auth as AuthSuccess).userId,
-      ],
-    );
+
+    // P2 plan 2026-10-01 (fase 6.3): si el cliente manda
+    // `replacesRequestId`, validamos que la solicitud original este
+    // en status = REJECTED. Sin esto, podria referenciarse un id
+    // cualquiera y enlazar solicitudes sin sentido.
+    let replacesRequestId: string | null = null;
+    if (body.replacesRequestId) {
+      const parentRows = (await query<any[]>(
+        `SELECT id, status FROM payment_requests WHERE id = ?`,
+        [body.replacesRequestId],
+      )) as any[];
+      if (!parentRows.length) {
+        return NextResponse.json(
+          { error: "La solicitud original no existe" },
+          { status: 400 },
+        );
+      }
+      if (parentRows[0].status !== "REJECTED") {
+        return NextResponse.json(
+          {
+            error: `Solo se puede reemplazar una solicitud REJECTED (la original esta en ${parentRows[0].status})`,
+            code: "PARENT_NOT_REJECTED",
+          },
+          { status: 409 },
+        );
+      }
+      replacesRequestId = body.replacesRequestId;
+    }
+
+    // P2 plan 2026-10-01 (fase 6.1): consecutivos en tabla counters
+    // en vez de Date.now(). Lo calculamos dentro del transaction() para
+    // que la asignacion del numero y el INSERT sean atomicos.
+    let num = "";
+    await transaction(async (conn) => {
+      const seq = await nextSequence(conn, "PAG");
+      num = seq.number;
+      await conn.execute(
+        `INSERT INTO payment_requests
+         (id, request_number, project_id, provider_id, work_cut_id,
+          replaces_request_id, type, amount, priority, status,
+          current_approval_level, required_approval_level,
+          beneficiary_name, beneficiary_nit, bank_name, account_type, account_number,
+          due_date, description, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          num,
+          body.projectId,
+          body.providerId ?? null,
+          body.workCutId ?? null,
+          replacesRequestId,
+          body.type,
+          Number(body.amount),
+          body.priority ?? "NORMAL",
+          requiredApprovalLevel,
+          body.beneficiaryName,
+          body.beneficiaryNit,
+          body.bankName,
+          body.accountType ?? "CHECKING",
+          body.accountNumber,
+          body.dueDate ?? null,
+          body.description ?? null,
+          (auth as AuthSuccess).userId,
+        ],
+      );
+    });
     return NextResponse.json(
-      { id, ...body, requestNumber: num },
+      {
+        id,
+        ...body,
+        requestNumber: num,
+        replacesRequestId: replacesRequestId ?? undefined,
+      },
       { status: 201 },
     );
   } catch (e: any) {
