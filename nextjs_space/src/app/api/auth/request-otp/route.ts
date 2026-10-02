@@ -77,7 +77,13 @@ export async function POST(req: Request) {
     // Generar OTP de 6 digitos
     const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
     const codeHash = hashCode(email, code);
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 min
+    // P0 plan 2026-10-02:
+    //  - 30 min (antes 10 min) para absorber latencia entre zonas horarias.
+    //  - Forzamos UTC: `new Date(now + ms)` con `now = Date.now()` siempre
+    //    devuelve un instante absoluto. Lo guardamos como datetime MySQL;
+    //    con `SET time_zone='+00:00'` en la conexion, NOW() y los DATETIME
+    //    se interpretan de forma consistente sin importar la TZ del servidor.
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 min
 
     // Eliminar codigos previos del mismo email no usados
     await query(`DELETE FROM auth_otps WHERE email = ? AND used_at IS NULL`, [

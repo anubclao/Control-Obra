@@ -100,6 +100,15 @@ function createPool(): Pool {
   // Ping en background; no bloquea el arranque del módulo.
   p.getConnection()
     .then((conn) => {
+      // P0 plan 2026-10-02: forzar zona horaria UTC en cada conexion.
+      // Antes, MySQL usaba la zona del servidor (que puede ser UTC+0 en
+      // Hostinger) y Node usa la local (UTC-5 en Colombia). Eso hacia
+      // que `expires_at` se guardara con hora del servidor, 5h adelante
+      // de la hora real del usuario. Con NOW() y curDate en UTC, ambos
+      // sistemas quedan alineados.
+      conn.query("SET time_zone = '+00:00'").catch((e: any) => {
+        console.warn("[db] No pude setear time_zone UTC:", e?.message);
+      });
       conn.release();
       console.log(`[db] ✓ Pool MySQL conectado a ${cfg.host}:${cfg.port}/${cfg.database}`);
     })
