@@ -2231,19 +2231,29 @@ SET FOREIGN_KEY_CHECKS = 1;
 
 -- =============================================================================
 -- 3) USUARIOS INICIALES (P0 plan 2026-10-02, Fase 4.2)
--- Solo ADMIN y GERENTE. El resto se crea desde /administrativo/usuarios.
--- Tras primer login el sistema solicita OTP por email (auth/request-otp).
+-- Estos son los usuarios que tenian la BD de Hostinger antes del reset.
+-- ON DUPLICATE KEY UPDATE preserva el id existente para no romper FKs
+-- (payment_requests.created_by, etc) si la BD se reimporta sobre una
+-- poblada. Tras primer login el sistema solicita OTP por email.
 -- =============================================================================
 
--- ADMIN: Nelson Rozo <nelson@controlobra.local>
--- GERENTE: queda como placeholder. Crear con el primer login real.
+-- 4 usuarios administrativos iniciales de ControlObra (pre-existentes en Hostinger prod)
 INSERT INTO users (id, email, name, role, area, status, is_active, created_at, updated_at)
 VALUES
-  (UUID(), 'nelson@controlobra.local', 'Nelson Rozo', 'ADMIN', 'administrativo', 'ACTIVE', 1, NOW(), NOW())
-ON DUPLICATE KEY UPDATE role = 'ADMIN', is_active = 1, updated_at = NOW();
+  (UUID(), 'anubclao@gmail.com',           'Anubis Clavio',  'ADMIN',   'administrativo', 'ACTIVE', 1, NOW(), NOW()),
+  (UUID(), 'julia.naranjo@marzotriangular.com',     'Juia Naranjo',    'ADMIN',   'administrativo', 'ACTIVE', 1, NOW(), NOW()),
+  (UUID(), 'diana.baracaldo@marzotriangular.com',   'Diana Baracaldo', 'ADMIN',   'tecnico',        'ACTIVE', 1, NOW(), NOW()),
+  (UUID(), 'asistente.contable@marzotriangular.com', 'Andy Pacheco',    'GERENTE', 'administrativo', 'ACTIVE', 1, NOW(), NOW())
+ON DUPLICATE KEY UPDATE
+  name        = VALUES(name),
+  role        = VALUES(role),
+  area        = VALUES(area),
+  status      = 'ACTIVE',
+  is_active   = 1,
+  updated_at  = NOW();
 
 
 -- =============================================================================
 -- Fin del consolidado. BD lista para arrancar ControlObra.
--- Tablas creadas, indices OK, FK activas. Solo usuarios ADMIN/GERENTE.
+-- Tablas creadas, indices OK, FK activas. 4 usuarios pre-existentes preservados.
 -- =============================================================================

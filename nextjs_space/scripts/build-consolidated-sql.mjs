@@ -182,18 +182,28 @@ out +=
   "\n\nSET FOREIGN_KEY_CHECKS = 1;\n" +
   "\n-- =============================================================================\n" +
   "-- 3) USUARIOS INICIALES (P0 plan 2026-10-02, Fase 4.2)\n" +
-  "-- Solo ADMIN y GERENTE. El resto se crea desde /administrativo/usuarios.\n" +
-  "-- Tras primer login el sistema solicita OTP por email (auth/request-otp).\n" +
+  "-- Estos son los usuarios que tenian la BD de Hostinger antes del reset.\n" +
+  "-- ON DUPLICATE KEY UPDATE preserva el id existente para no romper FKs\n" +
+  "-- (payment_requests.created_by, etc) si la BD se reimporta sobre una\n" +
+  "-- poblada. Tras primer login el sistema solicita OTP por email.\n" +
   "-- =============================================================================\n\n" +
-  `-- ADMIN: Nelson Rozo <nelson@controlobra.local>\n` +
-  `-- GERENTE: queda como placeholder. Crear con el primer login real.\n` +
+  `-- 4 usuarios administrativos iniciales de ControlObra (pre-existentes en Hostinger prod)\n` +
   `INSERT INTO users (id, email, name, role, area, status, is_active, created_at, updated_at)\n` +
   `VALUES\n` +
-  `  (UUID(), 'nelson@controlobra.local', 'Nelson Rozo', 'ADMIN', 'administrativo', 'ACTIVE', 1, NOW(), NOW())\n` +
-  `ON DUPLICATE KEY UPDATE role = 'ADMIN', is_active = 1, updated_at = NOW();\n\n` +
+  `  (UUID(), 'anubclao@gmail.com',           'Anubis Clavio',  'ADMIN',   'administrativo', 'ACTIVE', 1, NOW(), NOW()),\n` +
+  `  (UUID(), 'julia.naranjo@marzotriangular.com',     'Juia Naranjo',    'ADMIN',   'administrativo', 'ACTIVE', 1, NOW(), NOW()),\n` +
+  `  (UUID(), 'diana.baracaldo@marzotriangular.com',   'Diana Baracaldo', 'ADMIN',   'tecnico',        'ACTIVE', 1, NOW(), NOW()),\n` +
+  `  (UUID(), 'asistente.contable@marzotriangular.com', 'Andy Pacheco',    'GERENTE', 'administrativo', 'ACTIVE', 1, NOW(), NOW())\n` +
+  `ON DUPLICATE KEY UPDATE\n` +
+  `  name        = VALUES(name),\n` +
+  `  role        = VALUES(role),\n` +
+  `  area        = VALUES(area),\n` +
+  `  status      = 'ACTIVE',\n` +
+  `  is_active   = 1,\n` +
+  `  updated_at  = NOW();\n\n` +
   "\n-- =============================================================================\n" +
   "-- Fin del consolidado. BD lista para arrancar ControlObra.\n" +
-  "-- Tablas creadas, indices OK, FK activas. Solo usuarios ADMIN/GERENTE.\n" +
+  "-- Tablas creadas, indices OK, FK activas. 4 usuarios pre-existentes preservados.\n" +
   "-- =============================================================================\n";
 
 fs.writeFileSync(outFile, out, "utf-8");
