@@ -7,6 +7,7 @@ export const runtime = 'nodejs';
  * para que el verifier pueda probar los filtros de cada KPI sin levantar MySQL.
  */
 import { NextResponse } from "next/server";
+import type { RowDataPacket } from "mysql2";
 import { query } from "@/lib/db";
 import { requireAuth, authFailureResponse } from "@/lib/api-auth";
 import { computeDashboardStats } from "@/lib/dashboard-stats-compute";
@@ -21,7 +22,11 @@ export async function GET() {
     // Antes, una sola query fallida (timeout, columna no existe en una BD
     // sin migrar, etc) colgaba el dashboard con loading=true para siempre.
     // Ahora, si una falla, devolvemos la query en [] y logueamos el error.
-    const safe = async <T,>(label: string, sql: string, args: unknown[] = []): Promise<T[]> => {
+    const safe = async <T extends RowDataPacket = RowDataPacket>(
+    label: string,
+    sql: string,
+    args: unknown[] = [],
+  ): Promise<T[]> => {
       try {
         return await query<T[]>(sql, args);
       } catch (e: any) {
