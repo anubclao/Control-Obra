@@ -17,6 +17,19 @@ export async function GET() {
   const fail = authFailureResponse(auth);
   if (fail) return fail;
   try {
+    // P0 plan 2026-10-02 (fix build): cada query con su propio fallback.
+    // Antes, una sola query fallida (timeout, columna no existe en una BD
+    // sin migrar, etc) colgaba el dashboard con loading=true para siempre.
+    // Ahora, si una falla, devolvemos la query en [] y logueamos el error.
+    const safe = async <T,>(label: string, sql: string, args: unknown[] = []): Promise<T[]> => {
+      try {
+        return await query<T[]>(sql, args);
+      } catch (e: any) {
+        console.warn(`[dashboard/stats] ${label} fallback ([]):`, e?.code, e?.message);
+        return [];
+      }
+    };
+
     const [
       projects,
       cuts,
@@ -26,13 +39,13 @@ export async function GET() {
       employees,
       logs,
     ] = await Promise.all([
-      query<any[]>(`SELECT status, total_budget, executed_amount FROM projects`),
-      query<any[]>(`SELECT status FROM work_cuts`),
-      query<any[]>(`SELECT status, amount FROM payment_requests`),
-      query<any[]>(`SELECT status FROM clients`),
-      query<any[]>(`SELECT status, total FROM quotations`),
-      query<any[]>(`SELECT COUNT(*) AS n, status FROM employees GROUP BY status`),
-      query<any[]>(`SELECT COUNT(*) AS n FROM work_logs WHERE date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)`),
+      safe<any>("projects",   `SELECT status, total_budget, executed_amount FROM projects`),
+      safe<any>("cuts",       `SELECT status FROM work_cuts`),
+      safe<any>("payments",   `SELECT status, amount FROM payment_requests`),
+      safe<any>("clients",    `SELECT status FROM clients`),
+      safe<any>("quotations", `SELECT status, total FROM quotations`),
+      safe<any>("employees",  `SELECT COUNT(*) AS n, status FROM employees GROUP BY status`),
+      safe<any>("logs",       `SELECT COUNT(*) AS n FROM work_logs WHERE date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)`),
     ]);
 
     return NextResponse.json(
@@ -43,7 +56,7 @@ export async function GET() {
         clients,
         quotations,
         employees,
-        recentLogs: logs[0]?.n ?? 0,
+        recentLogs: (logs as any[])[0]?.n ?? 0,
       }),
     );
   } catch (e: any) {
