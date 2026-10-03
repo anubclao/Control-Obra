@@ -341,7 +341,18 @@ export function parseExcelContent(
     const { type, layerName } = detectRowType(raw, mapping);
     const quantity = parseNumber(raw[mapping.quantity]);
     const unitPrice = parseNumber(raw[mapping.unitPrice]);
-    const total = parseNumber(raw[mapping.totalPrice]) || quantity * unitPrice;
+    // P0 plan 2026-10-03 (bug): solo calcular totalPrice para filas ITEM.
+    // Antes calculabamos total = parseNumber(totalRaw) || qty*price PARA
+    // TODAS las filas, pero eso asignaba el VALOR TOTAL del Excel (por
+    // ejemplo "TOTAL TRAMITES" = $122M, "VALOR TOTAL PRESUPUESTO" = $5.556B)
+    // a filas header de tipo CHAPTER/SUBCHAPTER. Esos valores NO son items
+    // reales, son totales agregados que se sumaban al totalValue del PT
+    // duplicando el resultado. Fijamos totalPrice=0 para no-ITEM rows para
+    // que el reduce solo sume items reales.
+    let total = 0;
+    if (type === "ITEM") {
+      total = parseNumber(raw[mapping.totalPrice]) || quantity * unitPrice;
+    }
     return {
       rowNumber: idx + 2, // +1 header, +1 base 1
       raw,
