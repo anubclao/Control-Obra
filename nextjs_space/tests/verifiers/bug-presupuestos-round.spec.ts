@@ -106,6 +106,39 @@ describe("Bug presupuestos — parseExcelContent preserva totales (AC-7)", () =>
   });
 });
 
+describe("Bug presupuestos — parseNumber no rompe moneda solo-comas (caso 2026-10-03)", () => {
+  it("BUG 2026-10-03: '$ 7,434,742' (solo comas) → 7434742, NO 7.434742", () => {
+    // Antes del fix el parser trataba la unica coma como decimal,
+    // dando 7.434742 en vez de 7.434.742 (un millon de veces menor).
+    expect(parseNumber("$ 7,434,742")).toBe(7434742);
+  });
+
+  it("BUG 2026-10-03: '7,434,742' sin símbolo → 7434742", () => {
+    expect(parseNumber("7,434,742")).toBe(7434742);
+  });
+
+  it("BUG 2026-10-03: '$ 5,556,464,503' → 5556464503 (miles sin punto)", () => {
+    // VALOR TOTAL PRESUPUESTO del Excel real de Parques del Valle.
+    expect(parseNumber("$ 5,556,464,503")).toBe(5556464503);
+  });
+
+  it("BUG 2026-10-03: '$ 1,984,208' → 1984208", () => {
+    expect(parseNumber("$ 1,984,208")).toBe(1984208);
+  });
+
+  it("BUG 2026-10-03: '$ 15,000,000.00' → 15000000 (US: coma miles + punto decimal)", () => {
+    expect(parseNumber("$ 15,000,000.00")).toBe(15000000);
+  });
+
+  it("REGRESION: '$ 1.234,56' (EU: punto miles + coma decimal) → 1234.56", () => {
+    expect(parseNumber("$ 1.234,56")).toBe(1234.56);
+  });
+
+  it("REGRESION: '$ 1,234.56' (US: coma miles + punto decimal) → 1234.56", () => {
+    expect(parseNumber("$ 1,234.56")).toBe(1234.56);
+  });
+});
+
 describe("Bug presupuestos — parseExcelFile expuesto para la página de carga (AC-1, AC-2, AC-3, AC-5)", () => {
   it("AC-1/AC-2: parseExcelFile está exportado desde excel-parser", () => {
     expect(typeof parseExcelFile).toBe("function");

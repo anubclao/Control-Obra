@@ -221,28 +221,56 @@ export function computeFrenteSummary(
 // Convierte un string a número, manejando formatos comunes (1.234,56 → 1234.56)
 // y el formato anglosajón (1,234.56 → 1234.56). Regla: el separador que
 // aparezca MÁS A LA DERECHA es el decimal; el otro es separador de miles.
+//
+// Caso especial para moneda colombiana (comun en presupuestos oficiales):
+// "$ 7,434,742" tiene SOLO comas (sin punto). En ese caso las comas son
+// SIEMPRE separadores de miles, no decimales. El codigo anterior las
+// trataba como decimales (cayendo en el return final que reemplaza la
+// ultima coma por punto), lo que daba "$ 7,434,742" -> 7.434742 en vez
+// de 7434742. Por eso los totales del modal salian como $56.069 en vez
+// de $11.234.939.521.
 export function parseNumber(value: string | undefined): number {
   if (value === undefined || value === null) return 0;
   const trimmed = String(value).trim();
   if (trimmed === "") return 0;
   // Limpiar símbolos de moneda y espacios, conservar dígitos, coma, punto y signo.
   const cleaned = trimmed.replace(/[^\d,.\-]/g, "");
+  if (cleaned === "" || cleaned === "-") return 0;
   const lastComma = cleaned.lastIndexOf(",");
   const lastDot = cleaned.lastIndexOf(".");
+  // Sin separadores: parseo directo (ej: "1234").
   if (lastComma === -1 && lastDot === -1) {
     return parseFloat(cleaned) || 0;
   }
-  // El separador decimal es el que aparece MÁS A LA DERECHA.
+  // Solo comas, sin punto: el caso ambiguo. Heuristica:
+  //  - Si hay UNA sola coma ("0,99" o "3703,68"), tratar como decimal
+  //    EU (coma = decimal, ej: presupuestos que usan coma para decimales).
+  //  - Si hay DOS o mas comas ("7,434,742" o "1,234,567"), NO puede
+  //    ser decimal (un decimal solo tiene una coma); tratar como miles.
+  //    Caso del Excel "PARQUES DEL VALLE" del 2026-10-03 donde
+  //    "$ 7,434,742" (sin punto) daba 7.434742 en vez de 7434742.
+  if (lastDot === -1) {
+    const commaCount = (cleaned.match(/,/g) || []).length;
+    if (commaCount >= 2) {
+      // Multi-coma sin punto: miles seguros.
+      return parseFloat(cleaned.replace(/,/g, "")) || 0;
+    }
+    // Una sola coma sin punto: decimal EU.
+    return parseFloat(cleaned.replace(",", ".")) || 0;
+  }
+  // Solo puntos, sin coma: parseo directo (ej: "1.234" como 1.234 decimal
+  // o "1.234.567" como 1234567 si fuera ambigo). Aqui lo dejamos como
+  // decimal (caso mas comun en este parser).
+  if (lastComma === -1) {
+    return parseFloat(cleaned) || 0;
+  }
+  // Ambos: el que aparece MÁS A LA DERECHA es el decimal; el otro es miles.
   if (lastComma > lastDot) {
     // Formato colombiano/europeo: 1.234,56
     return parseFloat(cleaned.replace(/\./g, "").replace(",", ".")) || 0;
   }
-  if (lastDot > lastComma) {
-    // Formato anglosajón: 1,234.56
-    return parseFloat(cleaned.replace(/,/g, "")) || 0;
-  }
-  // Misma posición (no debería pasar), intentar coma como decimal.
-  return parseFloat(cleaned.replace(",", ".")) || 0;
+  // Formato anglosajón: 1,234.56
+  return parseFloat(cleaned.replace(/,/g, "")) || 0;
 }
 
 // Detecta si una fila es un capítulo (sin cantidad/precio pero tiene código y descripción)
