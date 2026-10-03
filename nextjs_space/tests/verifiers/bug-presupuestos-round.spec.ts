@@ -139,6 +139,96 @@ describe("Bug presupuestos — parseNumber no rompe moneda solo-comas (caso 2026
   });
 });
 
+describe("Bug presupuestos — excluir trámites del total (caso 2026-10-03)", () => {
+  it("BUG 2026-10-03: items con code='Tramites' se excluyen del totalValue", () => {
+    const rows = [
+      {
+        Codigo: "1.1.1",
+        Descripción: "Item de obra normal",
+        Unidad: "M2",
+        Cantidad: "100",
+        "P. Unitario": "1.000.000",
+        Total: "100.000.000",
+        Clasificación: "PROYECTO A",
+      },
+      {
+        Codigo: "Tramites",
+        Descripción: "CERTIFICACION RETIE",
+        Unidad: "UND",
+        Cantidad: "1",
+        "P. Unitario": "24.723.760",
+        Total: "24.723.760",
+        Clasificación: "PROYECTO A",
+      },
+      {
+        Codigo: "tramites",  // lowercase debe matchear tambien
+        Descripción: "IMPUESTOS EPSA",
+        Unidad: "UND",
+        Cantidad: "1",
+        "P. Unitario": "15.000.000",
+        Total: "15.000.000",
+        Clasificación: "PROYECTO A",
+      },
+    ];
+    const parsed = parseExcelContent(rows);
+    // Solo el item de obra cuenta ($100M); los 2 tramites NO
+    expect(parsed.totalValue).toBe(100_000_000);
+    expect(parsed.itemCount).toBe(1);
+  });
+
+  it("BUG 2026-10-03: items principales dan suma correcta entre frentes", () => {
+    const rows = [
+      {
+        Codigo: "1.1.1", Descripción: "Item A1", Unidad: "M2",
+        Cantidad: "10", "P. Unitario": "5.000.000", Total: "50.000.000",
+        Clasificación: "FRENTE A",
+      },
+      {
+        Codigo: "1.1.2", Descripción: "Item A2", Unidad: "ML",
+        Cantidad: "20", "P. Unitario": "2.000.000", Total: "40.000.000",
+        Clasificación: "FRENTE A",
+      },
+      {
+        Codigo: "2.1.1", Descripción: "Item B1", Unidad: "UND",
+        Cantidad: "1", "P. Unitario": "100.000.000", Total: "100.000.000",
+        Clasificación: "FRENTE B",
+      },
+      {
+        Codigo: "Tramites", Descripción: "Certificacion",
+        Unidad: "UND", Cantidad: "1", "P. Unitario": "5.000.000", Total: "5.000.000",
+        Clasificación: "FRENTE B",
+      },
+    ];
+    const parsed = parseExcelContent(rows);
+    // 50M + 40M + 100M = 190M (tramites excluido)
+    expect(parsed.totalValue).toBe(190_000_000);
+  });
+
+  it("BUG 2026-10-03: capitulos/subcapitulos con descripcion no se cuentan como tramites", () => {
+    const rows = [
+      {
+        Codigo: "1", Descripción: "TRAMITES VARIOS", Unidad: "",
+        Cantidad: "", "P. Unitario": "", Total: "",
+        Clasificación: "PROYECTO X",
+      },
+      {
+        Codigo: "1.1", Descripción: "CERTIFICACIONES", Unidad: "",
+        Cantidad: "", "P. Unitario": "", Total: "",
+        Clasificación: "PROYECTO X",
+      },
+      {
+        Codigo: "1.1.1", Descripción: "Item de obra", Unidad: "M2",
+        Cantidad: "10", "P. Unitario": "1.000.000", Total: "10.000.000",
+        Clasificación: "PROYECTO X",
+      },
+    ];
+    const parsed = parseExcelContent(rows);
+    // Solo cuenta 10M del item. El "1 TRAMITES VARIOS" y "1.1 CERTIFICACIONES"
+    // son headers sin cant/price, dan totalPrice=0 (capitulos/subcapitulos).
+    expect(parsed.totalValue).toBe(10_000_000);
+  });
+});
+
 describe("Bug presupuestos — parseExcelFile expuesto para la página de carga (AC-1, AC-2, AC-3, AC-5)", () => {
   it("AC-1/AC-2: parseExcelFile está exportado desde excel-parser", () => {
     expect(typeof parseExcelFile).toBe("function");

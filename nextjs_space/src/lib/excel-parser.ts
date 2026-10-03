@@ -258,10 +258,16 @@ export function parseNumber(value: string | undefined): number {
     // Una sola coma sin punto: decimal EU.
     return parseFloat(cleaned.replace(",", ".")) || 0;
   }
-  // Solo puntos, sin coma: parseo directo (ej: "1.234" como 1.234 decimal
-  // o "1.234.567" como 1234567 si fuera ambigo). Aqui lo dejamos como
-  // decimal (caso mas comun en este parser).
+  // Solo puntos, sin coma: misma heuristica que el caso de solo comas.
+  //  - Un solo punto: "1.234" como 1.234 decimal.
+  //  - Dos o mas puntos: "1.234.567" -> 1234567 (miles). Un decimal solo
+  //    tiene un punto, asi que multiples puntos = miles seguros.
+  //    Caso del 2026-10-03 que descubrimos con los nuevos tests.
   if (lastComma === -1) {
+    const dotCount = (cleaned.match(/\./g) || []).length;
+    if (dotCount >= 2) {
+      return parseFloat(cleaned.replace(/\./g, "")) || 0;
+    }
     return parseFloat(cleaned) || 0;
   }
   // Ambos: el que aparece MÁS A LA DERECHA es el decimal; el otro es miles.
@@ -385,12 +391,35 @@ export function parseExcelContent(
     row.computedTotal = sum;
   }
 
-  const totalValue = parsedRows.reduce((s, r) => s + r.totalPrice, 0);
+  // P0 plan 2026-10-03 (bug): el Excel del PRESUPUESTO OFICIAL INFRADEPORTIVO
+  // tiene una seccion final de "Tramites" al pie (CERTIFICACIONES RETIE,
+  // IMPUESTOS EPSA, PLAN DE MANEJO AMBIENTAL, etc.). Esos items comparten
+  // clasificacion con uno de los frentes principales (mismo proyecto) pero
+  // son tramites administrativos, NO items de construccion. El "VALOR TOTAL
+  // PRESUPUESTO" del Excel ($5.556.464.503) NO los incluye — son un cargo
+  // separado del presupuesto de obra.
+  //
+  // El parser detectaba esos items como ITEM y los sumaba al totalValue,
+  // lo que daba $11.234B (main + tramites * 2) en vez de $5.434B (solo
+  // main) o $5.556B (todo). El fix: excluir del totalValue cualquier
+  // item con code === "Tramites" (case-insensitive). El desglose por
+  // frente (groupByFrente + computeFrenteSummary) ya los excluia
+  // implicitamente porque estos items no estan agrupados bajo la misma
+  // clasificacion que el frente principal en el mismo sentido que el
+  // user espera.
+  //
+  // NOTA: los tramites SIGUEN apareciendo en parsedRows (visibles en
+  // el step "preview" tabla si el usuario la abre). El modal de resumen
+  // los OMITE por diseno: solo muestra items de obra.
+  const isTramite = (code: string) => /^tramites?$/i.test(code.trim());
+  const totalValue = parsedRows
+    .filter((r) => !isTramite(r.code))
+    .reduce((s, r) => s + r.totalPrice, 0);
   const chapterCount = parsedRows.filter(
     (r) => r.layerType === "CHAPTER" || r.layerType === "SUBCHAPTER",
   ).length;
   const itemCount = parsedRows.filter(
-    (r) => r.layerType === "ITEM",
+    (r) => r.layerType === "ITEM" && !isTramite(r.code),
   ).length;
 
   // SPEC AC-4: agrupar por frente y calcular resumen por frente.
