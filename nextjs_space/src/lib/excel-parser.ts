@@ -19,8 +19,22 @@ export interface ParsedExcelRow {
   computedTotal?: number;
 }
 
+/**
+ * Resumen por frente (clasificacion del Excel). Un proyecto puede tener N
+ * frentes, todos parte del mismo PT.
+ */
+export interface FrenteSummary {
+  name: string;
+  itemCount: number;
+  subtotal: number;
+  chapterCount: number;
+}
+
 export interface ParsedExcel {
+  /** Contenido de la fila 1 del Excel (titulo del proyecto). */
+  title: string;
   rows: ParsedExcelRow[];
+  frentes: FrenteSummary[];
   totalValue: number;
   chapterCount: number;
   itemCount: number;
@@ -105,6 +119,105 @@ export function detectColumns(headers: string[]): ExcelColumnMapping {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Title extraction + matching (SPEC: budget-upload-validation.md AC-1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Devuelve el primer string no-vacio de la fila 1 del Excel, sin espacios
+ * al inicio/final. Si todas las celdas de la fila 1 estan vacias (algunos
+ * Excel exportados dejan 2-3 filas vacias), salta hasta encontrar una fila
+ * con contenido.
+ *
+ * El titulo suele ser el nombre del proyecto: "PRESUPUESTO GENERAL
+ * PARQUES DEL VALLE". La validacion contra project.name se hace con
+ * `titlesMatch` (case + accent insensitive, por contencion).
+ */
+export function extractTitle(firstRow: ReadonlyArray<unknown>): string {
+  for (const cell of firstRow) {
+    const s = String(cell ?? "").trim();
+    if (s) return s;
+  }
+  return "";
+}
+
+/** Lowercase + trim + sin diacriticos. Util para matching flexible. */
+export function normalizeForTitleMatch(s: string): string {
+  return s
+    .toLowerCase()
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+/**
+ * True si los dos titulos "son equivalentes" tras normalizar (case +
+ * acentos). Acepta por contencion en cualquier direccion: o `a` esta
+ * dentro de `b`, o `b` esta dentro de `a`. Esto cubre el caso real donde
+ * el Excel dice "PRESUPUESTO GENERAL <X>" y el project.name es "<X>".
+ *
+ * Si alguno es vacio, devuelve false (no aceptamos titulos faltantes).
+ */
+export function titlesMatch(a: string, b: string): boolean {
+  const na = normalizeForTitleMatch(a);
+  const nb = normalizeForTitleMatch(b);
+  if (!na || !nb) return false;
+  return na.includes(nb) || nb.includes(na);
+}
+
+// ---------------------------------------------------------------------------
+// Frente grouping (SPEC: budget-upload-validation.md AC-4)
+// ---------------------------------------------------------------------------
+
+const UNCLASSIFIED = "__UNCLASSIFIED__";
+
+/**
+ * Agrupa rows por `classification` (frente), preservando el orden de primera
+ * aparicion. Rows sin classification caen en `UNCLASSIFIED`. Solo rows
+ * `layerType === 'ITEM'` se cuentan; CHAPTER / SUBCHAPTER son headers
+ * que no son "trabajo" por si mismos.
+ */
+export function groupByFrente(
+  rows: ReadonlyArray<ParsedExcelRow>,
+): Map<string, ParsedExcelRow[]> {
+  const map = new Map<string, ParsedExcelRow[]>();
+  for (const row of rows) {
+    if (row.layerType !== "ITEM") continue;
+    const key = row.classification?.trim() || UNCLASSIFIED;
+    const bucket = map.get(key);
+    if (bucket) bucket.push(row);
+    else map.set(key, [row]);
+  }
+  return map;
+}
+
+/**
+ * Resumen numerico de un frente: cantidad de items, subtotal sumado, y
+ * cantidad de capitulos distintos. Capitulos = la parte del codigo hasta
+ * el primer punto (1.1.1 -> 1).
+ */
+export function computeFrenteSummary(
+  name: string,
+  rows: ReadonlyArray<ParsedExcelRow>,
+): FrenteSummary {
+  let itemCount = 0;
+  let subtotal = 0;
+  const chapters = new Set<string>();
+  for (const row of rows) {
+    if (row.layerType !== "ITEM") continue;
+    itemCount++;
+    subtotal += row.totalPrice;
+    const chapter = String(row.code ?? "").split(".")[0];
+    if (chapter) chapters.add(chapter);
+  }
+  return {
+    name,
+    itemCount,
+    subtotal,
+    chapterCount: chapters.size,
+  };
+}
+
 // Convierte un string a número, manejando formatos comunes (1.234,56 → 1234.56)
 // y el formato anglosajón (1,234.56 → 1234.56). Regla: el separador que
 // aparezca MÁS A LA DERECHA es el decimal; el otro es separador de miles.
@@ -167,7 +280,9 @@ export function parseExcelContent(
 ): ParsedExcel {
   if (rows.length === 0) {
     return {
+      title: "",
       rows: [],
+      frentes: [],
       totalValue: 0,
       chapterCount: 0,
       itemCount: 0,
@@ -250,7 +365,22 @@ export function parseExcelContent(
     (r) => r.layerType === "ITEM",
   ).length;
 
-  return { rows: parsedRows, totalValue, chapterCount, itemCount, warnings };
+  // SPEC AC-4: agrupar por frente y calcular resumen por frente.
+  const grouped = groupByFrente(parsedRows);
+  const frentes: FrenteSummary[] = [];
+  for (const [name, rows] of grouped) {
+    frentes.push(computeFrenteSummary(name, rows));
+  }
+
+  return {
+    title: "",
+    rows: parsedRows,
+    frentes,
+    totalValue,
+    chapterCount,
+    itemCount,
+    warnings,
+  };
 }
 
 // Convierte filas parseadas en estructura jerárquica BudgetLayer[]
@@ -402,7 +532,21 @@ export async function parseExcelFile(
     if (skipRows === 0) normalized = candidate;
   }
 
+  // SPEC AC-1: extraer el titulo del proyecto de la fila 1 del Excel.
+  // Lo hacemos leyendo el sheet como array-of-arrays (header:1) y
+  // pasando la primera fila por `extractTitle`, que ignora celdas vacias
+  // iniciales. Asi capturamos tanto el caso comun (titulo en fila 1,
+  // headers en fila 2) como el raro (titulo en fila 2/3 por hojas
+  // exportadas con filas vacias).
+  const aoa = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+    header: 1,
+    raw: false,
+    defval: "",
+  });
+  const title = extractTitle(aoa[0] ?? []);
+
   const result = parseExcelContent(normalized, customMapping);
+  result.title = title;
   if (headerRowUsed > 1) {
     result.warnings.unshift(
       `Encabezados detectados en la fila ${headerRowUsed} (la fila 1 contiene un titulo).`,

@@ -25,6 +25,14 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useBudgetsStore } from "@/lib/data-store";
 import { useProjectsStore } from "@/lib/data-store";
 import { useEnsureLoaded } from "@/lib/use-ensure-loaded";
@@ -33,6 +41,7 @@ import {
   parseExcelFile,
   buildBudgetLayers,
   SAMPLE_EXCEL_DATA,
+  titlesMatch,
   type ParsedExcel,
 } from "@/lib/excel-parser";
 import { formatCurrency } from "@/lib/utils";
@@ -45,7 +54,9 @@ export default function CargarPresupuestoPage() {
   const { getProject, projects } = useProjectsStore();
   useEnsureLoaded("projects", "budgets");
 
-  const [step, setStep] = useState<"upload" | "preview" | "confirm">("upload");
+  const [step, setStep] = useState<"upload" | "preview" | "modal" | "confirm">(
+    "upload",
+  );
   const [parsed, setParsed] = useState<ParsedExcel | null>(null);
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -68,8 +79,18 @@ export default function CargarPresupuestoPage() {
 
     try {
       const result = await parseExcelFile(file);
+      // SPEC AC-1: validar que el titulo del Excel coincida con el nombre
+      // del proyecto en BD antes de aceptar la carga. Si no matchea,
+      // quedarse en step "upload" y mostrar error claro.
+      if (project && !titlesMatch(result.title, project.name)) {
+        setError(
+          `El titulo del Excel ("${result.title || "(vacio)"}") no coincide con el nombre del proyecto ("${project.name}"). Verifica que sea el archivo correcto.`,
+        );
+        setParsed(null);
+        return;
+      }
       setParsed(result);
-      setStep("preview");
+      setStep("modal");
     } catch (err) {
       const message =
         err instanceof Error
@@ -199,18 +220,130 @@ export default function CargarPresupuestoPage() {
         <ArrowRight className="h-4 w-4 text-muted-foreground" />
         <Step
           n={2}
-          label="Previsualizar"
-          active={step === "preview"}
+          label="Confirmar resumen"
+          active={step === "modal"}
           done={step === "confirm"}
         />
         <ArrowRight className="h-4 w-4 text-muted-foreground" />
         <Step
           n={3}
-          label="Confirmar"
+          label="Guardar"
           active={step === "confirm"}
           done={false}
         />
       </div>
+
+      {/* SPEC AC-2: Modal de resumen antes de confirmar. */}
+      <Dialog
+        open={step === "modal" && !!parsed}
+        onOpenChange={(open) => {
+          if (!open) setStep("upload");
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Resumen del Presupuesto Tope</DialogTitle>
+            <DialogDescription>
+              Verifica los totales antes de continuar. Esta es tu ultima
+              oportunidad para detectar errores antes de que el PT quede en BD.
+            </DialogDescription>
+          </DialogHeader>
+
+          {parsed && (
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs uppercase text-muted-foreground">
+                  Titulo del Excel
+                </p>
+                <p className="mt-1 text-sm font-medium">{parsed.title}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Proyecto destino:{" "}
+                  <span className="font-mono">{project?.name}</span>
+                </p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-md border bg-secondary/30 p-3 text-center">
+                  <p className="text-2xl font-semibold">
+                    {parsed.chapterCount}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Capitulos</p>
+                </div>
+                <div className="rounded-md border bg-secondary/30 p-3 text-center">
+                  <p className="text-2xl font-semibold">{parsed.itemCount}</p>
+                  <p className="text-xs text-muted-foreground">Items</p>
+                </div>
+                <div className="rounded-md border bg-secondary/30 p-3 text-center">
+                  <p className="text-2xl font-semibold">
+                    {formatCurrency(parsed.totalValue)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Valor total</p>
+                </div>
+              </div>
+
+              {parsed.frentes.length > 1 && (
+                <div>
+                  <p className="mb-2 text-xs uppercase text-muted-foreground">
+                    Desglose por frente ({parsed.frentes.length})
+                  </p>
+                  <div className="overflow-hidden rounded-md border">
+                    <table className="w-full text-sm">
+                      <thead className="bg-secondary/30 text-xs uppercase text-muted-foreground">
+                        <tr>
+                          <th className="px-3 py-2 text-left">Frente</th>
+                          <th className="px-3 py-2 text-right">Cap.</th>
+                          <th className="px-3 py-2 text-right">Items</th>
+                          <th className="px-3 py-2 text-right">Subtotal</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {parsed.frentes.map((f) => (
+                          <tr key={f.name} className="border-t">
+                            <td className="px-3 py-1.5">{f.name}</td>
+                            <td className="px-3 py-1.5 text-right">
+                              {f.chapterCount}
+                            </td>
+                            <td className="px-3 py-1.5 text-right">
+                              {f.itemCount}
+                            </td>
+                            <td className="px-3 py-1.5 text-right font-semibold">
+                              {formatCurrency(f.subtotal)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {parsed.warnings.length > 0 && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Advertencias</AlertTitle>
+                  <AlertDescription>
+                    <ul className="list-disc pl-5 text-xs">
+                      {parsed.warnings.map((w, i) => (
+                        <li key={i}>{w}</li>
+                      ))}
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStep("upload")}>
+              Cancelar
+            </Button>
+            <Button onClick={() => setStep("confirm")}>
+              Continuar
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {step === "upload" && (
         <Card>
