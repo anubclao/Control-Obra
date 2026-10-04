@@ -17,6 +17,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { query } from "@/lib/db";
 import { verifySessionCookie, SESSION_COOKIE } from "@/lib/session";
+import { devMockUser } from "@/lib/dev-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,6 +33,18 @@ export async function GET() {
   const session = await verifySessionCookie(cookieValue);
   if (!session) {
     return NextResponse.json({ user: null }, { status: 200 });
+  }
+  // DEV-ONLY: bypass para que el login funcione sin MySQL alcanzable.
+  // Solo si el flag explicito DEV_AUTH_BYPASS=true esta activo y NO estamos
+  // en produccion. Asi el dev local puede entrar a la app cuando su maquina
+  // no puede llegar al MySQL de Hostinger.
+  // Produccion (Hostinger): NUNCA tiene DEV_AUTH_BYPASS=true y ademas
+  // NODE_ENV=production, asi que esta rama nunca corre ahi.
+  if (
+    process.env.NODE_ENV !== "production" &&
+    process.env.DEV_AUTH_BYPASS === "true"
+  ) {
+    return NextResponse.json({ user: devMockUser(session.userId) });
   }
   try {
     // status='ACTIVE' (no solo is_active) para mantener consistencia

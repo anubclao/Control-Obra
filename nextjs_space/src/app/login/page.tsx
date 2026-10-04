@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, Loader2, ShieldCheck, Mail, KeyRound, ArrowLeft } from "lucide-react";
+import { Building2, Loader2, ShieldCheck, Mail, KeyRound, ArrowLeft, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -27,13 +27,36 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(0);
+  // DEV-ONLY: si /api/auth/dev-login responde !=404, mostramos el boton.
+  // Si NO esta habilitado (produccion o sin flag), el boton NO aparece
+  // y el usuario sigue el flujo OTP normal.
+  const [devBypassEnabled, setDevBypassEnabled] = useState(false);
+  const [devLoading, setDevLoading] = useState(false);
+
+  // Probe silencioso al montar: si el endpoint responde algo !=404,
+  // habilitamos el boton dev. Asi nunca aparece en produccion.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/auth/dev-login", { method: "POST", body: "{}" })
+      .then((r) => {
+        if (!cancelled) setDevBypassEnabled(r.status !== 404);
+      })
+      .catch(() => {
+        if (!cancelled) setDevBypassEnabled(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
 
   useEffect(() => {
-    if (hydrated && user) router.push(`/${user.area}`);
+    if (hydrated && user) {
+      router.push(`/${String(user.area ?? "administrativo").toLowerCase()}`);
+    }
   }, [hydrated, user, router]);
 
   useEffect(() => {
@@ -82,6 +105,35 @@ export default function LoginPage() {
     }
   }
 
+  async function devLogin() {
+    setError(null);
+    setInfo(null);
+    setDevLoading(true);
+    try {
+      const data = await api.post<{ ok: boolean; user: { area?: string } }>(
+        "/api/auth/dev-login",
+        { userId: "1" },
+      );
+      if (data.ok && data.user) {
+        // Sincronizar el store local con el user dev antes de navegar.
+        await refresh();
+        // Forzamos lowercase para alinear con los segmentos de Next.js
+        // (`/administrativo`, `/tecnico`). Ver bug fix en verifyOtp arriba.
+        router.push(
+          `/${String(data.user.area ?? "administrativo").toLowerCase()}`,
+        );
+      } else {
+        setError("Dev login no devolvio un usuario valido.");
+      }
+    } catch (e: any) {
+      setError(
+        e?.message ?? "No se pudo entrar como admin dev. Verifica DEV_AUTH_BYPASS=true en .env.local.",
+      );
+    } finally {
+      setDevLoading(false);
+    }
+  }
+
   async function verifyOtp(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -97,7 +149,10 @@ export default function LoginPage() {
         { email: email.trim().toLowerCase(), otp: otp.trim() }
       );
       if (data.ok && data.user) {
-        router.push(`/${data.user.area ?? "administrativo"}`);
+        // El area puede llegar en mayusculas desde la BD; Next.js usa
+        // segmentos en minusculas (`/administrativo`, `/tecnico`).
+        // Forzamos toLowerCase() para evitar 404 al redirigir.
+        router.push(`/${String(data.user.area ?? "administrativo").toLowerCase()}`);
       } else {
         setError("Codigo invalido. Verifica e intenta de nuevo.");
       }
@@ -175,6 +230,34 @@ export default function LoginPage() {
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Enviar codigo
                 </Button>
+                {devBypassEnabled && (
+                  <>
+                    <div className="relative my-2">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t border-dashed border-amber-300" />
+                      </div>
+                      <div className="relative flex justify-center text-[10px] uppercase tracking-wider">
+                        <span className="bg-card px-2 text-amber-600">
+                          dev only
+                        </span>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 hover:text-amber-950"
+                      onClick={devLogin}
+                      disabled={devLoading}
+                    >
+                      {devLoading ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Wrench className="mr-2 h-4 w-4" />
+                      )}
+                      Entrar como admin (modo dev)
+                    </Button>
+                  </>
+                )}
               </form>
             ) : (
               <form onSubmit={verifyOtp} className="space-y-4">

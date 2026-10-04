@@ -138,21 +138,32 @@ export async function POST(req: Request) {
           { status: 503 },
         );
       }
-      // En dev: seguimos y devolvemos devCode para que el flujo sea testeable.
+      // En dev: seguimos y devolvemos devCode para que el flujo sea testeable
+      // aunque el email falle (comun en local donde SMTP esta bloqueado o no
+      // se ha configurado). Mostramos emailSent=true cuando Gmail acepto
+      // el envio, false cuando fallo, para que el dev sepa el estado real.
       return NextResponse.json({
         ok: true,
-        message:
-          "Codigo generado. Email fallo pero puedes continuar con el codigo mostrado abajo (modo DEV).",
+        message: emailResult.ok
+          ? "Codigo enviado a tu correo (modo DEV: revisa devCode en la respuesta si no llega email)."
+          : "Codigo generado. Email fallo pero puedes continuar con el codigo mostrado abajo (modo DEV).",
         devCode: code,
-        emailSent: false,
+        emailSent: emailResult.ok,
         emailError: emailResult.error,
       });
     }
 
     // Produccion + SMTP OK => el codigo viaja solo por correo.
+// En dev: aunque SMTP funcione, devolvemos devCode tambien para que
+// el dev pueda validar el flujo completo desde el entry point sin
+// depender del inbox. La proteccion de seguridad (nunca devolver codigo
+// en produccion) sigue garantizada porque el if de arriba corta prod.
     return NextResponse.json({
       ok: true,
-      message: "Codigo enviado a tu correo",
+      message: isProd
+        ? "Codigo enviado a tu correo"
+        : "Codigo enviado a tu correo (modo DEV: tambien disponible como devCode).",
+      ...(isProd ? {} : { devCode: code }),
       emailSent: true,
     });
   } catch (e: any) {
