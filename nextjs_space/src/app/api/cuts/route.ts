@@ -79,6 +79,29 @@ function cutDto(r: any) {
   };
 }
 
+/**
+ * P0 plan 2026-10-04: renumerar cortes a CO-YYYY-NNNN (mismo patron
+ * que PSC y Contract). MAX+1 sobre contract_number LIKE 'CO-YYYY-%'.
+ */
+async function nextCutNumber(): Promise<string> {
+  const y = new Date().getFullYear();
+  const prefix = `CO-${y}-`;
+  const rows = await query<any[]>(
+    `SELECT cut_number FROM work_cuts
+       WHERE cut_number LIKE ?
+       ORDER BY cut_number DESC
+       LIMIT 1`,
+    [`${prefix}%`],
+  );
+  let nextSeq = 1;
+  if (rows.length > 0) {
+    const last = String(rows[0].cut_number ?? "");
+    const m = last.match(/^CO-\d{4}-(\d{4})$/);
+    if (m) nextSeq = parseInt(m[1], 10) + 1;
+  }
+  return `${prefix}${String(nextSeq).padStart(4, "0")}`;
+}
+
 export async function GET(req: Request) {
   const auth = await requireAuth();
   const fail = authFailureResponse(auth);
@@ -221,7 +244,7 @@ export async function POST(req: Request) {
       advanceDeduction,
     );
     const id = randomUUID();
-    const num = `CO-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+    const num = body.cutNumber ?? (await nextCutNumber());
     await transaction(async (conn) => {
       await conn.execute(
         `INSERT INTO work_cuts
