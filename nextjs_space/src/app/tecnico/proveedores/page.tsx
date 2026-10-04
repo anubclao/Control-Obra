@@ -128,7 +128,7 @@ export default function ProveedoresPage() {
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Proveedores</h1>
           <p className="text-sm text-muted-foreground">
-            {providers.length} registrados - {stats.complete} habilitados - {stats.expired} con docs vencidos
+            {(providers ?? []).length} registrados - {stats.complete} habilitados - {stats.expired} con docs vencidos
           </p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
