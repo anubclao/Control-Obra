@@ -63,7 +63,7 @@ export default function ProveedoresPage() {
   useEffect(() => { load(); }, []);
 
   const filtered = useMemo(() => {
-    return providers.filter((p) => {
+    return (providers ?? []).filter((p) => {
       const matchSearch =
         !search ||
         p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -77,11 +77,12 @@ export default function ProveedoresPage() {
   }, [providers, search, statusFilter, personTypeFilter, categoryFilter]);
 
   const stats = useMemo(() => {
-    const complete = providers.filter((p) => p.status === "COMPLETE").length;
-    const incomplete = providers.filter((p) => p.status === "INCOMPLETE").length;
-    const expired = providers.filter((p) => p.status === "EXPIRED").length;
-    const naturales = providers.filter((p) => p.personType === "NATURAL").length;
-    return { complete, incomplete, expired, naturales, total: providers.length };
+    const list = providers ?? [];
+    const complete = list.filter((p) => p.status === "COMPLETE").length;
+    const incomplete = list.filter((p) => p.status === "INCOMPLETE").length;
+    const expired = list.filter((p) => p.status === "EXPIRED").length;
+    const naturales = list.filter((p) => p.personType === "NATURAL").length;
+    return { complete, incomplete, expired, naturales, total: list.length };
   }, [providers]);
 
   function askDelete(p: Provider) {
