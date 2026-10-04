@@ -128,7 +128,7 @@ export async function uploadFile(
   // valida fileNameOverride; el fileName computado por buildProjectPath
   // también debe cumplir el formato.
   const v = validateFileName(rawName);
-  if (!v.ok === true) {
+  if (!v.ok) {
     throw new Error(
       `uploadFile: nombre inválido (${(v as { reason: string }).reason})`,
     );

@@ -61,9 +61,27 @@ export async function GET(req: Request) {
   }
 }
 
-function nextContractNumber(): string {
+async function nextContractNumber(): Promise<string> {
   const y = new Date().getFullYear();
-  return `CTR-${y}-${Date.now().toString(36).toUpperCase().slice(-4)}`;
+  const prefix = `CTR-${y}-`;
+  // P0 plan 2026-10-04: antes era CTR-${y}-${Date.now().base36} que era opaco.
+  // Usamos MAX(...)+1 sobre contract_number LIKE 'CTR-YYYY-%' para generar
+  // CTR-2026-0001, CTR-2026-0002, etc. MAX (no COUNT) tolera huecos y
+  // es seguro en condiciones de inserciones concurrentes.
+  const rows = await query<any[]>(
+    `SELECT contract_number FROM contracts
+       WHERE contract_number LIKE ?
+       ORDER BY contract_number DESC
+       LIMIT 1`,
+    [`${prefix}%`],
+  );
+  let nextSeq = 1;
+  if (rows.length > 0) {
+    const last = String(rows[0].contract_number ?? "");
+    const m = last.match(/^CTR-\d{4}-(\d{4})$/);
+    if (m) nextSeq = parseInt(m[1], 10) + 1;
+  }
+  return `${prefix}${String(nextSeq).padStart(4, "0")}`;
 }
 
 export async function POST(req: Request) {
@@ -98,7 +116,7 @@ export async function POST(req: Request) {
     const pricingMode = pm.value;
 
     const id = randomUUID();
-    const number = body.contractNumber ?? nextContractNumber();
+    const number = body.contractNumber ?? (await nextContractNumber());
     await query(
       `INSERT INTO contracts
        (id, contract_number, project_id, provider_id, type, value,

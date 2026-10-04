@@ -77,6 +77,7 @@ export type ServiceErrorCode =
   | "SP_SITE_NOT_FOUND"
   | "SP_TIMEOUT"
   | "UPLOAD_FAILED"
+  | "PERSIST_FAILED"
   | "INTERNAL";
 
 export interface ServiceInput {
@@ -385,7 +386,7 @@ export async function generateAndUpload(
         args.entityId,
         upload.webUrl,
       );
-      if (!persistResult.ok === true) {
+      if (!persistResult.ok) {
         // Forzar rollback y propagación controlada
         throw new Error((persistResult as { error: string }).error);
       }
@@ -404,20 +405,21 @@ export async function generateAndUpload(
         attempts: uploadAttempts,
         templateVersion: detectTemplateVersion(templateId),
       });
-      if (!logResult.ok === true) {
+      if (!logResult.ok) {
         throw new Error((logResult as { error: string }).error);
       }
     });
   } catch (e: unknown) {
-    // Log y persist fallaron juntos (o por separado, vía rollback).
-    // El archivo en SharePoint sí quedó. Devolvemos OK con un warning
-    // en el log server-side.
+    // P0 plan 2026-10-04: el archivo SÍ quedó en SharePoint, pero la
+    // transacción de persist+log falló. Antes retornabamos ok:true con
+    // warning server-side, lo que hacia que al refrescar el cliente
+    // perdiera la URL (la BD no tenia el link). Ahora retornamos
+    // ok:false con PERSIST_FAILED y log secundario para que el admin
+    // pueda limpiar el archivo huerfano si es necesario.
     persistFailed = e instanceof Error ? e.message : String(e);
     console.warn(
       `[generateAndUpload] transacción persist+log falló (SharePoint OK): ${persistFailed}`,
     );
-    // Hacemos un log secundario (no-transaccional) para que quede
-    // constancia del evento.
     await logGeneration({
       entity: args.entity,
       entityId: args.entityId,
@@ -425,7 +427,7 @@ export async function generateAndUpload(
       fileName: build.fileName,
       sharepointPath: build.folderPath,
       webUrl: upload.webUrl,
-      status: "OK",
+      status: "ERROR",
       errorCode: "PERSIST_TX_FAILED",
       durationMs: elapsed(),
       userId: args.userId ?? null,
@@ -439,6 +441,15 @@ export async function generateAndUpload(
         e2 instanceof Error ? e2.message : e2,
       );
     });
+    return {
+      ok: false,
+      errorCode: "PERSIST_FAILED",
+      message:
+        "El archivo se subió a SharePoint pero no se pudo persistir la URL. " +
+        "Reintenta en unos segundos; si persiste, contacta al admin.",
+      durationMs: elapsed(),
+      attempts: uploadAttempts,
+    };
   }
 
   return {
