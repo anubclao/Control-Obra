@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { Plus, AlertCircle, X, CheckCircle2 } from "lucide-react";
+import { Plus, AlertCircle, X, CheckCircle2, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ModuleExplanationCard } from "@/components/ui/module-explanation-card";
 import { usePscsStore } from "@/lib/data-store";
 import { useProjectsStore } from "@/lib/data-store";
 import { useProvidersStore } from "@/lib/data-store";
@@ -141,6 +142,21 @@ export function PSCForm({ psc, onSuccess }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <ModuleExplanationCard
+        icon={FileText}
+        variant="guide"
+        title="Como crear un PSC"
+        description="Selecciona el proyecto con PT, el contratista, y los items del PT que este PSC va a cubrir."
+        steps={[
+          { title: "Proyecto", description: "Elige el proyecto. Solo aparecen los que tienen PT cargado." },
+          { title: "Contratista", description: "Selecciona el proveedor. Debe estar habilitado en el modulo Proveedores." },
+          { title: "Items del PT", description: "Agrega los items del PT que este PSC va a cubrir." },
+          { title: "Alcance", description: "Define notas, fecha de inicio y guarda como DRAFT." },
+        ]}
+        tips={["El total contratado al proveedor se calcula automaticamente a partir de los items."]}
+        storageKey="psc:form"
+      />
+
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />

@@ -26,6 +26,32 @@ function r(row: any) {
   };
 }
 
+/**
+ * Calcula el siguiente PSC number con formato PSC-YYYY-NNNN.
+ * Usa MAX sobre `psc_number` LIKE 'PSC-YYYY-%' (mas seguro que COUNT + 1
+ * porque tolera huecos si hubo inserciones concurrentes o eliminaciones).
+ * P0 plan 2026-10-04: el formato anterior (PSC-${Date.now().base36}) era opaco
+ * y no incremental. El nuevo formato es legible y se ordena bien en BD.
+ */
+async function nextPscNumber(): Promise<string> {
+  const year = new Date().getFullYear();
+  const prefix = `PSC-${year}-`;
+  const rows = await query<any[]>(
+    `SELECT psc_number FROM pscs
+       WHERE psc_number LIKE ?
+       ORDER BY psc_number DESC
+       LIMIT 1`,
+    [`${prefix}%`],
+  );
+  let nextSeq = 1;
+  if (rows.length > 0) {
+    const last = String(rows[0].psc_number ?? "");
+    const m = last.match(/^PSC-\d{4}-(\d{4})$/);
+    if (m) nextSeq = parseInt(m[1], 10) + 1;
+  }
+  return `${prefix}${String(nextSeq).padStart(4, "0")}`;
+}
+
 export async function GET(req: Request) {
   const auth = await requireAuth();
   const fail = authFailureResponse(auth);
@@ -70,7 +96,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "projectId y providerId requeridos" }, { status: 400 });
     }
     const id = randomUUID();
-    const num = `PSC-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+    const num = await nextPscNumber();
     await transaction(async (conn) => {
       await conn.execute(
         `INSERT INTO pscs (id, psc_number, project_id, budget_id, provider_id,

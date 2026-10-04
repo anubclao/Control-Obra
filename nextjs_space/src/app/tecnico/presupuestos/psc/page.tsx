@@ -32,6 +32,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { ModuleExplanationCard } from "@/components/ui/module-explanation-card";
 import {
   usePscsStore,
   PSC_STATUS_LABELS,
@@ -96,6 +97,21 @@ export default function PSCPage() {
 
   return (
     <div className="space-y-6">
+      <ModuleExplanationCard
+        icon={Truck}
+        variant="guide"
+        title="Presupuestos Proveedor (PSC)"
+        description="Espejo del PT asignado a un proveedor. Cada PSC cubre un subconjunto de los items del presupuesto tope del proyecto."
+        steps={[
+          { title: "Tener PT cargado", description: "El proyecto debe tener su PT importado desde Excel (modulo Presupuestos)." },
+          { title: "Nuevo PSC", description: "Selecciona proyecto, items del PT que va a cubrir y proveedor asignado." },
+          { title: "Validar y activar", description: "El administrador revisa el alcance y pasa de DRAFT a ACTIVE." },
+          { title: "Cerrar", description: "Al terminar el trabajo, marca COMPLETED. Si se detiene temporalmente, SUSPENDED." },
+        ]}
+        tips={["El total contratado al proveedor se calcula automaticamente a partir de los items seleccionados."]}
+        storageKey="psc:list"
+      />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">PSC</h1>
