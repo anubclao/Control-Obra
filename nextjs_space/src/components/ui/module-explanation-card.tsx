@@ -120,7 +120,7 @@ export function ModuleExplanationCard({
         <CollapsibleTrigger asChild>
           <button
             type="button"
-            className="flex w-full flex-row items-start gap-3 p-6 pb-3 text-left transition-colors hover:bg-black/[0.02]"
+            className="flex w-full min-w-0 flex-row items-start gap-3 p-4 pb-3 text-left transition-colors hover:bg-black/[0.02] sm:p-6 sm:pb-3"
             aria-label={open ? "Plegar guia" : "Expandir guia"}
             data-testid="module-explanation-trigger"
           >
@@ -135,13 +135,13 @@ export function ModuleExplanationCard({
             <div className="min-w-0 flex-1">
               <h3
                 className={cn(
-                  "text-base font-semibold leading-none tracking-tight",
+                  "break-words text-base font-semibold leading-tight tracking-tight sm:leading-none",
                   cfg.titleColor,
                 )}
               >
                 {title}
               </h3>
-              <p className="mt-2 text-sm text-muted-foreground">
+              <p className="mt-2 break-words text-sm leading-relaxed text-muted-foreground">
                 {description}
               </p>
             </div>
@@ -154,7 +154,7 @@ export function ModuleExplanationCard({
           </button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <CardContent className="space-y-4 pt-0">
+          <CardContent className="space-y-4 px-4 pt-0 sm:px-6">
             {steps.length > 0 && (
               <ol className="space-y-2 text-sm">
                 {steps.map((s, i) => (
@@ -168,8 +168,8 @@ export function ModuleExplanationCard({
                       {i + 1}
                     </span>
                     <div className="min-w-0 flex-1 pt-0.5">
-                      <p className="font-medium">{s.title}</p>
-                      <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                      <p className="break-words font-medium">{s.title}</p>
+                      <p className="mt-0.5 break-words text-xs leading-relaxed text-muted-foreground">
                         {s.description}
                       </p>
                     </div>
@@ -186,8 +186,8 @@ export function ModuleExplanationCard({
                 <ul className="space-y-1 text-xs text-muted-foreground">
                   {tips.map((t, i) => (
                     <li key={i} className="flex gap-1.5">
-                      <span>•</span>
-                      <span>{t}</span>
+                      <span className="shrink-0">•</span>
+                      <span className="break-words">{t}</span>
                     </li>
                   ))}
                 </ul>
@@ -202,8 +202,8 @@ export function ModuleExplanationCard({
                 <ul className="space-y-1 text-xs text-amber-900">
                   {warnings.map((w, i) => (
                     <li key={i} className="flex gap-1.5">
-                      <span>•</span>
-                      <span>{w}</span>
+                      <span className="shrink-0">•</span>
+                      <span className="break-words">{w}</span>
                     </li>
                   ))}
                 </ul>

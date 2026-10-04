@@ -126,7 +126,7 @@ export default function PSCPage() {
               Nuevo PSC
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto sm:max-w-4xl">
             <DialogHeader>
               <DialogTitle>Crear PSC</DialogTitle>
               <DialogDescription>
@@ -235,7 +235,7 @@ export default function PSCPage() {
 
       {/* Modal editar */}
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Editar PSC</DialogTitle>
             <DialogDescription>{editing?.pscNumber}</DialogDescription>

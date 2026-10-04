@@ -163,7 +163,7 @@ export default function ProjectDetailPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="resumen" className="space-y-4">
-        <TabsList>
+        <TabsList className="flex h-auto w-full flex-wrap gap-1 p-1 sm:flex-nowrap">
           <TabsTrigger value="resumen">
             <Activity className="mr-1.5 h-4 w-4" />
             Resumen

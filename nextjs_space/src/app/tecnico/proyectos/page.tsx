@@ -163,7 +163,10 @@ function ProjectCard({
             <p className="font-mono text-xs text-muted-foreground">{project.code}</p>
             <Badge variant={variant}>{PROJECT_STATUS_LABELS[project.status]}</Badge>
           </div>
-          <Link href={`/tecnico/proyectos/${project.id}`} className="mt-1 block text-lg font-semibold hover:underline">
+          <Link
+            href={`/tecnico/proyectos/${project.id}`}
+            className="mt-1 block break-words text-lg font-semibold leading-tight hover:underline"
+          >
             {project.name}
           </Link>
           <div className="mt-2 flex flex-col gap-1 text-sm text-muted-foreground">

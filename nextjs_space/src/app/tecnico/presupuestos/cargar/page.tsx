@@ -240,7 +240,7 @@ export default function CargarPresupuestoPage() {
           if (!open) setStep("upload");
         }}
       >
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl overflow-y-auto max-h-[90vh] sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Resumen del Presupuesto Tope</DialogTitle>
             <DialogDescription>
