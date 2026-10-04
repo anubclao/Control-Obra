@@ -200,3 +200,20 @@ outer.push(\/\\) debe hacer .toLowerCase().
 - **El "VALOR TOTAL PRESUPUESTO" del Excel oficial colombiano SI incluye tramites**: el `#,##0` cell format y la presencia de la seccion "Tramites" al pie son el patron estandar de presupuestos oficiales. No excluir tramites del parser total.
 - **Reclassification de CHAPTER en cambio de clasificacion**: solo demotar a CHAPTER si la fila NO es tramite (codigo "^tramites?$"). Tramites tienen qty/precio y DEBEN contar como items.
 - **Tests que asumen un comportamiento viejo del parser**: cuando se revierte un fix (como 384ae94), hay que actualizar los tests que afirmaban ese comportamiento. Anotar en el comentario del describe() que ese caso es revertido, no nuevo.
+
+### [2026-10-04] project-detail-help-cards + psc-help-cards-and-renumber
+- P0 plan 2026-10-04: agregar `ModuleExplanationCard` a las pantallas que les faltaba.
+- `src/app/tecnico/proyectos/[id]/page.tsx`: 5 cards (Resumen / Presupuesto / Cortes / Contratistas / Bitacora) con storageKey por tab (`project-detail:*`). storageKey del componente permite que el usuario cierre la card y la preferencia persista en localStorage entre visitas.
+- Bug colateral arreglado en contratistas: `slice(0, 3)` sobre providers globales reemplazado por empty state consistente con los otros tabs (Bug preexistente: mezclaba proveedores de otros proyectos).
+- `src/app/tecnico/presupuestos/psc/page.tsx`: card de ayuda en la lista con ciclo de vida PSC.
+- `src/components/pscs/psc-form.tsx`: card de ayuda al inicio del form (guia los 4 pasos).
+- `src/app/api/pscs/route.ts`: nueva funcion `nextPscNumber()` que genera formato `PSC-YYYY-NNNN` (antes era opaco base36). Usa MAX(...)+1 sobre `psc_number LIKE 'PSC-YYYY-%'`. Backfill no aplica: solo afecta PSC nuevos creados despues del deploy.
+- Tests: 28 tests verde en 2 specs nuevos (`project-detail-help-cards.spec.ts`, `psc-help-cards-and-renumber.spec.ts`). Static source analysis + regex.
+- TS: solo error preexistente en `advances-suggestion.spec.ts:21` (TS2741). Sin errores nuevos.
+
+### Patrones a recordar (memory) — extension 2026-10-04
+- **ModuleExplanationCard siempre que haya flujo de varios pasos**: cualquier pantalla donde el usuario tiene que entender un ciclo de vida (DRAFT -> ACTIVE -> ..., o cargar PT -> confirmar -> guardar) merece un card explicativa. Patrón establecido: variante `guide` por defecto, `warning` si hay riesgo de preregistrar datos, `info` para info factual.
+- **storageKey en ModuleExplanationCard es por pantalla + tab**: usar `project-detail:presupuesto`, `psc:list`, `psc:form`. Asi el usuario puede cerrar cards independientemente.
+- **Numeracion incremental con MAX + 1, no COUNT + 1**: tolera race conditions y eliminaciones. Formato `PREFIJO-YYYY-NNNN` con `padStart(4, "0")`. Backfill opcional (no es bloqueante si no se hace en el deploy).
+- **Empty states consistentes**: cuando un tab no tiene datos, mostrar Card con icono grande + titulo + subtitulo + accion sugerida. NO usar placeholders rotos como `slice(0, 3)` sobre datos globales.
+- **Spec por sprint pequeno**: priorizar "1 sprint = 1 spec, 1 PR". Cada spec debe tener AC numerados, design contract, dependencies, out-of-scope, riesgos. Si el AC no se cumple, el spec falla.

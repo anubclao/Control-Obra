@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ModuleExplanationCard } from "@/components/ui/module-explanation-card";
 import {
   Dialog,
   DialogContent,
@@ -82,9 +83,11 @@ export default function ProjectDetailPage() {
   const cutsTotal = projectCuts.reduce((s, c) => s + c.grossValue, 0);
   const cutsPending = projectCuts.filter((c) => ["SUBMITTED", "VALIDATED"].includes(c.status)).length;
 
-  // Providers reales del proyecto (placeholder: primeros 3 hasta que exista relación project_provider)
-  // TODO: cuando exista tabla project_providers, filtrar por project.id
-  const projectProviders = (allProviders || []).slice(0, 3);
+  // Providers reales del proyecto. Hasta que exista la tabla project_providers
+  // (sprint futuro) mostramos empty state — antes mostraba los primeros 3
+  // providers globales (mezclaba proveedores de otros proyectos, incorrecto).
+  // P1 plan 2026-10-04: lo cambiamos a empty state consistente con los otros tabs.
+  const projectProviders: typeof allProviders = [];
 
   return (
     <div className="space-y-6">
@@ -190,6 +193,20 @@ export default function ProjectDetailPage() {
 
         {/* Resumen */}
         <TabsContent value="resumen" className="space-y-4">
+          <ModuleExplanationCard
+            icon={Activity}
+            variant="guide"
+            title="Vista general del proyecto"
+            description="Resumen ejecutivo con KPIs y avance financiero. Punto de entrada para entender el estado actual."
+            steps={[
+              { title: "Presupuesto", description: "Total autorizado del proyecto (campo manual o valor del Excel importado)." },
+              { title: "Ejecutado", description: "Suma de cortes en estado APPROVED o PAID." },
+              { title: "Cortes totales / pendientes", description: "Cuantos cortes se han registrado y cuantos esperan aprobacion." },
+              { title: "Avance financiero", description: "Ratio ejecutado / presupuesto. Se considera terminado cuando >= 90%." },
+            ]}
+            tips={["Los valores se actualizan al aprobar o pagar un corte."]}
+            storageKey="project-detail:resumen"
+          />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Card>
               <CardHeader className="pb-2">
@@ -265,7 +282,22 @@ export default function ProjectDetailPage() {
         </TabsContent>
 
         {/* Presupuesto */}
-        <TabsContent value="presupuesto">
+        <TabsContent value="presupuesto" className="space-y-4">
+          <ModuleExplanationCard
+            icon={Calculator}
+            variant="guide"
+            title="Presupuesto Tope (PT)"
+            description="Estructura presupuestal importada desde Excel o digitada manualmente. Define el tope maximo que se puede ejecutar en el proyecto."
+            steps={[
+              { title: "Ir a Presupuestos", description: "Menu lateral -> Presupuestos -> Cargar presupuesto." },
+              { title: "Seleccionar este proyecto", description: "Elegir PROY-001 PARQUES DEL VALLE en el selector del modal." },
+              { title: "Subir el Excel", description: "Archivo .xlsx oficial colombiano con capitulos, subcapitulos, items y, si aplica, tramites al pie." },
+              { title: "Confirmar resumen", description: "El modal muestra capitulos, subcapitulos, items, frentes y valor total. Verificar que coincide con el archivo y confirmar." },
+            ]}
+            tips={["El VALOR TOTAL del modal debe coincidir al centavo con la celda VALOR TOTAL PRESUPUESTO del Excel."]}
+            warnings={["Cargar un nuevo presupuesto reemplaza la estructura anterior del proyecto."]}
+            storageKey="project-detail:presupuesto"
+          />
           <Card>
             <CardHeader>
               <CardTitle>Estructura presupuestal</CardTitle>
@@ -286,7 +318,23 @@ export default function ProjectDetailPage() {
         </TabsContent>
 
         {/* Cortes */}
-        <TabsContent value="cortes">
+        <TabsContent value="cortes" className="space-y-4">
+          <ModuleExplanationCard
+            icon={Scissors}
+            variant="guide"
+            title="Cortes de obra"
+            description="Registro de avances parciales contra el presupuesto. Cada corte representa el trabajo ejecutado en un periodo y debe ser validado antes de pagarse."
+            steps={[
+              { title: "Crear (DRAFT)", description: "El residente de obra registra las cantidades ejecutadas por item del presupuesto." },
+              { title: "Enviar (SUBMITTED)", description: "Una vez completo en campo, envia el corte para revision." },
+              { title: "Validar (VALIDATED)", description: "El interventor revisa cantidades contra lo realmente ejecutado en obra." },
+              { title: "Aprobar (APPROVED)", description: "El administrador aprueba el corte para pago." },
+              { title: "Pagar (PAID)", description: "Tesoreria registra el pago al contratista." },
+            ]}
+            tips={["El ciclo de vida es DRAFT -> SUBMITTED -> VALIDATED -> APPROVED -> PAID."]}
+            warnings={["Un corte solo se paga cuando esta APPROVED. Cortes en DRAFT o REJECTED no generan pago."]}
+            storageKey="project-detail:cortes"
+          />
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -340,7 +388,21 @@ export default function ProjectDetailPage() {
         </TabsContent>
 
         {/* Contratistas */}
-        <TabsContent value="contratistas">
+        <TabsContent value="contratistas" className="space-y-4">
+          <ModuleExplanationCard
+            icon={Truck}
+            variant="guide"
+            title="Contratistas y proveedores"
+            description="Personas y empresas vinculadas al proyecto. Cada proveedor debe tener su documentacion al dia antes de asignarle trabajo."
+            steps={[
+              { title: "Alta del proveedor", description: "Menu lateral -> Proveedores -> Nuevo. Carga RUT, camara de comercio y certificaciones." },
+              { title: "Vinculacion al proyecto", description: "Vuelve a este tab y usa el boton Vincular para asociar el proveedor a PROY-001." },
+              { title: "Verificacion documental", description: "El badge muestra Habilitado, Incompleto o Docs vencidos segun el estado de los documentos." },
+              { title: "Asignacion de cortes", description: "Un proveedor con docs vencidos no puede recibir nuevos cortes hasta regularizar su situacion." },
+            ]}
+            tips={["El badge 'Docs vencidos' bloquea la asignacion de nuevos cortes."]}
+            storageKey="project-detail:contratistas"
+          />
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -348,46 +410,75 @@ export default function ProjectDetailPage() {
                   <CardTitle>Proveedores asignados</CardTitle>
                   <CardDescription>Personal y empresas vinculados al proyecto</CardDescription>
                 </div>
-                <Button variant="outline" size="sm" disabled>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled
+                  title="Disponible cuando exista la tabla project_providers en BD."
+                >
                   <Users className="mr-2 h-4 w-4" />
                   Vincular
                 </Button>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                {projectProviders.map((c) => (
-                  <div key={c.id} className="flex items-center justify-between rounded-md border p-3">
-                    <div>
-                      <p className="font-medium">{c.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        NIT {c.nit} · {c.contact}
-                      </p>
-                    </div>
-                    <Badge
-                      variant={
-                        c.status === "COMPLETE"
-                          ? "success"
+              {projectProviders.length === 0 ? (
+                <div className="rounded-lg border border-dashed p-8 text-center">
+                  <Users className="mx-auto h-10 w-10 text-muted-foreground" />
+                  <p className="mt-3 text-sm font-medium">Aun no hay proveedores vinculados</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Da de alta un proveedor en el menu lateral y luego vincúlalo a este proyecto desde el boton Vincular.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {projectProviders.map((c) => (
+                    <div key={c.id} className="flex items-center justify-between rounded-md border p-3">
+                      <div>
+                        <p className="font-medium">{c.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          NIT {c.nit} · {c.contact}
+                        </p>
+                      </div>
+                      <Badge
+                        variant={
+                          c.status === "COMPLETE"
+                            ? "success"
+                            : c.status === "EXPIRED"
+                            ? "destructive"
+                            : "warning"
+                        }
+                      >
+                        {c.status === "COMPLETE"
+                          ? "Habilitado"
                           : c.status === "EXPIRED"
-                          ? "destructive"
-                          : "warning"
-                      }
-                    >
-                      {c.status === "COMPLETE"
-                        ? "Habilitado"
-                        : c.status === "EXPIRED"
-                        ? "Docs vencidos"
-                        : "Incompleto"}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
+                          ? "Docs vencidos"
+                          : "Incompleto"}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
         {/* Bitácora */}
-        <TabsContent value="bitacora">
+        <TabsContent value="bitacora" className="space-y-4">
+          <ModuleExplanationCard
+            icon={BookOpen}
+            variant="guide"
+            title="Bitacora del proyecto"
+            description="Registro diario de actividades en obra: clima, personal, equipos, avances fisicos, novedades. Es la fuente de verdad para auditorias."
+            steps={[
+              { title: "Apertura diaria", description: "El residente abre la bitacora del dia al iniciar la jornada." },
+              { title: "Registro continuo", description: "Anota clima, personal presente, equipos en obra, avance fisico y novedades a lo largo del dia." },
+              { title: "Evidencia fotografica", description: "Adjunta fotos del avance y de las novedades relevantes." },
+              { title: "Cierre del dia", description: "Al final de la jornada cierra la entrada. No debe quedar abierta al dia siguiente." },
+            ]}
+            tips={["La bitacora es evidencia legal ante auditorias. No la dejes para el lunes."]}
+            storageKey="project-detail:bitacora"
+          />
           <Card>
             <CardHeader>
               <CardTitle>Bitácora del proyecto</CardTitle>
