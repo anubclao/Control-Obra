@@ -991,6 +991,7 @@ export const useBudgetsStore = () => {
 export const usePscsStore = () => {
   const s = useDataStore((x) => x.pscs);
   const items = useDataStore((x) => x.pscs.items) as any[];
+  const budgetsItems = useDataStore((x) => x.budgets.items) as Budget[];
   return {
     pscs: items,
     addany: (data: any) => s.add(data),
@@ -1000,6 +1001,85 @@ export const usePscsStore = () => {
       s.update(id, { isActive: active } as any),
     setStatus: (id: string, status: any) => s.update(id, { status } as any),
     load: s.load,
+    /**
+     * POST /api/pscs con la forma `{ ok: boolean, error?: string }` que
+     * espera el form (`psc-form.tsx`). Antes el form llamaba `createPSC`
+     * pero ese metodo no existia en el store, lo que causaba un
+     * "client-side exception" al hacer submit.
+     *
+     * P0 plan 2026-10-04 (fix bug psc-form): agregado.
+     */
+    createPSC: async (payload: any): Promise<{ ok: boolean; error?: string; id?: string; pscNumber?: string }> => {
+      try {
+        const res = await fetch("/api/pscs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          return { ok: false, error: body?.error ?? `HTTP ${res.status}` };
+        }
+        const body = await res.json();
+        // Refrescar cache del store despues de crear.
+        await s.load().catch(() => {});
+        return { ok: true, id: body?.id, pscNumber: body?.pscNumber };
+      } catch (e: any) {
+        return { ok: false, error: e?.message ?? "Error de red" };
+      }
+    },
+    /**
+     * PUT /api/pscs. Misma forma de retorno que createPSC.
+     * P0 plan 2026-10-04 (fix bug psc-form): agregado.
+     */
+    updatePSC: async (id: string, payload: any): Promise<{ ok: boolean; error?: string }> => {
+      try {
+        const res = await fetch("/api/pscs", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, ...payload }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          return { ok: false, error: body?.error ?? `HTTP ${res.status}` };
+        }
+        await s.load().catch(() => {});
+        return { ok: true };
+      } catch (e: any) {
+        return { ok: false, error: e?.message ?? "Error de red" };
+      }
+    },
+    /**
+     * Items del PT disponibles para asignar a un PSC nuevo (o al editar
+     * uno existente). Excluye items que ya estan en otros PSCs del
+     * mismo proyecto. P0 plan 2026-10-04 (fix bug psc-form): agregado.
+     */
+    getItemsAvailable: (projectId: string, excludePscId?: string) => {
+      const budget = budgetsItems.find((b) => b.projectId === projectId);
+      if (!budget) return [];
+      const allItems: { id: string; description: string; unit: string; unitPrice: number; totalPrice: number }[] = [];
+      for (const layer of budget.layers ?? []) {
+        for (const item of layer.items ?? []) {
+          allItems.push({
+            id: item.id,
+            description: item.description,
+            unit: item.unit,
+            unitPrice: item.unitPrice,
+            totalPrice: item.totalPrice,
+          });
+        }
+      }
+      // Set de ids ya asignados a otros PSCs del mismo proyecto.
+      const usedIds = new Set<string>();
+      for (const psc of items) {
+        if (psc.id === excludePscId) continue;
+        if (psc.projectId !== projectId) continue;
+        for (const it of psc.items ?? []) {
+          if (it.budgetItemId) usedIds.add(it.budgetItemId);
+        }
+      }
+      return allItems.filter((it) => !usedIds.has(it.id));
+    },
   } as any;
 };
 

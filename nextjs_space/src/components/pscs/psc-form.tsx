@@ -120,6 +120,7 @@ export function PSCForm({ psc, onSuccess }: Props) {
       budgetId: budget?.id ?? "",
       providerId,
       items: items.filter((it) => it.budgetItemId),
+      totalValue,
       status,
       notes: notes || undefined,
       startDate: startDate || undefined,
