@@ -688,7 +688,7 @@ export const useDataStore = create<DataState>()((set, get) => {
 
 export const useProjectsStore = () => {
   const s = useDataStore((x) => x.projects);
-  const projectsAll = useDataStore((x) => x.projects.items) as Project[];
+  const projectsAll = (useDataStore((x) => x.projects.items) as Project[]) ?? [];
   const error = useDataStore((x) => x.projects.error);
   const pagination = useDataStore((x) => x.projects.pagination);
   return {
@@ -707,7 +707,7 @@ export const useProjectsStore = () => {
 
 export const useProvidersStore = () => {
   const s = useDataStore((x) => x.providers);
-  const items = useDataStore((x) => x.providers.items) as Provider[];
+  const items = (useDataStore((x) => x.providers.items) as Provider[]) ?? [];
   return {
     providers: items,
     addProvider: (data: any) => s.add(data),
@@ -723,7 +723,7 @@ export const useProvidersStore = () => {
 
 export const useContractsStore = () => {
   const s = useDataStore((x) => x.contracts);
-  const items = useDataStore((x) => x.contracts.items) as Contract[];
+  const items = (useDataStore((x) => x.contracts.items) as Contract[]) ?? [];
   return {
     contracts: items,
     addContract: (data: any) => s.add(data),
@@ -751,7 +751,7 @@ export const useContractsStore = () => {
 
 export const useCutsStore = () => {
   const s = useDataStore((x) => x.cuts);
-  const items = useDataStore((x) => x.cuts.items) as WorkCut[];
+  const items = (useDataStore((x) => x.cuts.items) as WorkCut[]) ?? [];
   const error = useDataStore((x) => x.cuts.error);
   const pagination = useDataStore((x) => x.cuts.pagination);
   return {
@@ -791,7 +791,7 @@ export const useCutsStore = () => {
 
 export const usePaymentsStore = () => {
   const s = useDataStore((x) => x.payments);
-  const items = useDataStore((x) => x.payments.items) as PaymentRequest[];
+  const items = (useDataStore((x) => x.payments.items) as PaymentRequest[]) ?? [];
   const error = useDataStore((x) => x.payments.error);
   const pagination = useDataStore((x) => x.payments.pagination);
   return {
@@ -816,7 +816,7 @@ export const usePaymentsStore = () => {
 
 export const useClientsStore = () => {
   const s = useDataStore((x) => x.clients);
-  const items = useDataStore((x) => x.clients.items) as Client[];
+  const items = (useDataStore((x) => x.clients.items) as Client[]) ?? [];
   const error = useDataStore((x) => x.clients.error);
   return {
     clients: items,
@@ -836,7 +836,7 @@ export const useClientsStore = () => {
 
 export const useQuotationsStore = () => {
   const s = useDataStore((x) => x.quotations);
-  const items = useDataStore((x) => x.quotations.items) as Quotation[];
+  const items = (useDataStore((x) => x.quotations.items) as Quotation[]) ?? [];
   const error = useDataStore((x) => x.quotations.error);
   const pagination = useDataStore((x) => x.quotations.pagination);
   return {
@@ -859,7 +859,7 @@ export const useQuotationsStore = () => {
 
 export const useLogsStore = () => {
   const s = useDataStore((x) => x.workLogs);
-  const items = useDataStore((x) => x.workLogs.items) as WorkLog[];
+  const items = (useDataStore((x) => x.workLogs.items) as WorkLog[]) ?? [];
   return {
     logs: items,
     addLog: (data: any) => s.add(data),
@@ -875,7 +875,7 @@ export const useLogsStore = () => {
 
 export const useEmployeesStore = () => {
   const s = useDataStore((x) => x.employees);
-  const items = useDataStore((x) => x.employees.items) as Employee[];
+  const items = (useDataStore((x) => x.employees.items) as Employee[]) ?? [];
   return {
     employees: items,
     addEmployee: (data: any) => s.add(data),
@@ -897,7 +897,7 @@ export const useEmployeesStore = () => {
 
 export const useInvitationsStore = () => {
   const s = useDataStore((x) => x.invitations);
-  const items = useDataStore((x) => x.invitations.items) as Invitation[];
+  const items = (useDataStore((x) => x.invitations.items) as Invitation[]) ?? [];
   return {
     invitations: items,
     addInvitation: (data: any) => s.add(data),
@@ -912,7 +912,7 @@ export const useInvitationsStore = () => {
 
 export const useTaxesStore = () => {
   const s = useDataStore((x) => x.taxes);
-  const items = useDataStore((x) => x.taxes.items) as TaxConfig[];
+  const items = (useDataStore((x) => x.taxes.items) as TaxConfig[]) ?? [];
   return {
     taxes: items,
     addTax: (data: any) => s.add(data),
@@ -927,7 +927,7 @@ export const useTaxesStore = () => {
 
 export const useAiuStore = () => {
   const s = useDataStore((x) => x.aius);
-  const items = useDataStore((x) => x.aius.items) as AiuConfig[];
+  const items = (useDataStore((x) => x.aius.items) as AiuConfig[]) ?? [];
   return {
     aius: items,
     getAiuByProject: (projectId: string) =>
@@ -968,7 +968,7 @@ export const useAiuStore = () => {
 
 export const useBudgetsStore = () => {
   const s = useDataStore((x) => x.budgets);
-  const items = useDataStore((x) => x.budgets.items) as Budget[];
+  const items = (useDataStore((x) => x.budgets.items) as Budget[]) ?? [];
   return {
     budgets: items,
     getBudgetByProject: (projectId: string) =>
@@ -990,8 +990,8 @@ export const useBudgetsStore = () => {
 
 export const usePscsStore = () => {
   const s = useDataStore((x) => x.pscs);
-  const items = useDataStore((x) => x.pscs.items) as any[];
-  const budgetsItems = useDataStore((x) => x.budgets.items) as Budget[];
+  const items = (useDataStore((x) => x.pscs.items) as any[]) ?? [];
+  const budgetsItems = (useDataStore((x) => x.budgets.items) as Budget[]) ?? [];
   return {
     pscs: items,
     addany: (data: any) => s.add(data),
@@ -1085,7 +1085,7 @@ export const usePscsStore = () => {
 
 export const useExpensesStore = () => {
   const s = useDataStore((x) => x.expenses);
-  const items = useDataStore((x) => x.expenses.items) as Expense[];
+  const items = (useDataStore((x) => x.expenses.items) as Expense[]) ?? [];
   return {
     expenses: items,
     addExpense: (data: any) => s.add(data),

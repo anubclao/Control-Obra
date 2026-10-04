@@ -63,7 +63,7 @@ export default function ProveedoresPage() {
   useEffect(() => { load(); }, []);
 
   const filtered = useMemo(() => {
-    return (providers ?? []).filter((p) => {
+    return providers.filter((p) => {
       const matchSearch =
         !search ||
         p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -77,12 +77,11 @@ export default function ProveedoresPage() {
   }, [providers, search, statusFilter, personTypeFilter, categoryFilter]);
 
   const stats = useMemo(() => {
-    const list = providers ?? [];
-    const complete = list.filter((p) => p.status === "COMPLETE").length;
-    const incomplete = list.filter((p) => p.status === "INCOMPLETE").length;
-    const expired = list.filter((p) => p.status === "EXPIRED").length;
-    const naturales = list.filter((p) => p.personType === "NATURAL").length;
-    return { complete, incomplete, expired, naturales, total: list.length };
+    const complete = providers.filter((p) => p.status === "COMPLETE").length;
+    const incomplete = providers.filter((p) => p.status === "INCOMPLETE").length;
+    const expired = providers.filter((p) => p.status === "EXPIRED").length;
+    const naturales = providers.filter((p) => p.personType === "NATURAL").length;
+    return { complete, incomplete, expired, naturales, total: providers.length };
   }, [providers]);
 
   function askDelete(p: Provider) {
@@ -128,7 +127,7 @@ export default function ProveedoresPage() {
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Proveedores</h1>
           <p className="text-sm text-muted-foreground">
-            {(providers ?? []).length} registrados - {stats.complete} habilitados - {stats.expired} con docs vencidos
+            {providers.length} registrados - {stats.complete} habilitados - {stats.expired} con docs vencidos
           </p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
