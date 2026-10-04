@@ -130,3 +130,73 @@ You DO NOT write implementation code until:
 
 ### [2026-10-02] Cleanup manual requerido
 - Archivo tests/verifiers/_debug_id_status.cjs quedó en disco (usado para diagnosticar el bug del verifier). El sandbox bloqueó rm/Remove-Item y mavis-trash no está disponible en este runtime → borrar manualmente desde el Explorador de Windows.
+
+### [2026-10-03] dev-auth-bypass Â· FASE 1 (SPEC)
+- Spec creado en docs/specs/dev-auth-bypass.md.
+- Problema: el dev local NO puede alcanzar el MySQL de Hostinger (puerto 3306 no expuesto a Internet desde IPs externas). 
+equest-otp muere en el SELECT con ER_ACCESS_DENIED_ERROR antes de poder enviar el codigo o devolver devCode.
+- Solucion: bypass dev-only con doble guard (NODE_ENV !== "production" + DEV_AUTH_BYPASS === "true"). Ambos se cumplen en 
+pm run dev local, ambos fallan en Hostinger prod.
+- Sesion creada es legacy (${userId}.) -> NO escribe en user_sessions, y erifySessionCookie la acepta sin tocar MySQL (ver session.ts lineas 165-176).
+- Produccion: la ruta nueva siempre devuelve 404 (no 403, para no confirmar existencia). El GET /api/auth/login mantiene su comportamiento actual cuando el flag esta apagado.
+
+### [2026-10-03] dev-auth-bypass Â· FASE 2 (VERIFIER ROJO)
+- Verifier creado en tests/verifiers/dev-auth-bypass.spec.ts con 13 tests.
+- Cubre: AC-1 (prod 404), AC-2 (dev sin flag 404), AC-3 (dev con flag 200+user+cookie+no MySQL), AC-4 (GET /api/auth/login devuelve user sin MySQL), bug-fix colateral (area lowercase).
+- Sanitizacion de userId con regex /^[a-zA-Z0-9_-]{1,32}$/ para evitar inyeccion en la cookie. Cobertura explicita con test "' OR 1=1 --".
+- Estrategia: todos los i.mock() al top-level del archivo (Vitest los hoistea; dentro de describe chocan entre si y producen "0 tests").
+
+### [2026-10-03] dev-auth-bypass Â· FASE 3 (IMPLEMENTACIÃ“N)
+- Nuevos archivos:
+  - src/lib/dev-auth.ts (helper devMockUser(userId) + tipos DevMockUser).
+  - src/app/api/auth/dev-login/route.ts (POST con doble guard).
+- Modificaciones:
+  - src/app/api/auth/login/route.ts GET: aÃ±adida interception dev-only despues de verifySessionCookie, antes del SELECT. Importa devMockUser.
+  - src/app/login/page.tsx: probe silencioso a /api/auth/dev-login en mount para detectar si el bypass esta habilitado (status !== 404). Si lo esta, renderiza boton "Entrar como admin (modo dev)" debajo del form de email. Bug-fix colateral: 
+outer.push(\/\) ahora hace .toLowerCase() en las 3 redirecciones (devLogin, verifyOtp, useEffect). El bug pre-existente causaba 404 cuando users.area viene en MAYUSCULAS desde la BD (la ruta es /administrativo en minusculas). Esto es bit-identity-safe para prod porque solo cambia el redirect a la variante lowercase que es la unica que existe.
+- .env.local (gitignored): aÃ±adido DEV_AUTH_BYPASS=true. Hostinger prod NO tiene esta variable Y NODE_ENV=production, asi que el bypass NUNCA corre en prod.
+- Type-check 
+px tsc --noEmit: solo el error preexistente en 	ests/verifiers/advances-suggestion.spec.ts:21 (TS2741 'contractId' missing). Sin errores nuevos.
+- Vitest dev-auth-bypass.spec.ts: 13/13 verde. Vitest full: 638 passing + 34 failing preexistentes en document-xlsx-helpers.spec.ts (snapshots faltantes, sin relacion con este fix).
+
+### Patrones a recordar (memory)
+- **Doble guard prod**: cualquier ruta dev-only exige AMBOS NODE_ENV !== "production" Y una env opt-in (DEV_*=true). Esto hace que aunque el .env de prod incluya el flag por error, no se active.
+- **Legacy cookie**: signSession(userId) (formato ${userId}.) es la unica sesion que NO requiere fila en user_sessions. Usar para bypass que solo necesita "estar logueado".
+- **Mock location**: en Vitest, TODOS los i.mock() al top-level del archivo. Si los pones dentro de describe, Vitest los hoistea igualmente y chocan -> "0 tests" + error de hoisting.
+- **Lowercase area en redirect**: pre-existente bug que users.area puede venir en MAYUSCULAS de la BD y Next.js solo matchea minusculas. Cualquier 
+outer.push(\/\\) debe hacer .toLowerCase().
+- **DB inalcanzable desde local**: Hostinger no expone 3306 a Internet. Cualquier endpoint que toque MySQL va a fallar en local con ER_ACCESS_DENIED_ERROR. Soluciones: bypass dev-only (para login), tunnel SSH, o MySQL local con dump.
+
+### [2026-10-03] excel-parser-match-excel-total · FASE 1 (DIAGNOSIS)
+- Bug encontrado: el modal de upload daba `$5.270.232.769` mientras el `VALOR TOTAL PRESUPUESTO` del Excel oficial colombiano dice `$5.441.957.056` (gap $171M = 3.2%).
+- 3 causas raices distintas en el parser:
+  1. **Commit 384ae94** excluia `code="Tramites"` del `totalValue`. El Excel SI los incluye.
+  2. **Reclassification bug**: cuando la clasificacion cambiaba, la primera fila de la nueva clasificacion se demoteaba a CHAPTER. 6 tramites ($96M) cayeron ahi.
+  3. **Bug raw:false de SheetJS**: con `raw:false`, SheetJS aplica el formato de locale de la celda (`#,##0` colombiano). Asi 791770 se leia como string `"791.770"`, y parseNumber con single-dot=decimal interpretaba 791.77. Eso daba 145 items "fantasma" del parser y 144 items "perdidos" del Excel. Diff suma ~$50M.
+- Validado con diag scripts contra el Excel real (openpyxl) y contra el parser TS (SheetJS+parseNumber).
+
+### [2026-10-03] excel-parser-match-excel-total · FASE 2 (VERIFIER)
+- Tests existentes a actualizar: `bug-presupuestos-round.spec.ts` tenia 2 tests que afirmaban `totalValue` SIN tramites. Revertidos a asserts CON tramites.
+
+### [2026-10-03] excel-parser-match-excel-total · FASE 3 (IMPLEMENTACION)
+- `src/lib/excel-parser.ts`:
+  - `parseNumber` ahora acepta `number | string | undefined | null`. Si ya es number, lo devuelve tal cual. Esto elimina la ambiguedad del formato cuando SheetJS entrega un numero crudo.
+  - `parseExcelFile`: `raw: false` -> `raw: true` en `XLSX.utils.sheet_to_json`. Asi SheetJS entrega el numero crudo de la celda sin aplicar formato de locale. Para celdas numericas ya no hay string formateado que parsear.
+  - `isTramite` sigue existiendo (usado para skip de reclassification).
+  - Reclassification (lineas 380-403): agregada condicion `!isTramite(row.code)` para que tramites no se demoteen a CHAPTER. Antes 6 tramites ($96M) se perdian.
+  - `totalValue` (linea ~434): quitado `.filter(!isTramite)`. Ahora suma TODAS las filas layerType==ITEM, sin excluir tramites.
+  - `itemCount` (linea ~440): quitado el filtro `!isTramite`. Tramites cuentan como items (440 + 13 = 453 en Parques del Valle).
+  - `totalPrice=0` para CHAPTER/SUBCHAPTER (commit 4f14ae7) SE MANTIENE: asi las filas agregadas al pie del Excel ("TOTAL TRAMITES", "VALOR TOTAL PRESUPUESTO") siguen sin contar doble.
+- Resultado verificado con parser TS contra el Excel real:
+  - totalValue = `$5.441.957.056` (match exacto con VALOR TOTAL PRESUPUESTO del Excel)
+  - itemCount = 453
+  - chapterCount = 128
+  - SUMA subtotales por frente = totalValue (consistente).
+- Tests: 59/59 verde en specs modificados (bug-presupuestos-round + budget-upload-validation + dev-auth-bypass). Vitest full: 638 passing, 34 pre-existing failures en `document-xlsx-helpers.spec.ts` (snapshots faltantes, sin relacion).
+- TS: solo error preexistente en `advances-suggestion.spec.ts:21` (TS2741). Sin errores nuevos.
+
+### Patrones a recordar (memory) — extension 2026-10-03
+- **SheetJS raw:true > raw:false para celdas numericas**: con raw:false, SheetJS aplica el formato de locale (`#,##0`) y entrega strings como `"791.770"` que parseNumber interpreta ambiguamente. Con raw:true entrega `791770` directo. Siempre usar raw:true para columnas numericas (cantidad, vr unit, vr total).
+- **El "VALOR TOTAL PRESUPUESTO" del Excel oficial colombiano SI incluye tramites**: el `#,##0` cell format y la presencia de la seccion "Tramites" al pie son el patron estandar de presupuestos oficiales. No excluir tramites del parser total.
+- **Reclassification de CHAPTER en cambio de clasificacion**: solo demotar a CHAPTER si la fila NO es tramite (codigo "^tramites?$"). Tramites tienen qty/precio y DEBEN contar como items.
+- **Tests que asumen un comportamiento viejo del parser**: cuando se revierte un fix (como 384ae94), hay que actualizar los tests que afirmaban ese comportamiento. Anotar en el comentario del describe() que ese caso es revertido, no nuevo.

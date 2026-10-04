@@ -139,8 +139,13 @@ describe("Bug presupuestos — parseNumber no rompe moneda solo-comas (caso 2026
   });
 });
 
-describe("Bug presupuestos — excluir trámites del total (caso 2026-10-03)", () => {
-  it("BUG 2026-10-03: items con code='Tramites' se excluyen del totalValue", () => {
+describe("Bug presupuestos — totalValue incluye tramites (caso 2026-10-03, revertido)", () => {
+  // P0 plan 2026-10-03 (revert): antes (commit 384ae94) el parser excluyia
+  // tramites del totalValue. Eso daba gap de $171M entre el modal y el
+  // "VALOR TOTAL PRESUPUESTO" del Excel oficial colombiano, porque el
+  // Excel SI incluye tramites en su suma total. Revertimos el filtro:
+  // tramites CUENTAN en el totalValue, igual que en el Excel.
+  it("items con code='Tramites' se incluyen en el totalValue", () => {
     const rows = [
       {
         Codigo: "1.1.1",
@@ -171,12 +176,12 @@ describe("Bug presupuestos — excluir trámites del total (caso 2026-10-03)", (
       },
     ];
     const parsed = parseExcelContent(rows);
-    // Solo el item de obra cuenta ($100M); los 2 tramites NO
-    expect(parsed.totalValue).toBe(100_000_000);
-    expect(parsed.itemCount).toBe(1);
+    // Total: item obra + 2 tramites = $139.723.760 (todos cuentan)
+    expect(parsed.totalValue).toBe(139_723_760);
+    expect(parsed.itemCount).toBe(3);
   });
 
-  it("BUG 2026-10-03: items principales dan suma correcta entre frentes", () => {
+  it("items principales + tramites suman correctamente entre frentes", () => {
     const rows = [
       {
         Codigo: "1.1.1", Descripción: "Item A1", Unidad: "M2",
@@ -200,8 +205,8 @@ describe("Bug presupuestos — excluir trámites del total (caso 2026-10-03)", (
       },
     ];
     const parsed = parseExcelContent(rows);
-    // 50M + 40M + 100M = 190M (tramites excluido)
-    expect(parsed.totalValue).toBe(190_000_000);
+    // 50M + 40M + 100M + 5M (tramite) = 195M (tramite INCLUIDO)
+    expect(parsed.totalValue).toBe(195_000_000);
   });
 
   it("BUG 2026-10-03: capitulos/subcapitulos con descripcion no se cuentan como tramites", () => {

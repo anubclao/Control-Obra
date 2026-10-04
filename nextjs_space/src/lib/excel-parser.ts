@@ -218,7 +218,7 @@ export function computeFrenteSummary(
   };
 }
 
-// Convierte un string a número, manejando formatos comunes (1.234,56 → 1234.56)
+// Convierte un valor a número, manejando formatos comunes (1.234,56 → 1234.56)
 // y el formato anglosajón (1,234.56 → 1234.56). Regla: el separador que
 // aparezca MÁS A LA DERECHA es el decimal; el otro es separador de miles.
 //
@@ -229,8 +229,17 @@ export function computeFrenteSummary(
 // ultima coma por punto), lo que daba "$ 7,434,742" -> 7.434742 en vez
 // de 7434742. Por eso los totales del modal salian como $56.069 en vez
 // de $11.234.939.521.
-export function parseNumber(value: string | undefined): number {
+//
+// P0 plan 2026-10-03 (bugfix): si el caller pasa un number (caso normal
+// cuando SheetJS lee con raw:true), se devuelve tal cual. Esto evita
+// la ambiguedad del formato colombiano cuando SheetJS con raw:false
+// formatea "791770" como "791.770" (miles colombianos) y parseNumber
+// lo leia como 791.77 (decimal). Con raw:true ya no hay ese caso.
+// Ademas los parseNumber usados directamente en tests siguen aceptando
+// strings.
+export function parseNumber(value: string | number | undefined | null): number {
   if (value === undefined || value === null) return 0;
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
   const trimmed = String(value).trim();
   if (trimmed === "") return 0;
   // Limpiar símbolos de moneda y espacios, conservar dígitos, coma, punto y signo.
@@ -370,6 +379,14 @@ export function parseExcelContent(
     };
   });
 
+  // Helper para detectar tramites administrativos (CERTIFICACIONES RETIE,
+  // IMPUESTOS EPSA, PLAN DE MANEJO AMBIENTAL, etc.). Pattern comun en
+  // presupuestos oficiales colombianos: una seccion al pie de cada frente
+  // con code = "Tramites". El usuario espera que el VALOR TOTAL del modal
+  // coincida con la celda "VALOR TOTAL PRESUPUESTO" del Excel, que SI
+  // incluye esos tramites.
+  const isTramite = (code: string) => /^tramites?$/i.test(code.trim());
+
   // P0 plan 2026-10-02 (espejo del Excel): calcular el TOTAL de cada
   // capitulo/subcapitulo sumando los items que vienen debajo hasta el
   // proximo encabezado. En presupuestos municipales, la celda de total
@@ -377,12 +394,29 @@ export function parseExcelContent(
   // acumulada (asi figura en la planilla original). Tambien detectamos
   // cuando la Clasificacion cambia: si lo hace sin haber encontrado un
   // encabezado con codigo "1", "2", etc., forzamos el row como CHAPTER.
+  //
+  // P0 plan 2026-10-03 (revert + fix): antes (commit 384ae94) el parser
+  // excluia los tramites del VALOR TOTAL. Eso dio problemas cuando el
+  // proyecto se creo con la cifra copiada del Excel ($5.441M) y el modal
+  // de upload daba otra cifra ($5.270M): el gap de $171M era exactamente
+  // los tramites. Decidimos revertir ese filtro y hacer que el modal
+  // SIEMPRE refleje el VALOR TOTAL PRESUPUESTO del Excel.
+  //
+  // Ademas: la logica de "cambio de clasificacion -> demote first item
+  // to CHAPTER" estaba agarrando filas de tramites (code = "Tramites")
+  // y las reasignaba a CHAPTER. Como totalPrice=0 para CHAPTER (commit
+  // 4f14ae7), esos tramites ($96M) se perdian. Fix: NO demotar tramites.
   let currentClassification = "";
   for (let i = 0; i < parsedRows.length; i++) {
     const row = parsedRows[i];
     if (row.classification && row.classification !== currentClassification) {
-      // Cambio de clasificacion = nuevo capitulo logico
-      if (currentClassification !== "" && row.layerType === "ITEM") {
+      // Cambio de clasificacion = nuevo capitulo logico.
+      // NO demotar tramites: tienen qty/precio y DEBEN contar como items.
+      if (
+        currentClassification !== "" &&
+        row.layerType === "ITEM" &&
+        !isTramite(row.code)
+      ) {
         row.layerType = "CHAPTER";
         row.layerName = row.classification;
       }
@@ -402,35 +436,19 @@ export function parseExcelContent(
     row.computedTotal = sum;
   }
 
-  // P0 plan 2026-10-03 (bug): el Excel del PRESUPUESTO OFICIAL INFRADEPORTIVO
-  // tiene una seccion final de "Tramites" al pie (CERTIFICACIONES RETIE,
-  // IMPUESTOS EPSA, PLAN DE MANEJO AMBIENTAL, etc.). Esos items comparten
-  // clasificacion con uno de los frentes principales (mismo proyecto) pero
-  // son tramites administrativos, NO items de construccion. El "VALOR TOTAL
-  // PRESUPUESTO" del Excel ($5.556.464.503) NO los incluye — son un cargo
-  // separado del presupuesto de obra.
-  //
-  // El parser detectaba esos items como ITEM y los sumaba al totalValue,
-  // lo que daba $11.234B (main + tramites * 2) en vez de $5.434B (solo
-  // main) o $5.556B (todo). El fix: excluir del totalValue cualquier
-  // item con code === "Tramites" (case-insensitive). El desglose por
-  // frente (groupByFrente + computeFrenteSummary) ya los excluia
-  // implicitamente porque estos items no estan agrupados bajo la misma
-  // clasificacion que el frente principal en el mismo sentido que el
-  // user espera.
-  //
-  // NOTA: los tramites SIGUEN apareciendo en parsedRows (visibles en
-  // el step "preview" tabla si el usuario la abre). El modal de resumen
-  // los OMITE por diseno: solo muestra items de obra.
-  const isTramite = (code: string) => /^tramites?$/i.test(code.trim());
-  const totalValue = parsedRows
-    .filter((r) => !isTramite(r.code))
-    .reduce((s, r) => s + r.totalPrice, 0);
+  // totalValue: incluye TODAS las filas layerType==ITEM, sin filtro de
+  // tramites. Como totalPrice=0 para CHAPTER/SUBCHAPTER (commit 4f14ae7),
+  // las filas agregadas al pie del Excel ("TOTAL TRAMITES", "VALOR TOTAL
+  // PRESUPUESTO") NO se suman — siguen en 0. Resultado: totalValue ==
+  // VALOR TOTAL PRESUPUESTO del Excel.
+  const totalValue = parsedRows.reduce((s, r) => s + r.totalPrice, 0);
   const chapterCount = parsedRows.filter(
     (r) => r.layerType === "CHAPTER" || r.layerType === "SUBCHAPTER",
   ).length;
+  // itemCount: incluye tramites (ya no se filtran). Ver nota arriba sobre
+  // el revert del commit 384ae94.
   const itemCount = parsedRows.filter(
-    (r) => r.layerType === "ITEM" && !isTramite(r.code),
+    (r) => r.layerType === "ITEM",
   ).length;
 
   // SPEC AC-4: agrupar por frente y calcular resumen por frente.
@@ -577,7 +595,13 @@ export async function parseExcelFile(
       Record<string, string | number>
     >(sheet, {
       defval: "",
-      raw: false,
+      // P0 plan 2026-10-03 (bugfix): raw:true entrega el numero crudo de la
+      // celda sin aplicar el formato de locale. Antes con raw:false, el
+      // formato colombiano `#,##0` hacia que 791770 se leyera como string
+      // "791.770", y parseNumber lo interpretaba como decimal (791.77)
+      // porque single-dot era decimal. Eso daba gap de $50M vs el VALOR
+      // TOTAL PRESUPUESTO del Excel. Con raw:true ve 791770 directo.
+      raw: true,
       ...(skipRows > 0 ? { range: skipRows } : {}),
     });
     const candidate = rows.map((r) => {
