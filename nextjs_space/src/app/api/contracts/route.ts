@@ -20,7 +20,7 @@ import {
 } from "@/lib/api-auth";
 import { validatePricingMode } from "@/lib/contracts-constants";
 
-function r(row: any) {
+function r(row: any, docs: any[] = [], generatedDocumentUrl: string | null = null) {
   return {
     id: row.id,
     contractNumber: row.contract_number,
@@ -38,6 +38,19 @@ function r(row: any) {
     notes: row.notes ?? "",
     createdAt: row.created_at,
     createdBy: row.created_by,
+    // P0 plan 2026-10-04 (fix bug 5): la UI espera documents (length en
+    // Tab "Documentos") y generatedDocumentUrl (enlace al doc generado).
+    // Antes no se devolvian y la pagina crasheaba con
+    // "Cannot read 'length' of undefined".
+    documents: docs.map((d) => ({
+      id: d.id,
+      type: d.type,
+      fileName: d.file_name,
+      fileUrl: d.file_url,
+      uploadedAt: d.uploaded_at,
+      expirationDate: d.expiration_date,
+    })),
+    generatedDocumentUrl,
   };
 }
 
@@ -54,7 +67,30 @@ export async function GET(req: Request) {
       `SELECT * FROM contracts ${where} ORDER BY created_at DESC`,
       args,
     );
-    return NextResponse.json(rows.map(r));
+    // P0 plan 2026-10-04 (fix bug 5): JOIN a contract_documents para
+    // devolver documents a la UI. Sin esto la pagina de detalle
+    // crasheaba con "Cannot read 'length' of undefined".
+    const ids = rows.map((c) => c.id);
+    const placeholders = ids.length ? ids.map(() => "?").join(",") : "''";
+    const docs = ids.length
+      ? await query<any[]>(
+          `SELECT * FROM contract_documents WHERE contract_id IN (${placeholders}) ORDER BY uploaded_at DESC`,
+          ids,
+        )
+      : [];
+    const docsByContract = new Map<string, any[]>();
+    for (const d of docs) {
+      const list = docsByContract.get(d.contract_id) ?? [];
+      list.push(d);
+      docsByContract.set(d.contract_id, list);
+    }
+    return NextResponse.json(
+      rows.map((row) => r(
+        row,
+        docsByContract.get(row.id) ?? [],
+        row.generated_document_url ?? null,
+      )),
+    );
   } catch (e: any) {
     console.error("[contracts GET]", e?.code, e?.message);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
@@ -101,6 +137,23 @@ export async function POST(req: Request) {
     ) {
       return NextResponse.json(
         { error: "Faltan campos obligatorios" },
+        { status: 400 },
+      );
+    }
+    // P0 plan 2026-10-04 (fix bug 8): validar longitud maxima de campos
+    // TEXT para evitar ER_DATA_TOO_LONG y abuso (pegar 100MB de texto).
+    // MySQL TEXT aguanta ~64KB; dejamos margen amplio (5000 chars) y
+    // rechazamos inputs claramente malformados en el borde.
+    const MAX_TEXT = 5000;
+    if (typeof body.scopeOfWork === "string" && body.scopeOfWork.length > MAX_TEXT) {
+      return NextResponse.json(
+        { error: `scopeOfWork excede ${MAX_TEXT} caracteres (actual: ${body.scopeOfWork.length})` },
+        { status: 400 },
+      );
+    }
+    if (typeof body.notes === "string" && body.notes.length > MAX_TEXT) {
+      return NextResponse.json(
+        { error: `notes excede ${MAX_TEXT} caracteres (actual: ${body.notes.length})` },
         { status: 400 },
       );
     }
@@ -174,6 +227,20 @@ export async function PUT(req: Request) {
     const body = await req.json();
     if (!body?.id)
       return NextResponse.json({ error: "ID requerido" }, { status: 400 });
+    // P0 plan 2026-10-04 (fix bug 8): validar longitud de TEXT en PUT.
+    const MAX_TEXT = 5000;
+    if (typeof body.scopeOfWork === "string" && body.scopeOfWork.length > MAX_TEXT) {
+      return NextResponse.json(
+        { error: `scopeOfWork excede ${MAX_TEXT} caracteres` },
+        { status: 400 },
+      );
+    }
+    if (typeof body.notes === "string" && body.notes.length > MAX_TEXT) {
+      return NextResponse.json(
+        { error: `notes excede ${MAX_TEXT} caracteres` },
+        { status: 400 },
+      );
+    }
     const map: Record<string, string> = {
       projectId: "project_id",
       providerId: "provider_id",

@@ -9,7 +9,7 @@ import { query } from "@/lib/db";
 import { requireAuth, requireRole, requireAdmin, authFailureResponse } from "@/lib/api-auth";
 
 
-function r(row: any) {
+function r(row: any, docs: any[] = []) {
   return {
     id: row.id,
     employeeNumber: row.employee_number,
@@ -33,6 +33,17 @@ function r(row: any) {
     status: row.status,
     userId: row.user_id,
     createdAt: row.created_at,
+    // P0 plan 2026-10-04 (fix bug 6): JOIN a employee_documents para
+    // devolver documents a la UI. Sin esto la pagina de detalle
+    // crasheaba con "Cannot read 'length' of undefined".
+    documents: docs.map((d) => ({
+      id: d.id,
+      type: d.type,
+      fileName: d.file_name,
+      fileUrl: d.file_url,
+      uploadedAt: d.uploaded_at,
+      expirationDate: d.expiration_date,
+    })),
   };
 }
 
@@ -48,7 +59,24 @@ export async function GET(req: Request) {
     const rows = await query<any[]>(
       `SELECT * FROM employees ${where} ORDER BY full_name ASC`, args,
     );
-    return NextResponse.json(rows.map(r));
+    // P0 plan 2026-10-04 (fix bug 6): JOIN a employee_documents.
+    const ids = rows.map((e) => e.id);
+    const placeholders = ids.length ? ids.map(() => "?").join(",") : "''";
+    const docs = ids.length
+      ? await query<any[]>(
+          `SELECT * FROM employee_documents WHERE employee_id IN (${placeholders}) ORDER BY uploaded_at DESC`,
+          ids,
+        )
+      : [];
+    const docsByEmployee = new Map<string, any[]>();
+    for (const d of docs) {
+      const list = docsByEmployee.get(d.employee_id) ?? [];
+      list.push(d);
+      docsByEmployee.set(d.employee_id, list);
+    }
+    return NextResponse.json(
+      rows.map((row) => r(row, docsByEmployee.get(row.id) ?? [])),
+    );
   } catch (e: any) {
     console.error("[employees GET]", e?.code, e?.message);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });

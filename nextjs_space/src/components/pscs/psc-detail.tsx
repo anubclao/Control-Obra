@@ -25,14 +25,17 @@ export function PSCDetail({ psc, onClose }: { psc: PSC; onClose: () => void }) {
   const provider = getProvider(psc.providerId);
   const budget = getBudgetByProject(psc.projectId);
 
-  const executed = psc.items.reduce((s, it) => s + it.executedAmount, 0);
+  // P0 plan 2026-10-04 (fix bug 7): psc.items puede llegar undefined si el
+  // backend no lo devolvio. Defenderse con [].
+  const items = psc.items ?? [];
+  const executed = items.reduce((s, it) => s + it.executedAmount, 0);
   const percent = psc.totalValue > 0 ? (executed / psc.totalValue) * 100 : 0;
   const variant = PSC_STATUS_VARIANTS[psc.status];
 
   // Comparativa vs PT
   const ptItems = budget?.layers.flatMap((l) => l.items) ?? [];
   const ptTotal = budget?.totalValue ?? 0;
-  const ptContracted = psc.items.reduce((sum, it) => {
+  const ptContracted = items.reduce((sum, it) => {
     const ptItem = ptItems.find((p) => p.id === it.budgetItemId);
     return ptItem ? sum + ptItem.totalPrice : sum;
   }, 0);
@@ -122,7 +125,7 @@ export function PSCDetail({ psc, onClose }: { psc: PSC; onClose: () => void }) {
               </tr>
             </thead>
             <tbody>
-              {psc.items.map((it) => {
+              {items.map((it) => {
                 const ex = it.totalPrice > 0 ? (it.executedAmount / it.totalPrice) * 100 : 0;
                 const ptItem = ptItems.find((p) => p.id === it.budgetItemId);
                 return (
