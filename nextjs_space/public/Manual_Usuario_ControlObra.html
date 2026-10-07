@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manual de Usuario — ControlObra</title>
+<style>
+    /* ============================================================
+       ControlObra — Manual de Usuario
+       CSS embebido, sin dependencias externas.
+       Imprimible (Ctrl+P → Guardar como PDF desde el navegador).
+       ============================================================ */
+
+    :root {
+        --bg: #f7f8fa;
+        --surface: #ffffff;
+        --ink: #1d2433;
+        --ink-soft: #4b5568;
+        --muted: #6b7280;
+        --line: #e5e7eb;
+        --brand: #0f766e;
+        --brand-soft: #ccfbf1;
+        --accent: #2563eb;
+        --warn: #b45309;
+        --danger: #b91c1c;
+        --ok: #15803d;
+        --pill-bg: #eef2ff;
+        --pill-ink: #3730a3;
+        --shadow: 0 1px 3px rgba(15, 23, 42, .06), 0 4px 12px rgba(15, 23, 42, .04);
+    }
+
+    @media print {
+        :root { --bg: #ffffff; --surface: #ffffff; }
+        .no-print { display: none !important; }
+        body { background: #fff; }
+        .page { box-shadow: none; border: none; max-width: 100%; margin: 0; padding: 18mm; }
+        section { break-inside: avoid; }
+        h2 { break-before: page; }
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        font-size: 15px;
+        line-height: 1.55;
+    }
+
+    .page {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 32px 28px 96px;
+    }
+
+    header.cover {
+        background: linear-gradient(135deg, #0f766e 0%, #0e7490 100%);
+        color: white;
+        border-radius: 18px;
+        padding: 56px 40px;
+        box-shadow: var(--shadow);
+        margin-bottom: 28px;
+    }
+    header.cover h1 {
+        margin: 0 0 6px;
+        font-size: 40px;
+        letter-spacing: -0.5px;
+    }
+    header.cover .sub {
+        margin: 0;
+        opacity: .92;
+        font-size: 17px;
+    }
+    header.cover .meta {
+        margin-top: 22px;
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+        font-size: 13.5px;
+        opacity: .9;
+    }
+    header.cover .meta span {
+        background: rgba(255,255,255,.16);
+        padding: 4px 10px;
+        border-radius: 999px;
+    }
+
+    /* ---- TOC ---- */
+    .toc {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 22px 24px;
+        margin-bottom: 28px;
+        box-shadow: var(--shadow);
+    }
+    .toc h2 {
+        margin: 0 0 12px;
+        font-size: 18px;
+    }
+    .toc ol {
+        columns: 2;
+        column-gap: 32px;
+        padding-left: 20px;
+        margin: 0;
+    }
+    .toc li { margin-bottom: 4px; break-inside: avoid; }
+    .toc a { color: var(--accent); }
+
+    /* ---- Sections ---- */
+    section {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 28px 30px;
+        margin-bottom: 22px;
+        box-shadow: var(--shadow);
+        scroll-margin-top: 24px;
+    }
+    section h2 {
+        margin: 0 0 6px;
+        font-size: 26px;
+        color: var(--brand);
+        letter-spacing: -0.3px;
+    }
+    section h3 {
+        margin: 26px 0 8px;
+        font-size: 18.5px;
+        color: var(--ink);
+        border-left: 3px solid var(--brand);
+        padding-left: 12px;
+    }
+    section h4 {
+        margin: 20px 0 6px;
+        font-size: 15.5px;
+        color: var(--ink-soft);
+        text-transform: uppercase;
+        letter-spacing: .04em;
+    }
+    section p { margin: 6px 0 12px; }
+
+    /* ---- Pills / badges ---- */
+    .pill {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 999px;
+        font-size: 12.5px;
+        background: var(--pill-bg);
+        color: var(--pill-ink);
+        margin-right: 4px;
+    }
+    .pill.brand { background: var(--brand-soft); color: var(--brand); }
+    .pill.ok { background: #dcfce7; color: var(--ok); }
+    .pill.warn { background: #fef3c7; color: var(--warn); }
+    .pill.danger { background: #fee2e2; color: var(--danger); }
+    .pill.muted { background: #f3f4f6; color: var(--muted); }
+
+    /* ---- Tables ---- */
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 12px 0 18px;
+        font-size: 14px;
+    }
+    thead th {
+        background: #f1f5f9;
+        text-align: left;
+        padding: 9px 11px;
+        border-bottom: 2px solid var(--line);
+        font-weight: 600;
+    }
+    tbody td {
+        padding: 8px 11px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+    }
+    tbody tr:nth-child(odd) td { background: #fafbfc; }
+    th.col-center, td.col-center { text-align: center; }
+    td code, code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        background: #f1f5f9;
+        padding: 1px 6px;
+        border-radius: 5px;
+        font-size: 12.5px;
+    }
+
+    /* ---- Callouts ---- */
+    .callout {
+        border-left: 4px solid var(--brand);
+        background: #f0fdfa;
+        padding: 12px 16px;
+        border-radius: 6px;
+        margin: 14px 0;
+        font-size: 14.5px;
+    }
+    .callout.warn { border-left-color: var(--warn); background: #fffbeb; }
+    .callout.danger { border-left-color: var(--danger); background: #fef2f2; }
+    .callout.info { border-left-color: var(--accent); background: #eff6ff; }
+    .callout strong { display: block; margin-bottom: 4px; }
+
+    /* ---- Workflow diagram (ASCII) ---- */
+    .workflow {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        background: #0b1220;
+        color: #d6deeb;
+        padding: 18px 22px;
+        border-radius: 10px;
+        font-size: 13.5px;
+        line-height: 1.55;
+        overflow-x: auto;
+        white-space: pre;
+        margin: 14px 0;
+    }
+
+    /* ---- Field list ---- */
+    .fields {
+        display: grid;
+        grid-template-columns: 200px 1fr;
+        gap: 6px 18px;
+        margin: 10px 0 18px;
+    }
+    .fields dt { font-weight: 600; color: var(--ink-soft); }
+    .fields dd { margin: 0; }
+
+    /* ---- Layout helpers ---- */
+    .row { display: flex; flex-wrap: wrap; gap: 14px; }
+    .card {
+        flex: 1 1 220px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 16px;
+        background: #fafbfc;
+    }
+    .card h5 {
+        margin: 0 0 6px;
+        font-size: 14px;
+        color: var(--brand);
+    }
+    .card p { margin: 0; font-size: 13.5px; color: var(--ink-soft); }
+
+    /* ---- Print button ---- */
+    .actions {
+        position: fixed;
+        right: 24px;
+        bottom: 24px;
+        z-index: 10;
+    }
+    .actions button {
+        background: var(--brand);
+        color: white;
+        border: none;
+        border-radius: 999px;
+        padding: 12px 22px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: var(--shadow);
+    }
+    .actions button:hover { background: #115e59; }
+
+    footer {
+        text-align: center;
+        color: var(--muted);
+        font-size: 13px;
+        margin-top: 28px;
+        padding: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="page">
+
+<header class="cover">
+    <h1>Manual de Usuario — ControlObra</h1>
+    <p class="sub">Aplicativo administrativo para constructoras · Guía completa de módulos, roles, workflows y documentos</p>
+    <div class="meta">
+        <span>Versión 1.0</span>
+        <span>Octubre 2026</span>
+        <span>Plataforma web (Next.js + MySQL)</span>
+        <span>Multi-rol con OTP</span>
+    </div>
+</header>
+
+<!-- ================================================================
+     TABLA DE CONTENIDO
+     ================================================================ -->
+<nav class="toc">
+    <h2>Tabla de contenido</h2>
+    <ol>
+        <li><a href="#sec-1">1. Acceso y autenticación</a></li>
+        <li><a href="#sec-2">2. Roles y matriz de permisos</a></li>
+        <li><a href="#sec-3">3. Gestión de usuarios (alta y baja)</a></li>
+        <li><a href="#sec-4">4. Módulo de Ventas (Clientes, Cotizaciones, Pipeline)</a></li>
+        <li><a href="#sec-5">5. Módulo Técnico (Proyectos, Contratos, Presupuestos, Cortes, Gastos)</a></li>
+        <li><a href="#sec-6">6. Módulo Técnico — Bitácora y AIU</a></li>
+        <li><a href="#sec-7">7. Módulo de Pagos y Tesorería</a></li>
+        <li><a href="#sec-8">8. Módulo de Contabilidad</a></li>
+        <li><a href="#sec-9">9. Módulo de Empleados</a></li>
+        <li><a href="#sec-10">10. Módulo de Impuestos y Reportes financieros</a></li>
+        <li><a href="#sec-11">11. Flujo documental — Formatos generados</a></li>
+        <li><a href="#sec-12">12. Integración SharePoint</a></li>
+        <li><a href="#sec-13">13. Buenas prácticas y errores comunes</a></li>
+    </ol>
+</nav>
+
+<!-- ================================================================
+     1. ACCESO Y AUTENTICACIÓN
+     ================================================================ -->
+<section id="sec-1">
+    <h2>1. Acceso y autenticación</h2>
+    <p>ControlObra usa un esquema de <strong>autenticación en dos pasos con OTP por correo</strong>. Esto elimina contraseñas y protege el sistema contra accesos no autorizados, incluso si alguien conoce un email corporativo.</p>
+
+    <h3>1.1 Primer ingreso (activación)</h3>
+    <ol>
+        <li>Abre la URL de tu empresa: <code>https://controlobra.tuempresa.com</code></li>
+        <li>La raíz redirige automáticamente a <code>/login</code></li>
+        <li>Ingresa tu correo corporativo (Gmail/Workspace o SMTP del cliente).</li>
+        <li>Recibirás un código de 6 dígitos en tu bandeja — válido por 10 minutos.</li>
+        <li>Ingrésalo y accederás al dashboard del área que corresponde a tu rol.</li>
+    </ol>
+
+    <h3>1.2 Sesión y expiración</h3>
+    <ul>
+        <li>La sesión se guarda en una cookie firmada (<code>co_session</code>) con HMAC.</li>
+        <li>Duración: 8 horas de inactividad.</li>
+        <li>Los usuarios con rol <strong>ADMIN</strong> pueden revocar sesiones activas desde <em>Administrativo → Usuarios</em>.</li>
+        <li>Cerrar sesión: clic en tu avatar (esquina superior derecha) → <em>Cerrar sesión</em>.</li>
+    </ul>
+
+    <div class="callout info">
+        <strong>¿Olvidaste tu OTP?</strong>
+        Vuelve a la pantalla de login y solicita otro código. Los códigos anteriores quedan invalidados al pedir uno nuevo.
+    </div>
+
+    <h3>1.3 Áreas privadas y middleware</h3>
+    <p>Las tres áreas de la app están protegidas por un middleware que corre antes de cargar cualquier HTML:</p>
+    <table>
+        <thead><tr><th>URL</th><th>Área</th><th>Rol mínimo</th></tr></thead>
+        <tbody>
+            <tr><td><code>/ventas/*</code></td><td>Comercial y pipeline</td><td>RESIDENTE, DIRECTOR, GERENTE</td></tr>
+            <tr><td><code>/tecnico/*</code></td><td>Obra, presupuestos, cortes</td><td>RESIDENTE, DIRECTOR, GERENTE, HSEQ</td></tr>
+            <tr><td><code>/administrativo/*</code></td><td>Pagos, contabilidad, tesorería</td><td>TESORERIA, CONTABILIDAD, GERENTE, ADMIN</td></tr>
+            <tr><td><code>/api/*</code></td><td>Backend JSON</td><td>Validado por endpoint</td></tr>
+        </tbody>
+    </table>
+
+    <div class="callout warn">
+        <strong>Importante</strong>
+        Si navegas a un área sin permisos verás una pantalla en blanco o un error 403. No es un bug: la matriz de permisos bloquea el endpoint.
+    </div>
+</section>
+
+<!-- ================================================================
+     2. ROLES Y MATRIZ DE PERMISOS
+     ================================================================ -->
+<section id="sec-2">
+    <h2>2. Roles y matriz de permisos</h2>
+    <p>ControlObra maneja <strong>9 roles predefinidos</strong>. La matriz rol × recurso × acción es <em>deny-by-default</em>: lo que no esté explícitamente permitido está prohibido.</p>
+
+    <h3>2.1 Roles disponibles</h3>
+    <table>
+        <thead><tr><th>Rol</th><th>Descripción breve</th><th>Área principal</th></tr></thead>
+        <tbody>
+            <tr><td><span class="pill brand">ADMIN</span></td><td>Acceso total. Único que puede crear usuarios, revocar sesiones y aprobar cortes.</td><td>Todas</td></tr>
+            <tr><td><span class="pill">GERENTE</span></td><td>Aprobación final de pagos (L2), rechazo de cortes, vista global.</td><td>Administrativo + Técnico</td></tr>
+            <tr><td><span class="pill">DIRECTOR</span></td><td>Validación de cortes, aprobación L1 de pagos, gestión de contratos.</td><td>Técnico + Administrativo</td></tr>
+            <tr><td><span class="pill">RESIDENTE</span></td><td>Crea proyectos, presupuestos, cortes, gastos. Ejecuta la obra día a día.</td><td>Técnico + Ventas</td></tr>
+            <tr><td><span class="pill">CONTABILIDAD</span></td><td>Cuentas, ingresos, gastos contables, empleados, impuestos.</td><td>Administrativo</td></tr>
+            <tr><td><span class="pill">TESORERIA</span></td><td>Paga solicitudes aprobadas, cancela pagos, ve proyectos.</td><td>Administrativo</td></tr>
+            <tr><td><span class="pill">HSEQ</span></td><td>Bitácora de obra, gestión de personal (solo lectura de pagos).</td><td>Técnico</td></tr>
+            <tr><td><span class="pill muted">CLIENTE</span></td><td>Sin permisos por defecto. Reservado para futuro portal de clientes.</td><td>—</td></tr>
+            <tr><td><span class="pill muted">USER</span></td><td>Sin permisos por defecto. Placeholder; no usar en producción.</td><td>—</td></tr>
+        </tbody>
+    </table>
+
+    <h3>2.2 Matriz resumida de acciones críticas</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Acción</th>
+                <th class="col-center">ADMIN</th>
+                <th class="col-center">GERENTE</th>
+                <th class="col-center">DIRECTOR</th>
+                <th class="col-center">RESIDENTE</th>
+                <th class="col-center">CONTAB.</th>
+                <th class="col-center">TESORERIA</th>
+                <th class="col-center">HSEQ</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td>Crear usuarios</td><td class="col-center">✅</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">❌</td></tr>
+            <tr><td>Crear proyectos</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">❌</td></tr>
+            <tr><td>Crear cortes</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">❌</td></tr>
+            <tr><td>Validar corte</td><td class="col-center">✅</td><td class="col-center">❌</td><td class="col-center">✅</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">❌</td></tr>
+            <tr><td>Aprobar corte</td><td class="col-center">✅</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">❌</td></tr>
+            <tr><td>Crear solicitudes de pago</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">❌</td></tr>
+            <tr><td>Aprobar pago L1</td><td class="col-center">✅</td><td class="col-center">❌</td><td class="col-center">✅</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">❌</td></tr>
+            <tr><td>Aprobar pago L2</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">❌</td></tr>
+            <tr><td>Pagar (marcar PAID)</td><td class="col-center">✅</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">✅</td><td class="col-center">❌</td></tr>
+            <tr><td>Cancelar pago</td><td class="col-center">✅</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">✅</td><td class="col-center">❌</td></tr>
+            <tr><td>Rechazar pago</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">❌</td></tr>
+            <tr><td>Crear cotizaciones</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">❌</td></tr>
+            <tr><td>Mover cliente de etapa</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">✅</td></tr>
+            <tr><td>Crear cuenta contable</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">❌</td></tr>
+            <tr><td>Registrar ingreso/gasto</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">❌</td><td class="col-center">❌</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">❌</td></tr>
+            <tr><td>Generar documentos (OC/OS/etc.)</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">❌</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">✅</td><td class="col-center">✅</td></tr>
+        </tbody>
+    </table>
+
+    <div class="callout">
+        <strong>Separación de funciones (SoD)</strong>
+        Un usuario <strong>no puede aprobar una solicitud que él mismo creó</strong>. Esto se valida en <code>evaluatePaymentAction</code> y <code>evaluateCutAction</code>. Si necesitas aprobar un pago tuyo, debe hacerlo otra persona con el rol correspondiente.
+    </div>
+</section>
+
+<!-- ================================================================
+     3. GESTIÓN DE USUARIOS
+     ================================================================ -->
+<section id="sec-3">
+    <h2>3. Gestión de usuarios (alta y baja)</h2>
+    <p>Solo <span class="pill brand">ADMIN</span> puede crear, editar o desactivar usuarios. El flujo se hace desde <em>Administrativo → Usuarios</em>.</p>
+
+    <h3>3.1 Alta de un usuario nuevo</h3>
+    <ol>
+        <li>Ve a <code>/administrativo/usuarios</code>.</li>
+        <li>Clic en <em>Nuevo usuario</em>.</li>
+        <li>Completa el formulario:
+            <dl class="fields">
+                <dt>Email</dt><dd>Correo corporativo. Será su login. Único en el sistema.</dd>
+                <dt>Nombre completo</dt><dd>Como aparecerá en auditoría y documentos generados.</dd>
+                <dt>Rol</dt><dd>Uno de los 7 activos (ver sección 2).</dd>
+                <dt>Estado inicial</dt><dd>Recomendado: <code>ACTIVE</code>.</dd>
+                <dt>Notas (opcional)</dt><dd>Para futuras referencias internas.</dd>
+            </dl>
+        </li>
+        <li>Clic en <em>Guardar</em>.</li>
+        <li>El sistema enviará un correo automático con instrucciones de primer ingreso.</li>
+    </ol>
+
+    <h3>3.2 ¿Qué debe incluir cada usuario adicional?</h3>
+    <p>El alta del usuario es liviana: <strong>email + nombre + estado</strong>. No se asigna contraseña. La primera vez que el usuario ingresa, solicita OTP por email y queda activo automáticamente.</p>
+
+    <div class="callout info">
+        <strong>Tip de seguridad</strong>
+        Verifica que el email del nuevo usuario sea el corporativo antes de crearlo. Una vez creado, el sistema no permite cambiar el email — solo dar de baja y crear uno nuevo.
+    </div>
+
+    <h3>3.3 Cambio de rol</h3>
+    <p>Si necesitas ascender o cambiar de área a un usuario:</p>
+    <ol>
+        <li>Busca al usuario en <code>/administrativo/usuarios</code>.</li>
+        <li>Clic en el ícono de lápiz → cambia el <em>Rol</em>.</li>
+        <li>Guarda.</li>
+        <li>El cambio aplica de inmediato en su próxima acción; no requiere re-login.</li>
+    </ol>
+
+    <h3>3.4 Desactivación (baja lógica)</h3>
+    <p>Por seguridad y trazabilidad, ControlObra hace <strong>baja lógica</strong>: nunca se elimina el registro. Esto preserva el historial de quién creó cada documento, corte o pago.</p>
+    <ol>
+        <li>Edita al usuario.</li>
+        <li>Cambia el estado a <code>SUSPENDED</code> o <code>INACTIVE</code>.</li>
+        <li>Guarda.</li>
+    </ol>
+    <p>El usuario bloqueado:</p>
+    <ul>
+        <li>No puede iniciar sesión (recibe 401).</li>
+        <li>Su historial queda intacto en la BD.</li>
+        <li>No aparece en selectores de "Asignado a" ni "Aprobado por".</li>
+    </ul>
+
+    <h3>3.5 Revocar sesiones activas</h3>
+    <p>Si un usuario perdió su laptop o hubo compromiso de credenciales:</p>
+    <ol>
+        <li>Ve a <em>Usuarios → [usuario específico] → Sesiones activas</em>.</li>
+        <li>Clic en <em>Revocar todas</em>.</li>
+        <li>Todas las cookies <code>co_session</code> del usuario quedan inválidas en la siguiente petición.</li>
+    </ol>
+</section>
+
+<!-- ================================================================
+     4. VENTAS
+     ================================================================ -->
+<section id="sec-4">
+    <h2>4. Módulo de Ventas (Clientes, Cotizaciones, Pipeline)</h2>
+    <p>El módulo comercial vive bajo <code>/ventas</code>. Está pensado para que un <span class="pill">RESIDENTE</span> o <span class="pill">DIRECTOR</span> gestione el ciclo de venta: contacto inicial → cotización → cierre → activación del proyecto.</p>
+
+    <h3>4.1 Clientes</h3>
+    <p>Ruta: <code>/ventas/clientes</code></p>
+    <p>Listado con filtros por etapa, fuente, ciudad, responsable. Cada cliente tiene una <strong>etapa en el pipeline</strong> que controla qué acciones están disponibles.</p>
+
+    <h4>Etapas del cliente (workflow)</h4>
+    <div class="workflow">
+LEAD ─→ QUALIFIED ─→ PROPOSAL ─→ WON ─→ ACTIVE
+                              └─→ LOST
+    </div>
+
+    <dl class="fields">
+        <dt>LEAD</dt><dd>Primer contacto. Solo se almacena información básica.</dd>
+        <dt>QUALIFIED</dt><dd>Se verificó interés y datos del cliente. Listo para cotizar.</dd>
+        <dt>PROPOSAL</dt><dd>Se envió cotización al cliente. Esperando respuesta.</dd>
+        <dt>WON</dt><dd>Cotización aceptada. Se convierte automáticamente a proyecto.</dd>
+        <dt>LOST</dt><dd>Cotización rechazada o cliente perdido. Estado terminal.</dd>
+        <dt>ACTIVE</dt><dd>Cliente con proyectos en ejecución.</dd>
+    </dl>
+
+    <h4>Acciones disponibles por etapa</h4>
+    <table>
+        <thead><tr><th>Etapa actual</th><th>Puede pasar a</th><th>Roles habilitados</th></tr></thead>
+        <tbody>
+            <tr><td>LEAD</td><td>QUALIFIED, LOST</td><td>ADMIN, GERENTE, DIRECTOR, RESIDENTE, HSEQ</td></tr>
+            <tr><td>QUALIFIED</td><td>PROPOSAL, LOST</td><td>ADMIN, GERENTE, DIRECTOR, RESIDENTE, HSEQ</td></tr>
+            <tr><td>PROPOSAL</td><td>WON, LOST</td><td>ADMIN, GERENTE, DIRECTOR, RESIDENTE, HSEQ</td></tr>
+            <tr><td>WON</td><td>ACTIVE</td><td>Sistema (al iniciar obra)</td></tr>
+            <tr><td>LOST</td><td>—</td><td>Estado terminal</td></tr>
+        </tbody>
+    </table>
+
+    <h4>Campos del formulario de cliente</h4>
+    <dl class="fields">
+        <dt>Razón social / Nombre</dt><dd>Como aparece en RUTX / cédula.</dd>
+        <dt>NIT / Cédula</dt><dd>Único. El sistema valida duplicados.</dd>
+        <dt>Email principal</dt><dd>Para envío de cotizaciones.</dd>
+        <dt>Teléfono</dt><dd>Incluir indicativo.</dd>
+        <dt>Dirección</dt><dd>Para correspondencia y contratos.</dd>
+        <dt>Ciudad / Departamento</dt><dd>Para agrupación de informes.</dd>
+        <dt>Responsable</dt><dd>Quién gestiona la relación comercial.</dd>
+        <dt>Fuente</dt><dd>Cómo llegó al negocio (referido, web, etc.).</dd>
+    </dl>
+
+    <div class="callout info">
+        <strong>Auditoría</strong>
+        Cada cambio de etapa queda registrado en <code>client_stage_history</code> con: usuario que cambió, etapa anterior, etapa nueva, motivo (obligatorio para LOST).
+    </div>
+
+    <h3>4.2 Cotizaciones</h3>
+    <p>Ruta: <code>/ventas/cotizaciones</code></p>
+    <p>Una cotización es una propuesta económica formal con: ítems (descripción, cantidad, valor unitario), descuento, IVA y totales. El servidor <strong>recalcula todos los totales en cada guardado</strong> para evitar que el navegador altere valores.</p>
+
+    <h4>Workflow de cotizaciones</h4>
+    <div class="workflow">
+                  SENT ─→ VIEWED ─→ ACCEPTED ─→ (crea proyecto)
+                    │       │       │
+                    │       │       REJECTED  (terminal)
+                    │       │
+                CANCELLED (terminal)
+                                  EXPIRED (cron job automático)
+    </div>
+
+    <h4>Estructura de una cotización</h4>
+    <table>
+        <thead><tr><th>Sección</th><th>Campos</th></tr></thead>
+        <tbody>
+            <tr><td>Encabezado</td><td>Número automático (COT-####), cliente, fecha, válida hasta, responsable.</td></tr>
+            <tr><td>Items</td><td>Descripción, unidad, cantidad, valor unitario. Total por línea = cant × valor.</td></tr>
+            <tr><td>Descuento</td><td>% global (0–100). Se calcula antes del IVA.</td></tr>
+            <tr><td>IVA</td><td>% (típicamente 19% en Colombia).</td></tr>
+            <tr><td>Totales</td><td>Subtotal → descuento → base → IVA → total. Recalculados por el servidor.</td></tr>
+            <tr><td>Notas</td><td>Condiciones comerciales, plazo de entrega, forma de pago.</td></tr>
+        </tbody>
+    </table>
+
+    <h3>4.3 Pipeline</h3>
+    <p>Ruta: <code>/ventas/pipeline</code></p>
+    <p>Vista Kanban con tarjetas por etapa. Cada tarjeta muestra: nombre del cliente, monto de la cotización, días en la etapa, responsable. Las conversiones comerciales se calculan como <code>WON / (WON + LOST)</code>.</p>
+
+    <div class="row">
+        <div class="card">
+            <h5>¿Quién puede mover etapas?</h5>
+            <p>ADMIN, GERENTE, DIRECTOR, RESIDENTE, HSEQ. CONTABILIDAD y TESORERIA solo pueden ver.</p>
+        </div>
+        <div class="card">
+            <h5>Conversión automática</h5>
+            <p>Al pasar a WON, el sistema crea el proyecto inicial y deja al cliente en estado ACTIVE.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ================================================================
+     5. TÉCNICO (proyectos, contratos, presupuestos, cortes, gastos)
+     ================================================================ -->
+<section id="sec-5">
+    <h2>5. Módulo Técnico (Proyectos, Contratos, Presupuestos, Cortes, Gastos)</h2>
+    <p>Es el corazón operativo de la constructora. Aquí se crea el presupuesto, se ejecuta la obra y se miden los cortes.</p>
+
+    <h3>5.1 Proyectos</h3>
+    <p>Ruta: <code>/tecnico/proyectos</code></p>
+    <p>Un proyecto agrupa toda la información económica y operativa de una obra: presupuesto base, AIU, cortes de obra, contratos, gastos, cortes y bitácora.</p>
+
+    <h4>Estados de un proyecto</h4>
+    <div class="workflow">
+PLANNING ─→ ACTIVE ─→ PAUSED ─→ ACTIVE ─→ CLOSING ─→ CLOSED
+                                ─→ CANCELLED (terminal)
+    </div>
+
+    <h4>Campos de un proyecto</h4>
+    <dl class="fields">
+        <dt>Código</dt><dd>Único. Típicamente <code>P###</code> o <code>CLIENTE-####</code>.</dd>
+        <dt>Nombre</dt><dd>Descriptivo. Ej: "Edificio Ágbu - Torre 1".</dd>
+        <dt>Cliente</dt><dd>Seleccionado del módulo de Ventas.</dd>
+        <dt>Fecha inicio / fin estimada</dt><dd>Para cálculo de avance.</dd>
+        <dt>Responsable</dt><dd>Residente asignado (puede cambiar).</dd>
+        <dt>Dirección de obra</dt><dd>Ubicación física.</dd>
+        <dt>AIU</dt><dd>% de Administración, % Imprevistos, % Utilidad. Ver sección 5.3.</dd>
+        <dt>Presupuesto base</dt><dd>Total en moneda local.</dd>
+        <dt>Estado</dt><dd>PLANNING, ACTIVE, PAUSED, CLOSING, CLOSED, CANCELLED.</dd>
+    </dl>
+
+    <div class="callout warn">
+        <strong>Soft delete</strong>
+        Los proyectos no se borran físicamente. Al eliminarlos pasan a <code>deleted_at</code> con fecha y usuario. Se mantienen en BD por integridad referencial de cortes/pagos.
+    </div>
+
+    <h3>5.2 Contratos</h3>
+    <p>Ruta: <code>/tecnico/contratos</code></p>
+    <p>Cada proyecto puede tener varios contratos (uno por proveedor/contratista). El contrato es el acuerdo legal para ejecutar una parte de la obra.</p>
+
+    <h4>Tipos de contrato</h4>
+    <ul>
+        <li><strong>OBRA</strong> — Contratista ejecuta obra específica. Tiene <em>pricingMode</em>:
+            - <code>LUMP_SUM</code> → Precio global fijo → formato <code>CONT_GLOBAL</code>
+            - <code>UNIT_PRICE</code> → Precios unitarios por ítem → formato <code>CONT_UNITARIO</code>
+        </li>
+        <li><strong>DISENOS</strong> — Diseño y planos → formato <code>CONT_DISENOS</code></li>
+        <li><strong>LABORAL</strong> — Contrato con empleado → formato <code>CONT_LABORAL</code></li>
+    </ul>
+
+    <h4>Campos de un contrato</h4>
+    <dl class="fields">
+        <dt>Número</dt><dd>Automático (CON-####) según proyecto.</dd>
+        <dt>Proyecto</dt><dd>Relación obligatoria.</dd>
+        <dt>Contratista / Empleado</dt><dd>Relación con tabla de proveedores o empleados.</dd>
+        <dt>Tipo</dt><dd>OBRA / DISENOS / LABORAL.</dd>
+        <dt>Modo de precio (OBRA)</dt><dd>LUMP_SUM / UNIT_PRICE / COST_PLUS.</dd>
+        <dt>Valor total</dt><dd>Negociado. Para UNIT_PRICE es suma de ítems.</dd>
+        <dt>Fecha inicio / fin</dt><dd>Plazo contractual.</dd>
+        <dt>Garantía</dt><dd>% de cumplimiento (típico 5–10%).</dd>
+        <dt>Forma de pago</dt><dd>Anticipo + cortes / mensual / hitos.</dd>
+        <dt>Pólizas</dt><dd>Si aplica, número y fecha de vencimiento.</dd>
+    </dl>
+
+    <h3>5.3 Presupuestos y AIU</h3>
+    <p>Ruta: <code>/tecnico/presupuestos</code> y <code>/tecnico/aiu</code></p>
+    <p>El presupuesto es el desglose por capítulos, subcapítulos e ítems. La estructura AIU (Administración, Imprevistos, Utilidad) se aplica sobre el costo directo.</p>
+
+    <h4>Estructura del presupuesto</h4>
+    <div class="workflow">
+Capítulo  (ej: "01 - Preliminares")
+  └── Subcapítulo (ej: "01.01 - Descapote")
+        └── Ítem (descripción, unidad, cantidad, valor unit.)
+              └── Total ítem = cant × valor
+    </div>
+
+    <h4>Capa AIU</h4>
+    <table>
+        <thead><tr><th>Componente</th><th>% típico</th><th>Descripción</th></tr></thead>
+        <tbody>
+            <tr><td>Administración (A)</td><td>8–12%</td><td>Gastos generales del contratista.</td></tr>
+            <tr><td>Imprevistos (I)</td><td>2–5%</td><td>Reserva para riesgos.</td></tr>
+            <tr><td>Utilidad (U)</td><td>5–10%</td><td>Margen del contratista.</td></tr>
+        </tbody>
+    </table>
+
+    <p><strong>Total presupuesto = Costo directo × (1 + A% + I% + U%)</strong></p>
+
+    <div class="callout warn">
+        <strong>Persistencia</strong>
+        Los porcentajes de AIU son editables por capítulo/subcapítulo. El servidor recalcula automáticamente el costo total al guardar.
+    </div>
+
+    <h4>Control de cambios (CC)</h4>
+    <p>Cualquier modificación al presupuesto aprobado genera un <strong>cambio controlado</strong> con número <code>CC-###</code>.</p>
+    <ul>
+        <li><strong>CC-001</strong>: ajuste de cantidades sin cambio de ítem.</li>
+        <li><strong>CC-002</strong>: cambio de valor unitario (requiere justificación).</li>
+        <li><strong>CC-003</strong>: ítem nuevo no previsto (requiere aprobación GERENTE).</li>
+        <li><strong>CC-004</strong>: eliminación de ítem (requiere justificación).</li>
+    </ul>
+
+    <h3>5.5 Cortes de obra</h3>
+    <p>Ruta: <code>/tecnico/cortes</code></p>
+    <p>Un corte es la medición periódica del avance de obra (típicamente mensual o quincenal). Es el documento base para pagar al contratista.</p>
+
+    <h4>Workflow de cortes</h4>
+    <div class="workflow">
+DRAFT ──submit──→ SUBMITTED ──validate──→ VALIDATED ──approve──→ APPROVED
+  ↑                  │                       │
+  │                  reject                  reject
+  └──────REJECTED ←──┴───────────────────────┘
+                          │
+                          resubmit
+                          ↓
+                       SUBMITTED
+                                ↓ (al pagar la solicitud)
+                              PAID
+    </div>
+
+    <h4>Acciones por rol</h4>
+    <table>
+        <thead><tr><th>Acción</th><th>Roles permitidos</th><th>De estado</th><th>A estado</th></tr></thead>
+        <tbody>
+            <tr><td>SUBMIT</td><td>RESIDENTE, DIRECTOR, ADMIN</td><td>DRAFT o REJECTED</td><td>SUBMITTED</td></tr>
+            <tr><td>VALIDATE</td><td>DIRECTOR, ADMIN</td><td>SUBMITTED</td><td>VALIDATED</td></tr>
+            <tr><td>APPROVE</td><td>ADMIN</td><td>VALIDATED</td><td>APPROVED</td></tr>
+            <tr><td>REJECT</td><td>ADMIN, DIRECTOR, GERENTE</td><td>SUBMITTED o VALIDATED</td><td>REJECTED</td></tr>
+            <tr><td>PAY</td><td>(deshabilitado — ver 7)</td><td>—</td><td>—</td></tr>
+        </tbody>
+    </table>
+
+    <h4>Campos del corte</h4>
+    <dl class="fields">
+        <dt>Proyecto</dt><dd>Obligatorio.</dd>
+        <dt>Contrato</dt><dd>Filtrado por proyecto.</dd>
+        <dt>Periodo</dt><dd>Mes/año del corte (YYYY-MM).</dd>
+        <dt>Items ejecutados</dt><dd>Selección de ítems del presupuesto con cantidad ejecutada en el periodo y valor.</dd>
+        <dt>Anticipo amortizado</dt><dd>Calculado automáticamente (ver lib/advances.ts).</dd>
+        <dt>Retención</dt><dd>% de retención en garantía.</dd>
+        <dt>Valor bruto</dt><dd>Suma de items.</dd>
+        <dt>Valor neto</dt><dd>Bruto - retención - anticipo.</dd>
+        <dt>Solicitud de pago asociada</dt><dd>Se genera al aprobar.</dd>
+    </dl>
+
+    <h3>5.6 Gastos</h3>
+    <p>Ruta: <code>/tecnico/gastos</code></p>
+    <p>Gastos menores o legalizaciones contra un proyecto. Tipos:</p>
+    <ul>
+        <li><strong>COMPRA</strong> → genera Orden de Compra (OC).</li>
+        <li><strong>SERVICIO</strong> → genera Orden de Servicio (OS).</li>
+        <li><strong>LEGALIZACION</strong> → genera formato LEG.</li>
+        <li><strong>SOLICITUD_RECURSO</strong> → genera AD-0033 (anticipo).</li>
+    </ul>
+</section>
+
+<!-- ================================================================
+     6. BITÁCORA Y AIU
+     ================================================================ -->
+<section id="sec-6">
+    <h2>6. Módulo Técnico — Bitácora y AIU</h2>
+
+    <h3>6.1 Bitácora de obra</h3>
+    <p>Ruta: <code>/tecnico/bitacora</code></p>
+    <p>Registro diario de novedades en obra: clima, personal, accidentes, avances, visitantes, etc. Cada entrada la firma el residente y queda con <code>created_by</code> del usuario autenticado.</p>
+
+    <h4>Tipos de entrada</h4>
+    <table>
+        <thead><tr><th>Tipo</th><th>Descripción</th><th>Genera documento</th></tr></thead>
+        <tbody>
+            <tr><td>NORMAL</td><td>Avance normal del día.</td><td>No</td></tr>
+            <tr><td>AUSENCIA</td><td>Ausencia de personal. Se puede convertir en PDF.</td><td><span class="pill brand">AUSENCIA</span></td></tr>
+            <tr><td>INCIDENTE</td><td>Accidente, daño, disputa.</td><td>No</td></tr>
+            <tr><td>VISITA</td><td>Visita de cliente, interventoría, proveedor.</td><td>No</td></tr>
+        </tbody>
+    </table>
+
+    <h3>6.2 AIU</h3>
+    <p>Ruta: <code>/tecnico/aiu</code></p>
+    <p>Pantalla para gestionar las configuraciones AIU por proyecto y por capítulo. Permite comparar AIU planeado vs AIU real por capítulo.</p>
+</section>
+
+<!-- ================================================================
+     7. PAGOS Y TESORERÍA
+     ================================================================ -->
+<section id="sec-7">
+    <h2>7. Módulo de Pagos y Tesorería</h2>
+    <p>Es el corazón financiero del sistema. Una solicitud de pago pasa por <strong>2 niveles de aprobación</strong> (o 1 si el monto es bajo) antes de ser pagada por tesorería.</p>
+
+    <h3>7.1 Crear una solicitud de pago</h3>
+    <p>Ruta: <code>/administrativo/pagos</code></p>
+    <p>Cualquier rol con <em>payments:create</em> puede crear solicitudes (no HSEQ).</p>
+
+    <h4>Campos de la solicitud</h4>
+    <dl class="fields">
+        <dt>Tipo</dt><dd>ANTICIPO, LEGALIZACION, PAGO_FINAL, NOMINA, OTROS.</dd>
+        <dt>Proyecto</dt><dd>Si aplica.</dd>
+        <dt>Monto</dt><dd>En moneda local. El servidor valida el formato.</dd>
+        <dt>Beneficiario</dt><dd>Nombre y NIT/CC.</dd>
+        <dt>Banco y cuenta</dt><dd>Para pago. Se enmascara al mostrar a roles no-tesorería.</dd>
+        <dt>Justificación</dt><dd>Mínimo 30 caracteres.</dd>
+        <dt>Adjuntos</dt><dd>Opcional. Facturas, recibos.</dd>
+        <dt>Nivel de aprobación</dt><dd>1 (bajo monto) o 2 (estándar). Definido por ADMIN o GERENTE.</dd>
+    </dl>
+
+    <h3>7.2 Workflow de pagos</h3>
+    <div class="workflow">
+                       ┌─ APPROVE_L1 ─→ APPROVED_LEVEL_1 ─→ APPROVE_L2 ─→ APPROVED_LEVEL_2
+                       │                                                     ↓
+PENDING ──REJECT─────→REJECTED  (terminal)                              APPROVE_L2 (L2 only)
+   │                                                                  ↓
+   │  REJECT    CANCEL                                            APPROVED
+   └─→REJECTED  CANCELLED                                              ↓
+                                                                   PAY (Tesorería)
+                                                                       ↓
+                                                                   PAID (terminal)
+    </div>
+
+    <h4>Reglas clave</h4>
+    <ul>
+        <li><strong>Si <code>requiredApprovalLevel === 1</code></strong>, una sola aprobación lleva directo a <code>APPROVED</code>.</li>
+        <li><strong>Si <code>requiredApprovalLevel === 2</code></strong>, se requieren L1 + L2.</li>
+        <li><strong>REJECTED</strong> y <strong>PAID</strong> son terminales.</li>
+        <li><strong>PAY</strong> requiere <code>paymentReference</code> + <code>paymentMethod</code>.</li>
+        <li><strong>CANCEL</strong>: solo TESORERIA o ADMIN.</li>
+        <li><strong>Separación de funciones (SoD)</strong>: no puedes aprobar un pago que tú mismo creaste.</li>
+    </ul>
+
+    <h3>7.3 Roles y acciones</h3>
+    <table>
+        <thead><tr><th>Acción</th><th>Roles permitidos</th></tr></thead>
+        <tbody>
+            <tr><td>APPROVE_L1</td><td>DIRECTOR, ADMIN</td></tr>
+            <tr><td>APPROVE_L2</td><td>GERENTE, ADMIN</td></tr>
+            <tr><td>PAY</td><td>TESORERIA, ADMIN</td></tr>
+            <tr><td>REJECT</td><td>DIRECTOR, GERENTE, ADMIN</td></tr>
+            <tr><td>CANCEL</td><td>TESORERIA, ADMIN</td></tr>
+        </tbody>
+    </table>
+
+    <h3>7.4 Formato generado</h3>
+    <p>Solo las solicitudes <strong>ANTICIPO</strong> generan el formato <code>AD-0033</code> automáticamente al aprobarse. Los demás tipos se imprimen en pantalla.</p>
+
+    <h3>7.5 Reenvío de solicitudes rechazadas</h3>
+    <p>Si una solicitud fue <code>REJECTED</code>, puedes <strong>duplicarla como nueva</strong>:</p>
+    <ol>
+        <li>Abre la solicitud rechazada.</li>
+        <li>Clic en <em>Duplicar como nueva</em> (visible solo cuando status es REJECTED).</li>
+        <li>El sistema abre un formulario pre-rellenado con los datos originales + el motivo del rechazo en <em>description</em>.</li>
+        <li>Editas lo necesario, guardas y vuelves a <em>Submit</em>.</li>
+    </ol>
+    <p>La nueva solicitud queda vinculada a la original vía <code>replaces_request_id</code>.</p>
+</section>
+
+<!-- ================================================================
+     8. CONTABILIDAD
+     ================================================================ -->
+<section id="sec-8">
+    <h2>8. Módulo de Contabilidad</h2>
+    <p>Es el módulo que consolida ingresos, gastos, cuentas contables, impuestos y metas. Lo manejan principalmente <span class="pill">CONTABILIDAD</span> y <span class="pill">TESORERIA</span>.</p>
+
+    <h3>8.1 Plan de cuentas</h3>
+    <p>Ruta: <code>/administrativo/contabilidad</code> → Cuentas</p>
+    <p>Catálogo jerárquico de cuentas contables: ACTIVO, PASIVO, PATRIMONIO, INGRESO, GASTO, COSTO.</p>
+
+    <h4>Estructura de una cuenta</h4>
+    <dl class="fields">
+        <dt>Código</dt><dd>PUC colombiano. Típicamente 4–10 dígitos.</dd>
+        <dt>Nombre</dt><dd>Descriptivo. Ej: "Caja General".</dd>
+        <dt>Tipo</dt><dd>ACTIVO, PASIVO, PATRIMONIO, INGRESO, GASTO, COSTO.</dd>
+        <dt>Naturaleza</dt><dd>DÉBITO o CRÉDITO.</dd>
+        <dt>Cuenta padre</dt><dd>Para subcuentas (jerarquía).</dd>
+        <dt>Nivel</dt><dd>1 = grupo, 2 = cuenta, 3 = subcuenta.</dd>
+    </dl>
+
+    <h3>8.2 Ingresos</h3>
+    <p>Ruta: <code>/administrativo/contabilidad</code> → Ingresos</p>
+    <p>Registro de ingresos contra una cuenta. Origen automático cuando se <strong>PAI</strong> una solicitud de pago tipo <code>ANTICIPO</code> revertido, o cuando se cierra un proyecto.</p>
+
+    <h3>8.3 Gastos</h3>
+    <p>Ruta: <code>/administrativo/contabilidad</code> → Gastos</p>
+    <p>Registro manual de gastos contra cuenta. Cada gasto puede tener un comprobante PDF/DOCX adjunto que se sube a SharePoint.</p>
+
+    <h3>8.4 Impuestos</h3>
+    <p>Ruta: <code>/administrativo/impuestos</code></p>
+    <p>Tabla de tarifas tributarias (IVA, ICA, Retención en la fuente, etc.) configurable por año y tipo. Se usa para recálculos automáticos.</p>
+
+    <h3>8.5 Metas financieras</h3>
+    <p>Ruta: <code>/administrativo/contabilidad</code> → Metas</p>
+    <p>KPIs anuales: margen objetivo, ratio de gastos, ingresos por proyecto. El dashboard compara real vs meta.</p>
+</section>
+
+<!-- ================================================================
+     9. EMPLEADOS
+     ================================================================ -->
+<section id="sec-9">
+    <h2>9. Módulo de Empleados</h2>
+    <p>Ruta: <code>/administrativo/empleados</code></p>
+    <p>Gestión de personal contratado (vinculación laboral). Cada empleado genera automáticamente un <strong>contrato laboral</strong> en formato <code>CONT_LABORAL</code>.</p>
+
+    <h3>9.1 Datos del empleado</h3>
+    <dl class="fields">
+        <dt>Nombre completo</dt><dd>Como aparece en cédula.</dd>
+        <dt>Cédula</dt><dd>Única.</dd>
+        <dt>Fecha de nacimiento</dt><dd>Para cálculo de pensiones.</dd>
+        <dt>Fecha de ingreso</dt><dd>Inicio del contrato.</dd>
+        <dt>Cargo</dt><dd>Residente, maestro de obra, etc.</dd>
+        <dt>Salario base</dt><dd>Mensual.</dd>
+        <dt>Tipo de contrato</dt><dd>Indefinido, fijo, obra o labor.</dd>
+        <dt>EPS, ARL, Caja de compensación</dt><dd>Afiliaciones.</dd>
+        <dt>Cuenta de nómina</dt><dd>Para pago. Se enmascara al mostrar.</dd>
+        <dt>Estado</dt><td>ACTIVE, SUSPENDED, TERMINATED.</dd>
+    </dl>
+
+    <h3>9.2 Ausencias</h3>
+    <p>Cualquier ausencia (enfermedad, permiso, calamidad) se registra desde <em>Bitácora</em> con tipo <code>AUSENCIA</code>. Al guardar genera PDF <code>AUSENCIA</code>.</p>
+</section>
+
+<!-- ================================================================
+     10. REPORTES
+     ================================================================ -->
+<section id="sec-10">
+    <h2>10. Módulo de Impuestos y Reportes financieros</h2>
+
+    <h3>10.1 Reporte financiero</h3>
+    <p>Ruta: <code>/administrativo/reportes/financiero</code></p>
+    <p>Resumen ejecutivo: ingresos vs gastos por proyecto, mes, categoría. Exportable a XLSX.</p>
+
+    <h3>10.2 Dashboard</h3>
+    <p>Ruta raíz del área autenticada</p>
+    <ul>
+        <li>KPIs principales: obras activas, cobros pendientes, ingresos del mes.</li>
+        <li>Pipeline visual con conversión comercial.</li>
+        <li>Top 5 contratistas por monto ejecutado.</li>
+    </ul>
+</section>
+
+<!-- ================================================================
+     11. FLUJO DOCUMENTAL
+     ================================================================ -->
+<section id="sec-11">
+    <h2>11. Flujo documental — Formatos generados</h2>
+    <p>ControlObra genera documentos oficiales en formato Office Open XML (.xlsx, .docx) y PDF. Cada documento se sube automáticamente a SharePoint (ver sección 12).</p>
+
+    <h3>11.1 Catálogo de formatos</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Plantilla</th>
+                <th>Descripción</th>
+                <th>Cuándo se genera</th>
+                <th>Formato</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><span class="pill brand">AD-0033</span></td>
+                <td>Solicitud de anticipo</td>
+                <td>Al aprobar un pago tipo ANTICIPO o gasto SOLICITUD_RECURSO</td>
+                <td>.xlsx</td>
+            </tr>
+            <tr>
+                <td><span class="pill brand">LEG</span></td>
+                <td>Legalización de gastos / reintegro</td>
+                <td>Al aprobar gasto LEGALIZACION_GASTO o SOLICITUD_REINTEGRO</td>
+                <td>.xlsx</td>
+            </tr>
+            <tr>
+                <td><span class="pill brand">OC</span></td>
+                <td>Orden de compra</td>
+                <td>Al aprobar gasto ORDEN_COMPRA_POLIZAS o _SIN_POLIZAS</td>
+                <td>.xlsx</td>
+            </tr>
+            <tr>
+                <td><span class="pill brand">OS</span></td>
+                <td>Orden de servicio</td>
+                <td>Al aprobar gasto ORDEN_SERVICIO_POLIZAS o _SIN_POLIZAS</td>
+                <td>.xlsx</td>
+            </tr>
+            <tr>
+                <td><span class="pill brand">AUSENCIA</span></td>
+                <td>Certificado de ausencia laboral</td>
+                <td>Al registrar bitácora tipo AUSENCIA</td>
+                <td>.pdf</td>
+            </tr>
+            <tr>
+                <td><span class="pill brand">CORTE</span></td>
+                <td>Corte de obra y memorias</td>
+                <td>Al aprobar un corte</td>
+                <td>.xlsx</td>
+            </tr>
+            <tr>
+                <td><span class="pill brand">CONT_GLOBAL</span></td>
+                <td>Contrato de obra a precio global</td>
+                <td>Al crear contrato OBRA con pricingMode LUMP_SUM</td>
+                <td>.docx</td>
+            </tr>
+            <tr>
+                <td><span class="pill brand">CONT_UNITARIO</span></td>
+                <td>Contrato de obra a precio unitario</td>
+                <td>Al crear contrato OBRA con pricingMode UNIT_PRICE</td>
+                <td>.xlsx (estructura de items)</td>
+            </tr>
+            <tr>
+                <td><span class="pill brand">CONT_DISENOS</span></td>
+                <td>Contrato de diseños</td>
+                <td>Al crear contrato DISENOS</td>
+                <td>.docx</td>
+            </tr>
+            <tr>
+                <td><span class="pill brand">CONT_LABORAL</span></td>
+                <td>Contrato laboral con empleado</td>
+                <td>Al crear empleado (siempre)</td>
+                <td>.docx</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>11.2 Convención de nombres de archivo</h3>
+    <table>
+        <thead><tr><th>Plantilla</th><th>Patrón de nombre</th><th>Ejemplo</th></tr></thead>
+        <tbody>
+            <tr><td>AD-0033</td><td><code>AD-0033_{proyecto}_{YYYY-MM-DD}.xlsx</code></td><td><code>AD-0033_P001_2026-10-02.xlsx</code></td></tr>
+            <tr><td>LEG</td><td><code>LEG_{proyecto}_{YYYY-MM-DD}.xlsx</code></td><td><code>LEG_P001_2026-10-02.xlsx</code></td></tr>
+            <tr><td>OC</td><td><code>OC_{proyecto}_{numero}.xlsx</code></td><td><code>OC_P001_42.xlsx</code></td></tr>
+            <tr><td>OS</td><td><code>OS_{proyecto}_{numero}.xlsx</code></td><td><code>OS_P001_15.xlsx</code></td></tr>
+            <tr><td>CORTE</td><td><code>CORTE_{proyecto}_{numero}_{YYYY-MM}.xlsx</code></td><td><code>CORTE_P001_3_2026-10.xlsx</code></td></tr>
+            <tr><td>AUSENCIA</td><td><code>AUS_{empleado}_{YYYY-MM-DD}.pdf</code></td><td><code>AUS_juan_perez_2026-10-02.pdf</code></td></tr>
+            <tr><td>CONT_GLOBAL</td><td><code>CONT_{proyecto}_{contratista}_GLOBAL.docx</code></td><td><code>CONT_P001_hermanos_lopez_GLOBAL.docx</code></td></tr>
+            <tr><td>CONT_UNITARIO</td><td><code>CONT_{proyecto}_{contratista}_UNITARIO.docx</code></td><td><code>CONT_P001_hermanos_lopez_UNITARIO.docx</code></td></tr>
+            <tr><td>CONT_DISENOS</td><td><code>CONT-DIS_{proyecto}_{cliente}.docx</code></td><td><code>CONT-DIS_P001_inversiones_abc.docx</code></td></tr>
+            <tr><td>CONT_LABORAL</td><td><code>LAB_{empleado}_{YYYY-MM-DD}.docx</code></td><td><code>LAB_juan_perez_2026-10-02.docx</code></td></tr>
+        </tbody>
+    </table>
+
+    <h3>11.3 Cómo generar un documento</h3>
+    <p>Depende del tipo de entidad:</p>
+
+    <h4>A. Desde un pago o gasto</h4>
+    <ol>
+        <li>Abre el pago/gasto en su detalle.</li>
+        <li>Si el tipo genera formato (ver tabla 11.1), verás un botón <em>Generar documento</em>.</li>
+        <li>Clic. El sistema renderiza el archivo y lo sube a SharePoint en la carpeta del proyecto.</li>
+        <li>Aparece un toast <em>success</em> con la URL del archivo.</li>
+        <li>Si falla SharePoint, el archivo queda en disco (carpeta local temporal) y se reintenta en segundo plano.</li>
+    </ol>
+
+    <h4>B. Desde un corte</h4>
+    <p>La generación es automática al pasar a <code>APPROVED</code>.</p>
+
+    <h4>C. Desde un contrato</h4>
+    <p>La generación es automática al guardar el contrato por primera vez.</p>
+
+    <h4>D. Desde un empleado</h4>
+    <p>La generación es automática al guardar al empleado por primera vez.</p>
+
+    <h3>11.4 Trazabilidad</h3>
+    <p>Cada documento generado registra en BD:</p>
+    <ul>
+        <li>Plantilla usada.</li>
+        <li>Entidad origen (ID + tipo).</li>
+        <li>Fecha de generación.</li>
+        <li>URL de SharePoint (si subió) o ruta local.</li>
+        <li>Tamaño en bytes.</li>
+        <li>Versión en SharePoint (entero incremental).</li>
+    </ul>
+</section>
+
+<!-- ================================================================
+     12. SHAREPOINT
+     ================================================================ -->
+<section id="sec-12">
+    <h2>12. Integración SharePoint</h2>
+    <p>Cada documento generado se sube automáticamente a una carpeta de SharePoint que sigue la estructura del proyecto. Esto te da trazabilidad histórica, búsqueda por SharePoint, y respaldos en la nube de tu organización.</p>
+
+    <h3>12.1 Estructura de carpetas</h3>
+    <p>La biblioteca base es <code>Proyectos</code> (configurable con <code>SP_BASE_PATH</code>). Dentro:</p>
+    <div class="workflow">
+Proyectos/
+  ├── P001/
+  │   ├── 01-Anticipos/        (AD-0033)
+  │   ├── 02-Legalizaciones/    (LEG)
+  │   ├── 03-Ordenes-Compra/   (OC)
+  │   ├── 04-Ordenes-Servicio/ (OS)
+  │   ├── 05-Cortes/           (CORTE)
+  │   ├── 06-Contratos-Obra/   (CONT_GLOBAL, CONT_UNITARIO)
+  │   ├── 07-Contratos-Disenos/ (CONT_DISENOS)
+  │   ├── 08-Contratos-Laborales/ (CONT_LABORAL)
+  │   └── 09-Ausencias/        (AUSENCIA)
+  ├── P002/
+  └── SIN_PROYECTO/            (si la entidad no tiene proyecto)
+    </div>
+
+    <h3>12.2 Configuración técnica</h3>
+    <p>La integración se hace contra <strong>Microsoft Graph API</strong>. Variables de entorno necesarias:</p>
+    <dl class="fields">
+        <dt>SP_TENANT_ID</dt><dd>ID del tenant de Azure AD.</dd>
+        <dt>SP_CLIENT_ID</dt><dd>App registration ID.</dd>
+        <dt>SP_CLIENT_SECRET</dt><dd>Secreto del app registration.</dd>
+        <dt>SP_DRIVE_ID</dt><dd>ID del drive (biblioteca) de SharePoint.</dd>
+        <dt>SP_BASE_PATH</dt><dd>Default <code>Proyectos</code>.</dd>
+    </dl>
+
+    <h3>12.3 Cómo funciona la subida</h3>
+    <ol>
+        <li>Cuando un documento se genera, el backend llama <code>sharepoint.uploadFile()</code>.</li>
+        <li>La función navega segmento a segmento la ruta, creando carpetas si no existen (<code>ensureFolder</code>).</li>
+        <li>Si la carpeta raíz <code>Proyectos/P001/01-Anticipos</code> ya existe, no la vuelve a crear (idempotente).</li>
+        <li>Sube el archivo con PUT al path completo. Si ya existe un archivo con el mismo nombre, lo <strong>sobrescribe como nueva versión</strong> (SharePoint mantiene historial).</li>
+        <li>Si la subida falla por timeout o error 5xx, se reintenta con <strong>backoff exponencial</strong> (hasta 3 intentos).</li>
+        <li>Si falla por 4xx (auth/forbidden/not-found), <strong>no se reintenta</strong>: se devuelve el error para diagnóstico.</li>
+    </ol>
+
+    <h3>12.4 Manejo de errores</h3>
+    <table>
+        <thead><tr><th>Código Graph</th><th>Significado</th><th>Acción</th></tr></thead>
+        <tbody>
+            <tr><td>401</td><td>Token rechazado</td><td>Rotar <code>SP_CLIENT_SECRET</code> o re-aplicar Grant admin consent.</td></tr>
+            <tr><td>403</td><td>Sin permisos sobre el recurso</td><td>Verificar que el app tiene permisos <code>Sites.ReadWrite.All</code>.</td></tr>
+            <tr><td>404</td><td>Ruta no existe y no se pudo crear</td><td>Revisar permisos sobre la biblioteca padre.</td></tr>
+            <tr><td>409</td><td>Conflicto de nombre</td><td>El archivo está siendo editado.</td></tr>
+            <tr><td>408 / timeout</td><td>Subida muy lenta</td><td>Reintenta automático.</td></tr>
+            <tr><td>5xx</td><td>Error del servidor Microsoft</td><td>Reintenta automático.</td></tr>
+        </tbody>
+    </table>
+
+    <h3>12.5 ¿Cómo llegan los documentos a SharePoint?</h3>
+    <p>El flujo completo es:</p>
+    <div class="workflow">
+[Usuario crea / aprueba entidad]
+        │
+        ▼
+[Backend genera archivo en memoria (Buffer)]
+        │
+        ▼
+[Backend resuelve ruta SharePoint: buildProjectPath()]
+        │    - Lee SP_BASE_PATH
+        │    - Toma projectCode del record
+        │    - Toma carpeta de plantilla
+        │    - Genera nombre según patrón (ver tabla 11.2)
+        ▼
+[sharepoint.ensureFolder(ruta)]
+        │    - Si no existe, crea recursivamente
+        ▼
+[sharepoint.uploadFile() con retry]
+        │    - PUT al path completo
+        │    - Si archivo existe: nueva versión
+        │    - Si falla 5xx/timeout: reintenta 3x backoff
+        ▼
+[Respuesta: { webUrl, sizeBytes, version }]
+        │
+        ▼
+[Se persiste en documents_log de BD]
+        │
+        ▼
+[Toast success al usuario con URL]
+    </div>
+
+    <h3>12.6 Permisos del app en Azure AD</h3>
+    <p>El app registration necesita:</p>
+    <ul>
+        <li><code>Sites.ReadWrite.All</code> (permiso de aplicación, NO delegado)</li>
+        <li><code>User.Read</code> (para obtener info del usuario que genera)</li>
+        <li><strong>Grant admin consent</strong> aplicado a nivel organización.</li>
+    </ul>
+
+    <div class="callout warn">
+        <strong>Importante</strong>
+        Si tu organización tiene data residency en una región específica (ej: US Gov, EU), confirma que el tenant de SharePoint también esté en esa región. Los archivos NO cruzan regiones.
+    </div>
+</section>
+
+<!-- ================================================================
+     13. BUENAS PRÁCTICAS
+     ================================================================ -->
+<section id="sec-13">
+    <h2>13. Buenas prácticas y errores comunes</h2>
+
+    <h3>13.1 Antes de empezar</h3>
+    <ul>
+        <li><strong>Verifica el cliente antes de cotizar</strong>: el NIT/Cédula debe ser único.</li>
+        <li><strong>Crea el proyecto antes que las cotizaciones</strong>: las cotizaciones aceptadas convierten a proyecto, pero es más limpio partir del proyecto.</li>
+        <li><strong>Configura el AIU al inicio</strong>: aplicarlo después recalcula todos los cortes.</li>
+    </ul>
+
+    <h3>13.2 Cortes</h3>
+    <ul>
+        <li>No cierres un corte en DRAFT — el sistema no permite pagos si no está PAID.</li>
+        <li>Si te rechazan un corte, lee el motivo antes de reenviar. Está en <em>Motivo de rechazo</em>.</li>
+        <li>Los cortes van por <strong>periodo calendario</strong>. No mezcles periodos.</li>
+    </ul>
+
+    <h3>13.3 Pagos</h3>
+    <ul>
+        <li>El monto en una solicitud debe coincidir con el del contrato (o fraccionarse claramente).</li>
+        <li>Si es para un anticipo, usa tipo <code>ANTICIPO</code> para generar el formato AD-0033.</li>
+        <li>Cuando pagues, asegúrate de tener el comprobante de transferencia antes de marcar PAID.</li>
+        <li>Si el pago es contra un <strong>corte aprobado</strong>, vincúlalo desde el formulario de pago.</li>
+    </ul>
+
+    <h3>13.4 Documentos y SharePoint</h3>
+    <ul>
+        <li>Si SharePoint falla, el archivo <strong>queda en el log de documentos</strong> sin URL. Contacta al administrador.</li>
+        <li>Si subes dos veces el mismo formato, SharePoint mantiene la versión anterior. No perderás nada.</li>
+        <li>Los archivos PDF de ausencia NO tienen proyecto asociado: van directo a <code>Proyectos/SIN_PROYECTO/09-Ausencias/</code>.</li>
+    </ul>
+
+    <h3>13.5 Permisos y roles</h3>
+    <ul>
+        <li>El sistema bloquea automáticamente la separación de funciones: no puedes aprobar tu propia solicitud.</li>
+        <li>Si necesitas permisos nuevos, habla con el dueño del sistema (no edita Ctrl+O archivos de código).</li>
+    </ul>
+
+    <h3>13.6 Seguridad</h3>
+    <div class="callout danger">
+        <strong>Errores comunes que debes evitar</strong>
+        <ul>
+            <li>Compartir tu OTP por WhatsApp o correo. Los códigos son válidos 10 min y single-use.</li>
+            <li>Dejar la sesión abierta en equipos compartidos. Siempre cierra sesión.</li>
+            <li>Crear dos usuarios con el mismo email. La validación lo rechaza.</li>
+            <li>Cambiar el estado de un proyecto sin documentar el motivo.</li>
+            <li>Eliminar físicamente un registro (no se puede). Usa soft-delete.</li>
+        </ul>
+    </div>
+
+    <h3>13.7 Soporte</h3>
+    <p>Si encuentras:</p>
+    <ul>
+        <li><strong>Error 500</strong>: la pantalla de login muestra el detalle técnico. Compártelo con soporte.</li>
+        <li><strong>Documento no se sube a SharePoint</strong>: revisa <em>Administrativo → Conteo de documentos</em> y contacta al admin.</li>
+        <li><strong>Botón deshabilitado</strong>: tu rol no tiene el permiso. Pide a tu jefe directo.</li>
+        <li><strong>OTP no llega</strong>: revisa spam, luego contacta al admin para validar SMTP.</li>
+    </ul>
+</section>
+
+<footer>
+    <p>ControlObra · Manual de Usuario v1.0 · Última actualización: Octubre 2026</p>
+    <p>Para imprimir como PDF: <kbd>Ctrl</kbd> + <kbd>P</kbd> → Guardar como PDF.</p>
+</footer>
+
+</div>
+
+<!-- Botón flotante para imprimir / guardar como PDF -->
+<div class="actions no-print">
+    <button onclick="window.print()">🖨 Imprimir / Guardar PDF</button>
+</div>
+
+</body>
+</html>
