@@ -87,7 +87,7 @@ export default function ProveedorDetailPage() {
   }
 
   const variant = PROVIDER_STATUS_VARIANTS[provider.status];
-  const docsByType = new Map(provider.documents.map((d) => [d.type, d]));
+  const docsByType = new Map((provider.documents ?? []).map((d) => [d.type, d]));
   const requiredDocs = requiredDocsFor(provider.personType);
   const missingRequired = requiredDocs.filter((t) => !docsByType.has(t));
 
@@ -177,7 +177,7 @@ export default function ProveedorDetailPage() {
           <div className="rounded-lg bg-secondary/50 p-4 sm:min-w-[200px]">
             <p className="text-xs uppercase tracking-wider text-muted-foreground">Documentación</p>
             <p className="mt-1 text-3xl font-semibold">
-              {provider.documents.filter((d) => requiredDocs.includes(d.type)).length}
+              {(provider.documents ?? []).filter((d) => requiredDocs.includes(d.type)).length}
               <span className="text-base text-muted-foreground">/{requiredDocs.length}</span>
             </p>
             <p className="text-xs text-muted-foreground">documentos obligatorios</p>
@@ -274,11 +274,11 @@ export default function ProveedorDetailPage() {
             <CardHeader>
               <CardTitle>Referencias comerciales</CardTitle>
               <CardDescription>
-                {provider.references.length} de 3 referencias registradas
+                {(provider.references ?? []).length} de 3 referencias registradas
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {provider.references.length === 0 ? (
+              {(provider.references ?? []).length === 0 ? (
                 <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
                   Sin referencias registradas
                 </p>
@@ -502,7 +502,7 @@ export default function ProveedorDetailPage() {
           addDocument(provider.id, doc);
           setAddDocOpen(false);
         }}
-        existingTypes={provider.documents.map((d) => d.type)}
+        existingTypes={(provider.documents ?? []).map((d) => d.type)}
       />
     </div>
   );

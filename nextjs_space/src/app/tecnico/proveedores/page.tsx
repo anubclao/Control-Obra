@@ -94,7 +94,7 @@ export default function ProveedoresPage() {
           <p><strong>{p.personType === "JURIDICA" ? "NIT" : "CC"}:</strong> {p.nit}</p>
           <p><strong>Tipo:</strong> {PERSON_TYPE_LABELS[p.personType]}</p>
           <p><strong>Contacto:</strong> {p.contact}</p>
-          <p><strong>Documentos cargados:</strong> {p.documents.length}</p>
+          <p><strong>Documentos cargados:</strong> {(p.documents ?? []).length}</p>
         </div>
       ),
       variant: "danger",
@@ -287,7 +287,7 @@ function ProviderCard({
   onDelete: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const docsCount = p.documents.length;
+  const docsCount = (p.documents ?? []).length;
   const variant = PROVIDER_STATUS_VARIANTS[p.status];
 
   return (

@@ -10,7 +10,7 @@ import { requireAuth, requireRole, requireAdmin, authFailureResponse } from "@/l
 import { validateProviderNit, type ProviderNitRef } from "@/lib/providers-validation";
 
 
-function r(r: any) {
+function r(r: any, docs: any[] = []) {
   return {
     id: r.id,
     personType: r.person_type,
@@ -38,6 +38,16 @@ function r(r: any) {
     status: r.status,
     rating: r.rating ?? null,
     notes: r.notes ?? "",
+    // P0 plan 2026-10-08 (fix bug proveedores): la UI hace p.documents.length.
+    // Antes esto era undefined y la pagina crasheaba con TypeError.
+    documents: docs.map((d) => ({
+      id: d.id,
+      type: d.type,
+      fileName: d.file_name,
+      fileUrl: d.file_url,
+      uploadedAt: d.uploaded_at,
+      expirationDate: d.expiration_date,
+    })),
   };
 }
 
@@ -54,7 +64,24 @@ export async function GET(req: Request) {
       `SELECT * FROM providers ${where} ORDER BY name ASC`,
       args,
     );
-    return NextResponse.json(rows.map(r));
+    // P0 plan 2026-10-08: JOIN con provider_documents para devolver documents.
+    const ids = rows.map((p) => p.id);
+    const placeholders = ids.length ? ids.map(() => "?").join(",") : "''";
+    const docs = ids.length
+      ? await query<any[]>(
+          `SELECT * FROM provider_documents WHERE provider_id IN (${placeholders}) ORDER BY uploaded_at DESC`,
+          ids,
+        )
+      : [];
+    const docsByProvider = new Map<string, any[]>();
+    for (const d of docs) {
+      const list = docsByProvider.get(d.provider_id) ?? [];
+      list.push(d);
+      docsByProvider.set(d.provider_id, list);
+    }
+    return NextResponse.json(
+      rows.map((row) => r(row, docsByProvider.get(row.id) ?? [])),
+    );
   } catch (e: any) {
     console.error("[providers GET]", e?.code, e?.message);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
