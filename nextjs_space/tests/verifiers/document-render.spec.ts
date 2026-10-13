@@ -273,6 +273,14 @@ describe("renderDocument — manejo de errores", () => {
     expect(err(r).code).toBe("TEMPLATE_NOT_REGISTERED");
   });
 
+  // AUSENCIA filler: ausenciaFiller lanza AUSENCIA_FILLER_NOT_IMPLEMENTED,
+// que renderDocument captura y convierte en { ok: false, code: "FILLER_THREW" }.
+// Este test verifica ese path de error. Pasa con el stub actual.
+// Cuando AUSENCIA-F2 implemente el filler (puppeteer/pdf-lib/docx-replacement),
+// este test hay que actualizarlo (o eliminarlo) porque el código de error
+// ya no será "FILLER_THREW" — será AUSENCIA.pdf rellenada o un error
+// distinto. Ver spec/audit-formatos-snapshots-wiring.md §6.4 (baseline
+// AUSENCIA).
   it("AUSENCIA → FILLER_THREW (PDF no implementado)", async () => {
     const r = await renderDocument("AUSENCIA", {}, ctxBase, {
       formatosRoot: "/dummy",

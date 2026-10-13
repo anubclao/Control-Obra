@@ -12,6 +12,9 @@ export default defineConfig({
     globals: true,
     environment: "jsdom",
     setupFiles: ["./tests/setup.ts"],
+    // Sincroniza los snapshots de plantillas antes de la suite.
+    // Spec: docs/specs/audit-formatos-snapshots-wiring.md §AC-1.
+    globalSetup: ["./scripts/sync-formatos-snapshots.mjs"],
     include: ["tests/verifiers/**/*.spec.{ts,tsx}"],
     // Forzar que vitest NO use caché de transform: cuando reescribimos
     // fillers, los timestamps cambian pero el hash de vite puede

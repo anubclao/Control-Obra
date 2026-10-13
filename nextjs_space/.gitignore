@@ -51,3 +51,9 @@ scripts/sp-*.out
 # Plantillas reales de /Formatos (binarios pesados, no se commitean)
 /Formatos/
 /Formatos/**/*
+
+# Snapshots sincronizados desde /Formatos por scripts/sync-formatos-snapshots.mjs.
+# Por máquina, NO se commitean. El .gitkeep preserva el directorio.
+# Spec: docs/specs/audit-formatos-snapshots-wiring.md §AC-10.
+/src/lib/document-generator/formatos-snapshots/*
+!/src/lib/document-generator/formatos-snapshots/.gitkeep
