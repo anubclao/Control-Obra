@@ -258,3 +258,42 @@ outer.push(\/\\) debe hacer .toLowerCase().
 - **`NODE_OPTIONS=--max-old-space-size=4096` requerido para `tsc` y `next build`** en proyectos grandes (Next 15 + React 19 + jsdom + cientos de archivos). El heap default de 1.5 GB produce OOM en este host. Setear ANTES del comando.
 - **Cortes con multiples tareas en commits separados**: la auditoria del lockfile depende del estado en cada paso; combinar el `audit fix` con la reclasificacion impide diffing limpio. Cuesta 1 commit extra y reduce riesgo de rollback parcial.
 - **Politica de abortar ante diff inesperado en `npm audit fix`**: cualquier cambio fuera del set explicitamente aprobado (en este caso `{sharp, source-map-js, transitivos}`) debe pausar el flujo y pedir revision manual. Nunca aceptar transitivos "de paso" sin validarlos — algunos tienen implicaciones de seguridad o breaking.
+
+### [2026-10-12] audit-corte-2-next-bump · FASE 1 (SPEC)
+- Spec creado en `docs/specs/audit-corte-2-next-bump.md` con 10 AC (AC-1..AC-10), riesgos R1..R8 (R4 corregido en revision con el usuario: React mismo-minor OK, abortar en cambio de minor o major), plan de aborto A1..A8, verificaciones V1-V6.
+- 2 tareas acopladas en el mismo commit: bump `next` 15.5.25 → 15.5.27 (dependencias) + bump `eslint-config-next` 15.5.25 → 15.5.27 (devDependencies). Acoplamiento estricto: los presets de `eslint-config-next` esperan una version especifica de `next`; bumpear uno sin el otro desincroniza los presets.
+- R-gate explicito en §5: si la implementacion exige tocar `src/**` (improbable dado que es patch bump del mismo minor), PARAR y reportar sin aplicar.
+- Restricciones: no tocar xlsx (Corte 3), no tocar `@azure/msal-node` (Corte 4), no tocar tailwind.config.* ni eslint.config.*.
+
+### [2026-10-12] audit-corte-2-next-bump · FASE 2-4 (VERIFIER + IMPLEMENTACION + REFACTOR)
+- **Tarea unica ejecutada:** bump aplicado sin divisorias internas — el comando es atómico (2 lineas en `package.json` + lockfile sync).
+- Cambios:
+  - `package.json`: 2 lineas (`next` y `eslint-config-next`, de 15.5.25 a 15.5.27 en sus bloques respectivos).
+  - `package-lock.json`: 96 lineas (50 +/- / 46 -), 12 entradas cambiadas **todas en la familia `next`/`@next/*`/`eslint-config-next`**. Cero adds, cero removes.
+  - 12 entradas: `next` (root), `eslint-config-next`, `@next/env`, `@next/eslint-plugin-next`, `@next/swc-{darwin-arm64, darwin-x64, linux-arm64-gnu, linux-arm64-musl, linux-x64-gnu, linux-x64-musl, win32-arm64-msvc, win32-x64-msvc}` — todas 15.5.25 → 15.5.27.
+- **React/React-dom sin cambios:** siguen en `19.3.0` (dentro de politica same-minor del spec §9 A3). En realidad idénticos al pre-Corte 2, no se movieron.
+- **Demás paquetes del lockfile no tocados:** `xlsx`, `@azure/msal-node`, `tailwindcss-animate`, `tailwindcss`, `mysql2`, `zustand`, etc. todos idénticos al SHA previo. Cumple A7/A8.
+- **Verificaciones V1-V6:**
+  - V1 `npm install --dry-run` → `up to date in 6s`. Cumple AC-2.
+  - V3 lockfile: `next=15.5.27`, `eslint-config-next=15.5.27`, `react=19.3.0`, `react-dom=19.3.0`. Cumple AC-1, AC-3, AC-4.
+  - V4 `npx tsc --noEmit`: exit 2 (tsc devuelve 2 con errores), unico error = preexistente en `tests/verifiers/advances-suggestion.spec.ts:21` (TS2741 'contractId'). **0 nuevos**. Cumple AC-5.
+  - V5 `npm test`: **685 passing + 34 failing (mismos ENOENT `formatos-snapshots/`) + 8 skipped**. Idénticos numeros al baseline. 0 nuevos rojos. Exit 1 de vitest es por los 34 preexistentes, no por regresion. Cumple AC-6. Baseline snapshot documentado en spec §6.5 del Corte 1.
+  - V6 `npm run build`: `▲ Next.js 15.5.27`, `✓ Compiled successfully in 98s`, `✓ Generating static pages (29/29)`, exit 0. **Idénticos 29 paginas estaticas a V6 de Corte 1**. Cumple AC-7.
+  - 3 warnings `[db] ER_ACCESS_DENIED_ERROR` durante `next build` (mismo ruido esperado del host local sin acceso a Hostinger).
+- **Tamanos V6:** `/tecnico/presupuestos` paso de First Load JS 163 kB a 164 kB (+1 KB). Atribuido al patch de cache fingerprint. Sin implicaciones funcionales; aceptado por el usuario.
+- **Plan de aborto §9:** cero condiciones disparadas (A1..A8 todas limpias).
+- **`npm audit` global:** 13 → 12. La entrada `next 15.0.0 - 15.5.26` (Moderate cache poisoning) desaparecio del reporte. Residual para Cortes 3 (`xlsx` High) y 4 (`uuid` Moderate).
+- Commits materializados:
+  - TBD (Commit 1): `chore(deps): bump next 15.5.25 → 15.5.27 (audit moderate cache poisoning cleared)`
+  - TBD (Commit 2): `docs(specs): spec Corte 2 + log AGENTS.md`
+
+### Patrones a recordar (memory) — extension 2026-10-12 (Corte 2)
+- **`next` y `eslint-config-next` son acoplamiento estricto de version**: bumpear uno sin el otro deja presets de `eslint-config-next` desactualizados respecto al `next` que se ejecuta (FlatCompat los carga con `compat.extends("next/typescript")` esperando el mismo minor). Cuando se bumpea, **siempre sync**. En este proyecto ambos pinneados en `eslint.config.mjs:38`.
+- **Patch bumps dentro del mismo minor de Next son generalmente transparentes**: `15.5.25 → 15.5.27` no introdujo errores TS, no cambio API publica, no cambio numero de paginas estaticas (29 → 29). El API publico de `next` y los tipos `JSX`/`Metadata` se mantuvieron estables. Riesgos reales aparecen en cambios de minor (15.4 → 15.5) que tocan App Router / middleware / Server Actions.
+- **`npm install --dry-run` sin cambios pendientes imprime `up to date in Ns`**: sirve como V1 rapido del spec para confirmar que la lockfile esta coherente con `package.json` sin tocar archivos.
+- **DB inalcanzable durante `next build` no bloquea el build**: las paginas `ƒ` (Dynamic) no se pre-renderizan; las `○` (Static) se generan aunque los API routes fallen. Los 3 warnings `[db] ER_ACCESS_DENIED_ERROR` son ruido esperado en este entorno y aceptado por el usuario. **Nunca abortar el commit por warnings de DB durante `next build`** sin otro sintoma.
+- **`tsc --noEmit` exit 2 no es un fallo del flujo** — es la respuesta normal de tsc cuando hay errores. La redaccion real de "V4 paso" es: el reporte contiene **solo** el error preexistente documentado (`advances-suggestion.spec.ts:21` TS2741). Cualquier error adicional invalida la verediccion.
+- **Lockfile diff verificado programmaticamente, no por inspection manual**: el script `compare-lockfiles.js` (creado ad-hoc durante este corte) lee el lockfile en `HEAD` via `git show` y lo compara con `package-lock.json` actual; detecta changed/added/removed exhaustivamente en < 100 ms. Reutilizable para futuros bumps. Vive en la raiz del repo (sobre git root), **NO se commitea**.
+- **Aislamiento de commits por tarea dentro de un corte**: el `package.json`/`package-lock.json` se commitean **junto** cuando las 2 tareas son acopladas estrictamente (ej. `next` + `eslint-config-next`). El verifier/spec/log van en commit aparte. Patron confirmado: commit de codigo primero, commit administrativo despues.
+- **Politica de abortos §9 del spec (8 condiciones) es case-by-case**: A3 acepta mismo-minor React (decision explicita del usuario); A8 acepta cualquier paquete mientras no sea de familias prohibidas (xlsx, msal-node, tailwindcss-animate); A1/A2/A4-A7 son strict. La regla explicita evita la ambiguedad "esto cambio, sera malo?".
+- **First Load JS +1 KB despues de un patch de cache** es cambio esperado y aceptable. Si la app no tiene performance budget estricto, no es bloqueante. Documentar el delta en el summary para transparencia.
