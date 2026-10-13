@@ -217,3 +217,44 @@ outer.push(\/\\) debe hacer .toLowerCase().
 - **Numeracion incremental con MAX + 1, no COUNT + 1**: tolera race conditions y eliminaciones. Formato `PREFIJO-YYYY-NNNN` con `padStart(4, "0")`. Backfill opcional (no es bloqueante si no se hace en el deploy).
 - **Empty states consistentes**: cuando un tab no tiene datos, mostrar Card con icono grande + titulo + subtitulo + accion sugerida. NO usar placeholders rotos como `slice(0, 3)` sobre datos globales.
 - **Spec por sprint pequeno**: priorizar "1 sprint = 1 spec, 1 PR". Cada spec debe tener AC numerados, design contract, dependencies, out-of-scope, riesgos. Si el AC no se cumple, el spec falla.
+
+### [2026-10-12] audit-corte-1-deps-cleanup · FASE 1 (SPEC)
+- Spec creado en `docs/specs/audit-corte-1-deps-cleanup.md` con AC-1..AC-8, Verifier Plan V1-V6, Technical Contract y Out of Scope por Corte.
+- 2 tareas: `npm audit fix` (semver-safe) + mover `tailwindcss-animate` a devDependencies.
+- Restriccion explicita: no tocar xlsx / SheetJS / parser ni nada en `nextjs_space/nextjs_space/src/`.
+
+### [2026-10-12] audit-corte-1-deps-cleanup · FASE 2 (VERIFIER)
+- Verifier de regresion propuesto en spec §6.3 (static source analysis sobre `package.json`, patron readFileSync + JSON.parse similar a `bug-project-form-currency-step.spec.ts:56`).
+- **NO materializado como `tests/verifiers/*.spec.ts` en este corte**: el ciclo TDD Red->Green no aplica a un cambio de deps (el comando se ejecuta una vez). Red de seguridad real: V4/V5/V6 (typecheck + tests + build). El verifier se materializa en una iteracion posterior si el Corte 1 se repite.
+
+### [2026-10-12] audit-corte-1-deps-cleanup · FASE 3 (IMPLEMENTACION)
+- **Tarea 1 — `npm audit fix`** aplicado. Cambios solo en `package-lock.json` (244 lineas, 122 +/-):
+  - `sharp` 0.35.4 → 0.35.5 (librsvg SVG, High).
+  - `source-map-js` 1.2.1 → 1.2.2 (ReDoS, High).
+  - `engines.node` en lockfile root: `">=22.18.0"` → `">=20.0.0"` (resync con `package.json` actual; lockfile estaba stale previo al corte).
+- **Tarea 2 — mover `tailwindcss-animate`** de dependencies a devDependencies. package.json con 2 lineas tocadas, lockfile con 73+/1- (todos los "+" son `"dev": true,` en paquetes que antes eran alcanzables via prod: braces, chokidar, fast-glob, micromatch, postcss-selector-parser, postcss-nested, etc.).
+- Verificaciones post-cambio:
+  - `npx tsc --noEmit`: 1 error preexistente en `tests/verifiers/advances-suggestion.spec.ts:21` (TS2741 'contractId' missing). 0 nuevos. Requiere `NODE_OPTIONS=--max-old-space-size=4096` en este host (heap default 1.5 GB OOM).
+  - `npm test` (vitest): **685 pass + 34 fail (ENOENT snapshots preexistentes) + 8 skipped**. 0 nuevos rojos del Corte 1 (los 34 fail ya existian). Detalle abajo en FASE 4.
+  - `npm run build`: exit 0, build 95s, 29 paginas estaticas generadas. Los 3 warnings `[db] ER_ACCESS_DENIED_ERROR` son ruido esperado: las paginas `ƒ` (Dynamic) no se pre-renderizan y Hostinger DB no es alcanzable desde este host.
+- Commits materializados:
+  - `33aa5ec chore(deps): npm audit fix (sharp 0.35.5, source-map-js 1.2.2)`
+  - `50fb589 chore(deps): move tailwindcss-animate to devDependencies (audit omit=dev: 13 → 4)`
+
+### [2026-10-12] audit-corte-1-deps-cleanup · FASE 4 (REFACTOR & VERIFY)
+- `npm audit --omit=dev` final: **4 vulnerabilidades (1 High + 3 Moderate)** vs 14 pre-Corte 1 = **reduccion 71 %**.
+- **High residual (1):** `xlsx` × 2 advisories (Prototype Pollution + ReDoS, sin fix disponible) → **Corte 3**.
+- **Moderate residual (3):** `next` 15.5.25 (Corte 2), `uuid` <11.1.1 via `@azure/msal-node` (Corte 4), `xlsx` ReDoS como Moderate (Corte 3).
+- **Baseline conocido:** 34 tests fallan por snapshots binarios no versionados en `src/lib/document-generator/formatos-snapshots/`. NO es regresion del Corte 1. Issue separado pendiente (provisionamiento de fixtures no es parte del Corte 1). Ver spec §6.5.
+- AC-1..AC-8 cumplidos.
+- Output `npm audit --omit=dev` post-Corte 1: solo `xlsx`, `next`, `uuid` y `xlsx` (ReDoS) — exactamente los 3 paquetes que cada uno es su propio Corte.
+
+### Patrones a recordar (memory) — extension 2026-10-12
+- **`npm audit fix` sin `--force` solo parchea paquetes con rango declarado abierto (caret/tilde/mayor-igual)**: las versiones pineadas exact (sin ^/~/>=) no se tocan y requieren `--force`. Ejemplo de este proyecto: `next: "15.5.25"` pineado obligo a `--force`, mientras `sharp: "^0.18.5"` se parcho solo.
+- **Lockfile `engines.node` puede quedar stale vs `package.json`**: el lockfile guarda `engines.node` del momento en que se genero. `npm install` lo resincroniza con `package.json`. NO revertir el sync — un lockfile desalineado rompe futuras instalaciones.
+- **Mover paquetes a devDependencies cambia el reporte `--omit=dev` drasticamente**: ~70 paquetes transitivos se marcan `"dev": true` en lockfile sin tocar codigo funcional. Util para separar toolchain de runtime cuando el paquete arrastra transitivos vulnerables.
+- **Tests con fixtures binarios no versionados son baseline, no regresion**: si el directorio de snapshots solo contiene `.gitkeep`, los `ENOENT` son preexistentes. Verificar con `ls` antes de abortar el corte.
+- **Verifiers estaticos para cambios de `package.json`**: patron readFileSync + JSON.parse + asserciones, estabelecido en `tests/verifiers/bug-project-form-currency-step.spec.ts:56`. Funcionan como regresion a futuro; NO son parte del ciclo Red->Green cuando el cambio se ejecuta una sola vez.
+- **`NODE_OPTIONS=--max-old-space-size=4096` requerido para `tsc` y `next build`** en proyectos grandes (Next 15 + React 19 + jsdom + cientos de archivos). El heap default de 1.5 GB produce OOM en este host. Setear ANTES del comando.
+- **Cortes con multiples tareas en commits separados**: la auditoria del lockfile depende del estado en cada paso; combinar el `audit fix` con la reclasificacion impide diffing limpio. Cuesta 1 commit extra y reduce riesgo de rollback parcial.
+- **Politica de abortar ante diff inesperado en `npm audit fix`**: cualquier cambio fuera del set explicitamente aprobado (en este caso `{sharp, source-map-js, transitivos}`) debe pausar el flujo y pedir revision manual. Nunca aceptar transitivos "de paso" sin validarlos — algunos tienen implicaciones de seguridad o breaking.
