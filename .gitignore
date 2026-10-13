@@ -1,0 +1,61 @@
+# Root .gitignore for the nested-project layout at nextjs_space/ (the git root).
+#
+# The actual Next.js project lives at nextjs_space/nextjs_space/ and has its
+# own .gitignore. This file only filters artifacts that land at the OUTER
+# level (nextjs_space/) where they otherwise show as untracked noise.
+
+# === Bloque minimo (aprobado por el usuario, 2026-10-13) ===
+
+# Dependencies (outer + nested)
+**/node_modules/
+
+# Next.js build artifacts (covers .next/ at outer AND inside nextjs_space/)
+**/.next/
+
+# Environment files (root level)
+.env
+.env.local
+.env*.local
+
+# TypeScript build info (tsconfig.tsbuildinfo, tsconfig.strict.tsbuildinfo)
+*.tsbuildinfo
+
+# Logs (any .log file at any depth)
+*.log
+
+# macOS noise
+.DS_Store
+
+# === Bloque Seguro: auto-generados, build outputs, debug (2026-10-13) ===
+
+# Outputs auto-generados por builders del proyecto (UTF-8 mojibake regenerable).
+# Se regeneran corriendo nextjs_space/scripts/_build-processes.mjs y
+# nextjs_space/scripts/generate-process-docs.mjs (estos builders estan tracked).
+nextjs_space/scripts/processes.json
+nextjs_space/scripts/processes-part*.json
+
+# Build artifact SQL regenerable desde 000_init.sql (tracked) +
+# scripts/build-clean-sql.mjs (outer, pendiente commit aparte).
+nextjs_space/database/mysql/000_init_clean.sql
+
+# Debug scripts (prefijo _debug_).
+nextjs_space/tests/verifiers/_debug_*.cjs
+
+# Debug ad-hoc tiny (prefijo _test-, 319 B).
+nextjs_space/scripts/_test-parse.mjs
+
+# === Mantenimiento ===
+#
+# Strays parcialmente en papelera (Triage 2026-10-13, recovery parcialmente
+# exitoso via mavis-trash, abortado por latencia):
+#   - next-env.d.ts (outer)        -> papelerado OK
+#   - .next/ (outer)                -> papelerado OK
+#   - tsconfig.tsbuildinfo          -> papelerado OK
+#   - tsconfig.strict.tsbuildinfo   -> papelerado OK
+#   - node_modules/ (outer)         -> ~24/422 dirs papelerado; resto queda
+#                                     en disco (~200-300 MB) y se ignora via
+#                                     `**/node_modules/` de este archivo.
+# Para limpieza manual definitiva del outer node_modules cuando sea deseable:
+#   PowerShell:  Remove-Item -Recurse -Force 'D:\desarrollos\ControlObra\ControlObra\nextjs_space\node_modules'
+#   cmd:         rd /s /q "D:\desarrollos\ControlObra\ControlObra\nextjs_space\node_modules"
+# NO usar mavis-trash: tarda ~58 min para 32k archivos (9 s/dir en promedio).
