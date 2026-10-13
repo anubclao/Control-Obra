@@ -44,6 +44,12 @@ nextjs_space/tests/verifiers/_debug_*.cjs
 # Debug ad-hoc tiny (prefijo _test-, 319 B).
 nextjs_space/scripts/_test-parse.mjs
 
+# Docs del sistema de procesos (auto-generados por
+# nextjs_space/scripts/generate-process-docs.mjs, regenerables).
+# Solo README.md se commitea; el resto es output derivado.
+nextjs_space/docs/procesos/*
+!nextjs_space/docs/procesos/README.md
+
 # === Mantenimiento ===
 #
 # Strays parcialmente en papelera (Triage 2026-10-13, recovery parcialmente
