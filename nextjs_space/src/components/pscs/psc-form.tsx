@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { Plus, AlertCircle, X, CheckCircle2, FileText } from "lucide-react";
+import { Plus, AlertCircle, X, CheckCircle2, FileText, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ModuleExplanationCard } from "@/components/ui/module-explanation-card";
+import { PscBulkLoadDialog } from "@/components/pscs/psc-bulk-load-dialog";
 import { usePscsStore } from "@/lib/data-store";
 import { useProjectsStore } from "@/lib/data-store";
 import { useProvidersStore } from "@/lib/data-store";
@@ -22,6 +23,7 @@ import { useBudgetsStore } from "@/lib/data-store";
 import { useAuthStore } from "@/lib/auth-store";
 import { formatCurrency } from "@/lib/utils";
 import type { PSC, PSCItem, PSCStatus } from "@/types";
+import type { PscImportItem, PscImportPtItem } from "@/lib/psc-excel";
 
 interface Props {
   psc?: PSC;
@@ -30,13 +32,14 @@ interface Props {
 
 export function PSCForm({ psc, onSuccess }: Props) {
   const { createPSC, updatePSC, getItemsAvailable } = usePscsStore();
-  const { projects } = useProjectsStore();
+  const { projects, getProject } = useProjectsStore();
   const { providers } = useProvidersStore();
   const { getBudgetByProject } = useBudgetsStore();
   const { user } = useAuthStore();
   const isEditing = !!psc;
 
   const [projectId, setProjectId] = useState(psc?.projectId ?? "");
+  const project = getProject(projectId);
   const [providerId, setProviderId] = useState(psc?.providerId ?? "");
   const [status, setStatus] = useState<PSCStatus>(psc?.status ?? "DRAFT");
   const [notes, setNotes] = useState(psc?.notes ?? "");
@@ -45,6 +48,7 @@ export function PSCForm({ psc, onSuccess }: Props) {
     psc?.items ?? [{ id: "new1", budgetItemId: "", description: "", unit: "M2", quantity: 0, unitPrice: 0, totalPrice: 0, executedQuantity: 0, executedAmount: 0 }]
   );
   const [error, setError] = useState<string | null>(null);
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
 
   // Auto-sugerir: si cambia proyecto, refrescar items disponibles
   const availableItems = useMemo(() => {
@@ -52,12 +56,50 @@ export function PSCForm({ psc, onSuccess }: Props) {
     return getItemsAvailable(projectId, psc?.id);
   }, [projectId, getItemsAvailable, psc?.id]);
 
+  // PT items (todos, no filtrados por otros PSCs) — para el dialog de carga masiva
+  const ptItems: PscImportPtItem[] = useMemo(() => {
+    if (!projectId) return [];
+    const budget = getBudgetByProject(projectId);
+    if (!budget) return [];
+    const items: PscImportPtItem[] = [];
+    for (const layer of budget.layers ?? []) {
+      for (const item of layer.items ?? []) {
+        items.push({
+          id: item.id,
+          description: item.description,
+          unit: item.unit,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
+        });
+      }
+    }
+    return items;
+  }, [projectId, getBudgetByProject]);
+
   // Si cambia de proyecto, validar items
   useEffect(() => {
     if (!projectId) return;
     const availableIds = new Set(availableItems.map((i) => i.id));
     setItems((prev) => prev.filter((it) => !it.budgetItemId || availableIds.has(it.budgetItemId)));
   }, [projectId, availableItems]);
+
+  // Handler del dialog: convierte PscImportItem[] → PSCItem[] y los agrega al state
+  function handleBulkConfirm(imported: PscImportItem[]) {
+    const newPscItems: PSCItem[] = imported
+      .filter((it) => it.included && it.ptItem)
+      .map((it) => ({
+        id: `new_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        budgetItemId: it.ptItem!.id,
+        description: it.description,
+        unit: it.unit,
+        unitPrice: it.unitPrice,
+        quantity: it.quantity,
+        totalPrice: it.totalPrice,
+        executedQuantity: 0,
+        executedAmount: 0,
+      }));
+    setItems((prev) => [...prev, ...newPscItems]);
+  }
 
   function selectItem(idx: number, itemId: string) {
     const item = availableItems.find((i) => i.id === itemId);
@@ -239,9 +281,27 @@ export function PSCForm({ psc, onSuccess }: Props) {
               Selecciona los ítems que este contratista va a ejecutar
             </p>
           </div>
-          <Button type="button" variant="outline" size="sm" onClick={addItem}>
-            <Plus className="mr-1 h-3.5 w-3.5" /> Ítem
-          </Button>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={addItem}>
+              <Plus className="mr-1 h-3.5 w-3.5" /> Ítem
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setBulkDialogOpen(true)}
+              disabled={!projectId || ptItems.length === 0}
+              title={
+                !projectId
+                  ? "Selecciona un proyecto primero"
+                  : ptItems.length === 0
+                    ? "Este proyecto no tiene items en el PT"
+                    : undefined
+              }
+            >
+              <FileSpreadsheet className="mr-1 h-3.5 w-3.5" /> Carga masiva
+            </Button>
+          </div>
         </div>
 
         {projectId && availableItems.length === 0 && !isEditing && (
@@ -338,6 +398,14 @@ export function PSCForm({ psc, onSuccess }: Props) {
       <div className="flex justify-end gap-2 border-t pt-4">
         <Button type="submit">{isEditing ? "Guardar cambios" : "Crear PSC"}</Button>
       </div>
+
+      <PscBulkLoadDialog
+        open={bulkDialogOpen}
+        onOpenChange={setBulkDialogOpen}
+        ptItems={ptItems}
+        projectName={project?.name ?? ""}
+        onConfirm={handleBulkConfirm}
+      />
     </form>
   );
 }
