@@ -124,7 +124,7 @@ export function ProviderForm({ provider, onSuccess }: Props) {
           incomeYear: provider.incomeYear ?? "",
           rating: provider.rating ?? 0,
           references:
-            provider.references.length > 0
+            (provider.references ?? []).length > 0
               ? provider.references
               : [{ name: "", company: "", phone: "", email: "" }],
           notes: provider.notes ?? "",
