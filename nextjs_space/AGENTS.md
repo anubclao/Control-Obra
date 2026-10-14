@@ -369,3 +369,55 @@ outer.push(\/\\) debe hacer .toLowerCase().
 - Opción B: resetear con el objeto ya normalizado: `reset(normalizeProvider(provider))` donde `normalizeProvider()` aplica los `?? ""` y `references: provider.references ?? [{...}]`.
 - Requiere: test que falle sin fix, verificación de que el flujo "crear → editar en mismo modal" sigue funcionando.
 - No hay urgencia: los usuarios no crashean.
+
+---
+
+## Corte 9 — middleware redirect hardcoded a `/administrativo` (P0 bugfix)
+
+**Fecha:** 2026-10-14
+**Commits:** `4d1c456` (Fix 1: middleware), `3d257ef` (Fix 2: login fallback), `cleanup` (Fix 3: borrar `src/page.tsx`).
+**Spec:** `docs/specs/audit-corte-9-middleware-redirect.md`.
+
+### Síntoma
+Usuario autenticado con cookie (formato válido pero firma/expiración inválida) hace `Ctrl+Shift+R` en `/login` o `/` → middleware valida solo el formato de la cookie (no la firma ni la expiración) → redirect a `/administrativo` → 404 "This page could not be found". El bug también afecta a usuarios de `area=tecnico` o `area=ventas` con sesión activa que navegan a `/login` por logout/login o nueva pestaña.
+
+### Causa raíz (resumida)
+`src/middleware.ts` líneas 48 y 57 hardcodeaban `url.pathname = "/administrativo"` como destino del redirect cuando había cookie, sin importar el `user.area` real. El comentario del autor admitía: *"best-effort: no tenemos el area aqui sin BD, asi que redirigimos a /administrativo por defecto; el cliente hara un redirect fino si lo necesita"*. Pero ese "redirect fino del cliente" corre **después** del redirect del middleware en hard refresh, así que el browser ya navegó a `/administrativo` antes de que el cliente pudiera corregir.
+
+Adicionalmente, `src/app/login/page.tsx` tenía 3 sitios con fallback `?? "administrativo"` que enmascaraban un `user.area` faltante mandando al usuario a un 404 silencioso.
+
+`src/page.tsx` (huérfano de la migración Next 14 → 15, no es route) fue borrado para evitar confusión futura.
+
+### Fix aplicado (3 commits)
+1. **Fix 1 — middleware:** cambiar `url.pathname = "/administrativo"` a `url.pathname = "/login"` en ambos branches (`/` y `/login`). El cliente (`login/page.tsx` useEffect) hace el redirect fino a `user.area` con un hop extra de latencia (~100-300ms). Comentario explicativo actualizado.
+2. **Fix 2 — login fallback:** reemplazar los 3 `?? "administrativo"` con check explícito `if (!user.area) { setError("...sin área asignada..."); return; }` antes del `router.push`. Si `user.area` falta, no se hace redirect (mostrar error en lugar de 404).
+3. **Fix 3 — cleanup:** `git rm src/page.tsx`. Dead code de Next 14, ignorado por Next 15 con `app/` directory pero confuso para nuevos devs.
+
+### Verificación
+- **V1** (intent): los 2 `url.pathname = "/administrativo"` del middleware ahora son `"/login"`. El único match residual de `"/administrativo"` en el archivo es en `PROTECTED_PREFIXES` (línea 29), que es legítimo (es la lista de paths protegidos, no un redirect target).
+- **V2:** los 3 `?? "administrativo"` del login page ahora son checks explícitos de `user.area` con `setError`.
+- **V3:** `src/page.tsx` eliminado (mavis-trash recoverable).
+- **V4 (tsc):** 0 nuevos errores. Solo el preexistente `tests/verifiers/advances-suggestion.spec.ts:21` (TS2741 'contractId' missing).
+- **V5 (vitest):** 51 files, 751 passed, 0 failed, 8 skipped (759 total). Sin regresiones. Mismo baseline que post-Corte-6.
+- **V6 (next build):** exit 0. 29+ páginas estáticas. Middleware 34.4 kB. Sin warnings nuevos.
+
+### Pendiente para el usuario (manual browser test, V7-V8)
+- V7: hard refresh en `/login` con cookie expirada → debe mostrar form de login, NO redirigir a `/administrativo`.
+- V8: hard refresh en `/` con sesión activa de `area=tecnico` → debe terminar en `/tecnico` (después del hop `/login` → `useEffect` → `/${user.area}`), NO en `/administrativo`.
+
+### Lección operativa
+- **Edge runtime ≠ SSR client checks.** El middleware corre en el edge runtime (sin DB), así que NO puede leer `user.area` desde la BD. El "best-effort" del autor era legítimo en su contexto, pero la suposición "el cliente hace redirect fino" NO se cumple en hard refresh. **Regla operativa:** cuando un middleware hace redirect y depende del cliente para corregir, documentar EXPLÍCITAMENTE ese flujo y validar con browser test que el cliente efectivamente lo hace.
+- **`?? "valor_default"` es un anti-pattern en flujos críticos** porque enmascara datos faltantes. En el login, `?? "administrativo"` convertía un `user.area` faltante en un redirect a 404 silencioso. Mejor: check explícito + mensaje claro + NO redirect. Aplica a cualquier flujo donde el default hardcodeado es solo "bueno" para el caso feliz.
+
+### Backlog (NO tocar en este corte, anotado para Cortes futuros)
+
+- **Corte 10** — Middleware valida expiración/firma de cookie antes del redirect. Hoy, el middleware solo comprueba `cookieValue.includes(".")` y `length >= 16`. No verifica firma HMAC ni `exp` ni fila en `user_sessions` (revocada o no). Esto significa que cookies expiradas/revocadas con formato válido pasan el gate y llegan al cliente, donde `/api/auth/login` (GET) las rechaza. Mientras tanto, el browser ya cargó `/login` y luego intenta navegar a otra URL — pequeño flash de UI. Solución: o (a) llevar `verifySessionCookie` al edge runtime (limitado porque el edge runtime no tiene `node:crypto` por defecto en Next 15), o (b) agregar un endpoint lightweight `/api/auth/validate` que el middleware llama antes de redirigir. **Prioridad:** media. El bug del Corte 9 está mitigado, pero el síntoma (sesión expirada con flash) persiste.
+
+- **Corte 11** — Cookie incluye `user.area` firmado para que el middleware pueda redirigir al área correcta sin BD lookup ni endpoint extra. Cambia el formato de cookie a `${userId}|${exp}|${tokenId}|${area}.${sig}`. Esto requiere:
+  - Actualizar `sign`/`verifySessionCookie` en `src/lib/session.ts`.
+  - Rotar todas las sesiones activas (logout forzoso de todos los usuarios).
+  - Validar que `sign` es backward-compatible (los cookies viejos no se pueden deserializar con el formato nuevo).
+  - En el middleware, parsear la cookie, extraer `user.area`, hacer el redirect correcto (sin pasar por `/login`).
+
+  **Prioridad:** baja-media. Elimina el hop extra de `/` → `/login` → `/${user.area}` que introdujo el Fix 1. Pero requiere migración de sesiones y cambio de formato, así que es más invasivo que el Fix 1 actual.
+
