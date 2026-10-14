@@ -55,7 +55,11 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (hydrated && user) {
-      router.push(`/${String(user.area ?? "administrativo").toLowerCase()}`);
+      if (!user.area) {
+        setError("Tu cuenta no tiene un área asignada. Contacta al administrador.");
+        return;
+      }
+      router.push(`/${user.area.toLowerCase()}`);
     }
   }, [hydrated, user, router]);
 
@@ -117,11 +121,15 @@ export default function LoginPage() {
       if (data.ok && data.user) {
         // Sincronizar el store local con el user dev antes de navegar.
         await refresh();
+        if (!data.user.area) {
+          setError(
+            "Tu cuenta dev no tiene un área asignada. Contacta al administrador.",
+          );
+          return;
+        }
         // Forzamos lowercase para alinear con los segmentos de Next.js
         // (`/administrativo`, `/tecnico`). Ver bug fix en verifyOtp arriba.
-        router.push(
-          `/${String(data.user.area ?? "administrativo").toLowerCase()}`,
-        );
+        router.push(`/${data.user.area.toLowerCase()}`);
       } else {
         setError("Dev login no devolvio un usuario valido.");
       }
@@ -149,10 +157,16 @@ export default function LoginPage() {
         { email: email.trim().toLowerCase(), otp: otp.trim() }
       );
       if (data.ok && data.user) {
+        if (!data.user.area) {
+          setError(
+            "Tu cuenta no tiene un área asignada. Contacta al administrador.",
+          );
+          return;
+        }
         // El area puede llegar en mayusculas desde la BD; Next.js usa
         // segmentos en minusculas (`/administrativo`, `/tecnico`).
         // Forzamos toLowerCase() para evitar 404 al redirigir.
-        router.push(`/${String(data.user.area ?? "administrativo").toLowerCase()}`);
+        router.push(`/${data.user.area.toLowerCase()}`);
       } else {
         setError("Codigo invalido. Verifica e intenta de nuevo.");
       }
