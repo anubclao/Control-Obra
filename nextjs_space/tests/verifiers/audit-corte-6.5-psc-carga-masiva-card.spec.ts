@@ -213,20 +213,36 @@ describe("AC-7: cantidad editable + botón eliminar por fila", () => {
 });
 
 describe("AC-8: onConfirm agrega al state sin persistir", () => {
-  it("psc-form pasa setItems via onConfirm", () => {
+  /**
+   * Fix 2026-10-14: los 2 tests originales pasaban por accidente.
+   *  - 'psc-form pasa setItems via onConfirm' matcheaba el setItems del
+   *    useEffect de cambio de proyecto (línea 83), no del handler bulk.
+   *  - 'psc-form NO llama a createPSC ni updatePSC' pasaba porque el
+   *    match regex devolvía null (body vacío), no porque verificara
+   *    algo real.
+   *
+   * Reemplazados por 3 tests estrictos que:
+   *  1. Verifican que `function handleBulkConfirm` existe en psc-form.tsx.
+   *  2. Verifican que dentro de handleBulkConfirm hay un setItems con
+   *     spread append (prev => [...prev, ...X]) — NO filter ni replace.
+   *  3. Verifican que handleBulkConfirm NO llama a createPSC ni updatePSC.
+   */
+  it("psc-form define función handleBulkConfirm", () => {
     const src = readFileSync(formPath, "utf8");
-    expect(src).toMatch(/setItems\s*\(\s*\(?\s*prev/);
+    expect(src).toMatch(/function\s+handleBulkConfirm/);
   });
-  it("psc-form NO llama a createPSC ni updatePSC dentro de handleBulkConfirm", () => {
+  it("handleBulkConfirm usa setItems con spread append (prev => [...prev, ...X])", () => {
     const src = readFileSync(formPath, "utf8");
-    // El handleBulkConfirm debe hacer setItems, NO createPSC/updatePSC.
-    // createPSC/updatePSC solo se llaman en handleSubmit.
-    const handleBulkConfirmMatch = src.match(
-      /handleBulkConfirm[\s\S]*?^  \}/m,
-    );
-    expect(handleBulkConfirmMatch).toBeTruthy();
-    const body = handleBulkConfirmMatch?.[0] ?? "";
-    expect(body).toContain("setItems");
+    const match = src.match(/function\s+handleBulkConfirm[\s\S]*?^  \}/m);
+    expect(match).toBeTruthy();
+    const body = match?.[0] ?? "";
+    expect(body).toMatch(/setItems\s*\(\s*\(?prev\)?\s*=>\s*\[\.\.\.prev/);
+  });
+  it("handleBulkConfirm NO llama a createPSC ni updatePSC", () => {
+    const src = readFileSync(formPath, "utf8");
+    const match = src.match(/function\s+handleBulkConfirm[\s\S]*?^  \}/m);
+    expect(match).toBeTruthy();
+    const body = match?.[0] ?? "";
     expect(body).not.toMatch(/createPSC|updatePSC/);
   });
 });
