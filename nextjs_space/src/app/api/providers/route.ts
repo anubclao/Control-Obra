@@ -38,6 +38,11 @@ function r(r: any, docs: any[] = []) {
     status: r.status,
     rating: r.rating ?? null,
     notes: r.notes ?? "",
+    // P0 plan 2026-10-13 (Corte 4 — defensive references): tabla provider_references
+    // existe en DB pero r.references siempre undefined porque la columna no
+    // está en providers. Devolvemos array vacío para que el contrato sea
+    // explícito y futuros usos no crasheen. Corte 6 implementará el JOIN real.
+    references: r.references ?? [],
     // P0 plan 2026-10-08 (fix bug proveedores): la UI hace p.documents.length.
     // Antes esto era undefined y la pagina crasheaba con TypeError.
     documents: docs.map((d) => ({

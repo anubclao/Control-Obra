@@ -169,9 +169,9 @@ export function ProviderForm({ provider, onSuccess }: Props) {
   const subcategory = watch("subcategory");
 
   function addRef() {
-    if (references.length >= 3) return;
+    if ((references ?? []).length >= 3) return;
     setValue("references", [
-      ...references,
+      ...(references ?? []),
       { name: "", company: "", phone: "", email: "" },
     ]);
   }
@@ -179,12 +179,12 @@ export function ProviderForm({ provider, onSuccess }: Props) {
   function removeRef(idx: number) {
     setValue(
       "references",
-      references.filter((_, i) => i !== idx),
+      (references ?? []).filter((_, i) => i !== idx),
     );
   }
 
   async function onSubmit(data: FormData) {
-    const cleanRefs: ProviderReference[] = data.references
+    const cleanRefs: ProviderReference[] = (data.references ?? [])
       .filter((r) => r.name || r.company)
       .map((r) => ({
         name: r.name ?? "",
@@ -473,11 +473,11 @@ export function ProviderForm({ provider, onSuccess }: Props) {
         desc="Hasta 3 referencias (opcional)"
       >
         <div className="space-y-3">
-          {references.map((_, idx) => (
+          {(references ?? []).map((_, idx) => (
             <div key={idx} className="rounded-md border bg-secondary/30 p-3">
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-sm font-medium">Referencia {idx + 1}</p>
-                {references.length > 1 && (
+                {(references ?? []).length > 1 && (
                   <Button
                     type="button"
                     variant="ghost"
@@ -508,7 +508,7 @@ export function ProviderForm({ provider, onSuccess }: Props) {
               </div>
             </div>
           ))}
-          {references.length < 3 && (
+          {(references ?? []).length < 3 && (
             <Button type="button" variant="outline" size="sm" onClick={addRef}>
               <Plus className="mr-1 h-3.5 w-3.5" />
               Agregar referencia

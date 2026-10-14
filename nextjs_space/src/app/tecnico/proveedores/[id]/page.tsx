@@ -284,7 +284,7 @@ export default function ProveedorDetailPage() {
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {provider.references.map((ref, i) => (
+                  {(provider.references ?? []).map((ref, i) => (
                     <div key={i} className="rounded-md border bg-secondary/30 p-3 text-sm">
                       <p className="font-medium">{ref.name}</p>
                       <p className="text-muted-foreground">{ref.company}</p>
