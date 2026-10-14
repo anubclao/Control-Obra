@@ -350,3 +350,22 @@ outer.push(\/\\) debe hacer .toLowerCase().
 - **Aplica en:** document-generation/ (siguientes iteraciones), y como template para futuros sistemas con assets pre-sincronizados.
 - **Repo:** ControlObra. Implementación: `nextjs_space/scripts/sync-formatos-snapshots.mjs` (función `syncSnapshots`, líneas 109-167). Spec: `docs/specs/audit-formatos-snapshots-wiring.md §AC-2 (modos de operación)`.
 - **Commits relacionados:** Commit 1 del Corte 2.5 (re-escrito con smart-skip), Commit 2 con spec + AGENTS.md.
+
+## Corte 4 — provider.references (causa raíz encontrada, no mystery)
+
+**Fecha:** 2026-10-14
+**Commits:** d446f63 (defensa 1 línea), f2cdc31 (defensa completa 8 usos).
+
+**Causa raíz:** provider-form.tsx:161-163 hace `useEffect(() => reset(provider as unknown as FormData))`, que pisa los defaultValues normalizados con el objeto crudo de la API. Sin `references` en la respuesta, `watch("references")` quedaba undefined. El cast `as unknown as FormData` ocultaba el desajuste de tipos.
+
+**Efectos colaterales del reset (pendientes):**
+- Anula los `?? ""` de otros campos (email2, phone2, website…): nulls de la DB llegan a los inputs.
+- Elimina la fila vacía por defecto de referencias.
+
+**Defensa actual:** los 8 usos de `references` (form state y provider prop) están guardados con `?? []`. El crash está resuelto, pero la causa raíz no.
+
+**Fix de raíz pendiente (Corte 7 — deuda técnica, prioridad media-baja):**
+- Opción A: eliminar el useEffect por completo (si el reset() no es necesario para otros flujos).
+- Opción B: resetear con el objeto ya normalizado: `reset(normalizeProvider(provider))` donde `normalizeProvider()` aplica los `?? ""` y `references: provider.references ?? [{...}]`.
+- Requiere: test que falle sin fix, verificación de que el flujo "crear → editar en mismo modal" sigue funcionando.
+- No hay urgencia: los usuarios no crashean.
