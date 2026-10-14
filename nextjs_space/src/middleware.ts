@@ -33,10 +33,11 @@ export function middleware(req: NextRequest) {
 
   // 1) La raiz "/" redirige segun sesion:
   //    - sin cookie: /login.
-  //    - con cookie: al dashboard del area del usuario (best-effort:
-  //      no tenemos el area aqui sin BD, asi que redirigimos a
-  //      /administrativo por defecto; el cliente hara un redirect
-  //      fino si lo necesita).
+  //    - con cookie: tambien a /login; el cliente (login/page.tsx
+  //      useEffect) hace el redirect fino al area del usuario con
+  //      `user.area`. (Corte 9: antes redirigiamos a /administrativo
+  //      hardcodeado, lo que causaba 404 para usuarios de area=tecnico
+  //      o ventas.)
   if (pathname === "/") {
     const has = req.cookies.get(SESSION_COOKIE)?.value;
     if (!has) {
@@ -45,7 +46,7 @@ export function middleware(req: NextRequest) {
       return NextResponse.redirect(url);
     }
     const url = req.nextUrl.clone();
-    url.pathname = "/administrativo";
+    url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
@@ -54,7 +55,7 @@ export function middleware(req: NextRequest) {
     const has = req.cookies.get(SESSION_COOKIE)?.value;
     if (has) {
       const url = req.nextUrl.clone();
-      url.pathname = "/administrativo";
+      url.pathname = "/login";
       return NextResponse.redirect(url);
     }
     return NextResponse.next();
