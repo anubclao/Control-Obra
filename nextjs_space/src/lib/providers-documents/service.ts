@@ -92,40 +92,55 @@ export async function uploadProviderDocument(
     return { ok: false, error: { code: "VALIDATION_FAILED", validation } };
   }
 
-  // 2. Leer el provider y su project_code
-  const providers = await query<any[]>(
-    `SELECT id, project_id, code FROM providers WHERE id = ? LIMIT 1`,
-    [input.providerId],
-  );
-  if (providers.length === 0) {
+  // 2. Leer el provider (id, name, nit). En este commit temporal NO leemos
+  // project_id (esa columna NO existe en providers; Corte 13 lo agregará
+  // vía migración DB y vía query a pscs).
+  // Wrap en try/catch para capturar errores SQL (ECONNREFUSED, ETIMEDOUT,
+  // ER_BAD_FIELD_ERROR, etc.) y devolver DB_ERROR en lugar de 500.
+  let provider: { id: string; name: string; nit: string };
+  try {
+    const providers = await query<any[]>(
+      `SELECT id, name, nit FROM providers WHERE id = ? LIMIT 1`,
+      [input.providerId],
+    );
+    if (providers.length === 0) {
+      return {
+        ok: false,
+        error: { code: "DB_ERROR", message: `Provider ${input.providerId} no encontrado` },
+      };
+    }
+    provider = providers[0];
+  } catch (e: any) {
+    console.error("[providers-documents.upload] provider lookup failed", e?.code, e?.message);
     return {
       ok: false,
-      error: { code: "DB_ERROR", message: `Provider ${input.providerId} no encontrado` },
+      error: {
+        code: "DB_ERROR",
+        message: `No se pudo leer el provider: ${e?.code ?? e?.message ?? "unknown"}`,
+      },
     };
   }
-  const provider = providers[0];
 
-  // 3. Leer project_code del project asociado
-  const projects = await query<any[]>(
-    `SELECT code FROM projects WHERE id = ? LIMIT 1`,
-    [provider.project_id],
-  );
-  if (projects.length === 0) {
-    return {
-      ok: false,
-      error: { code: "DB_ERROR", message: `Project ${provider.project_id} no encontrado` },
-    };
-  }
-  const projectCode = projects[0].code;
+  // 3. projectCode: placeholder hasta Corte 13. (Corte 13 leerá desde
+  // pscs → projects).
+  const projectCode = "";
 
   // 4. Sanitizar fileName
   const sanitizedFileName = sanitizeFileName(input.file.name);
+
+  // 4.5 Sanitizar providerCode (NIT) para uso en path de SharePoint.
+  // Solo caracteres alfanuméricos y guiones, max 64 chars.
+  // Ej: "79739284" → "79739284"; "900.111.222-3" → "900-111-222-3".
+  const providerCode =
+    (provider.nit ?? "")
+      .replace(/[^a-zA-Z0-9-]/g, "-")
+      .slice(0, 64) || "sin-nit";
 
   // 5. Construir path SharePoint
   const { folderPath } = buildProviderDocumentPath({
     basePath: process.env.SP_BASE_PATH ?? "Proyectos",
     projectCode,
-    providerCode: provider.code,
+    providerCode,
     documentType: input.documentType,
     fileName: sanitizedFileName,
   });

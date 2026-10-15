@@ -111,11 +111,13 @@ describe("AC-5: GET download route existe y exporta GET", () => {
 // ============================================================================
 
 describe("AC-3: buildProviderDocumentPath produces correct path", () => {
-  it("usa convencion Proyectos/{projectCode}/Proveedores/{providerCode}/{type}", () => {
+  it("usa convencion Proyectos/Proveedores/{providerCode}/{type} (temporal, sin projectCode)", () => {
     const src = readFileSync(pathsFilePath, "utf8");
     expect(src).toMatch(/Proyectos/);
     expect(src).toMatch(/Proveedores/);
-    expect(src).toMatch(/\$\{[^}]*projectCode[^}]*\}/);
+    // projectCode ahora es opcional (Corte 13 lo hará required).
+    // Verificamos que el código maneja projectCode ausente.
+    expect(src).toMatch(/projectCode\s*\?/);
     expect(src).toMatch(/\$\{[^}]*providerCode[^}]*\}/);
     expect(src).toMatch(/\$\{[^}]*documentType[^}]*\}/);
   });

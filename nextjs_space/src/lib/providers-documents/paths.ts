@@ -3,8 +3,11 @@
 // Construcción de paths y sanitización de nombres para documentos de
 // proveedor en SharePoint.
 //
-// Convención (decidida 2026-10-14, spec §3):
-//   Proyectos/{projectCode}/Proveedores/{providerCode}/{DocumentType}/
+// Convención:
+//   Final  (Corte 13): Proyectos/{projectCode}/07-Proveedores/{providerCode}/{DocumentType}/
+//   Temporal (Corte 12 fix 2026-10-15): Proyectos/Proveedores/{providerCode}/{DocumentType}/
+//   (projectCode se omite hasta que Corte 13 agregue la migración DB
+//   y el projectCode lookup vía pscs → projects)
 //
 // NO se debe importar desde src/lib/sharepoint/paths.ts (que es para
 // documentos GENERADOS desde plantilla, e.g. Anticipos, OC). Esta
@@ -15,9 +18,13 @@ import type { ProviderDocumentType } from "@/types";
 export interface BuildProviderDocumentPathInput {
   /** "Proyectos" (default, configurable via SP_BASE_PATH). */
   basePath: string;
-  /** Código del proyecto (ej: "PV-2026-001"). */
-  projectCode: string;
-  /** Código del proveedor (ej: "PROV-EMPRESA-A"). */
+  /**
+   * Código del proyecto (ej: "PV-2026-001"). Opcional en este commit
+   * temporal (Corte 12): si está vacío/undefined, el path omite el
+   * segmento project. Corte 13 lo hará required tras la migración DB.
+   */
+  projectCode?: string;
+  /** Código del proveedor (ej: "PROV-EMPRESA-A" o NIT sanitizado). */
   providerCode: string;
   /** Tipo de documento del enum ProviderDocumentType. */
   documentType: ProviderDocumentType;
@@ -32,17 +39,20 @@ export interface BuildProviderDocumentPathResult {
 
 /**
  * Resuelve la ruta SharePoint para un documento de proveedor.
- * Ejemplo:
+ *
+ * Path final (Corte 13): Proyectos/{projectCode}/07-Proveedores/{providerCode}/{DocumentType}/
+ * Path temporal (Corte 12): Proyectos/Proveedores/{providerCode}/{DocumentType}/
+ *
+ * Ejemplo temporal:
  *   buildProviderDocumentPath({
  *     basePath: "Proyectos",
- *     projectCode: "PV-2026-001",
- *     providerCode: "PROV-EMPRESA-A",
+ *     providerCode: "79739284",  // temporalmente NIT sanitizado
  *     documentType: "CEDULA",
- *     fileName: "cedula-representante-legal.pdf",
+ *     fileName: "cedula.pdf",
  *   })
  *   => {
- *     folderPath: "Proyectos/PV-2026-001/Proveedores/PROV-EMPRESA-A/CEDULA",
- *     fileName: "cedula-representante-legal.pdf",
+ *     folderPath: "Proyectos/Proveedores/79739284/CEDULA",
+ *     fileName: "cedula.pdf",
  *   }
  */
 export function buildProviderDocumentPath(
@@ -51,8 +61,18 @@ export function buildProviderDocumentPath(
   // Limpia cada segmento de leading/trailing slashes para evitar
   // "Proyectos//PV-001/..." (que SharePoint rechaza).
   const clean = (s: string) => s.replace(/^\/+|\/+$/g, "");
+  // Fix 2026-10-15: projectCode opcional. Si está vacío, omitir.
+  // En el path final (Corte 13) projectCode siempre estará presente.
+  const projectSegment = input.projectCode ? `${clean(input.projectCode)}` : "";
+  const segments = [
+    clean(input.basePath),
+    projectSegment,
+    "Proveedores",
+    `${clean(input.providerCode)}`,
+    `${clean(input.documentType)}`,
+  ].filter((s) => s.length > 0);
   return {
-    folderPath: `${clean(input.basePath)}/${clean(input.projectCode)}/Proveedores/${clean(input.providerCode)}/${clean(input.documentType)}`,
+    folderPath: segments.join("/"),
     fileName: input.fileName,
   };
 }
