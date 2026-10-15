@@ -52,6 +52,7 @@ import {
 } from "@/lib/data-store";
 import { ProviderForm } from "@/components/providers/provider-form";
 import { useCutsStore } from "@/lib/data-store";
+import { DocumentLink } from "@/components/providers/document-link";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import type { ProviderDocument, ProviderDocumentType } from "@/types";
 
@@ -380,14 +381,23 @@ export default function ProveedorDetailPage() {
                         </div>
                       </div>
                       {doc && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeDocument(provider.id, (doc as any).id)}
-                          className="h-7 w-7"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <DocumentLink
+                            providerId={provider.id}
+                            docId={(doc as any).id}
+                            label="Descargar"
+                            showIcon={false}
+                            className="h-7 px-2 text-xs text-primary hover:underline"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeDocument(provider.id, (doc as any).id)}
+                            className="h-7 w-7"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       )}
                     </div>
                   );
@@ -408,14 +418,23 @@ export default function ProveedorDetailPage() {
                           </p>
                         </div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeDocument(provider.id, (doc as any).id)}
-                        className="h-7 w-7"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <DocumentLink
+                          providerId={provider.id}
+                          docId={(doc as any).id}
+                          label="Descargar"
+                          showIcon={false}
+                          className="h-7 px-2 text-xs text-primary hover:underline"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeDocument(provider.id, (doc as any).id)}
+                          className="h-7 w-7"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
               </div>
@@ -498,9 +517,14 @@ export default function ProveedorDetailPage() {
       <AddDocumentDialog
         open={addDocOpen}
         onOpenChange={setAddDocOpen}
-        onAdd={(doc) => {
-          addDocument(provider.id, doc);
-          setAddDocOpen(false);
+        onAdd={async (doc) => {
+          try {
+            await addDocument(provider.id, doc);
+            setAddDocOpen(false);
+          } catch (e) {
+            // Mostrar error simple. En Commit 14+ se puede cambiar a un toast.
+            alert((e as Error).message ?? "Error al subir el documento");
+          }
         }}
         existingTypes={(provider.documents ?? []).map((d) => d.type)}
       />
@@ -527,25 +551,31 @@ function AddDocumentDialog({
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
-  onAdd: (doc: Omit<ProviderDocument, "id" | "uploadedAt">) => void;
+  onAdd: (doc: { type: ProviderDocumentType; file: File; expirationDate?: string }) => Promise<void> | void;
   existingTypes: ProviderDocumentType[];
 }) {
   const [type, setType] = useState<ProviderDocumentType>("CEDULA");
-  const [fileName, setFileName] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [expirationDate, setExpirationDate] = useState("");
 
   const availableTypes = Object.keys(DOCUMENT_TYPE_LABELS) as ProviderDocumentType[];
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    onAdd({
-      type,
-      fileName: fileName || `${type.toLowerCase()}.pdf`,
-      expirationDate: expirationDate || undefined,
-    });
+    if (!file) {
+      alert("Por favor selecciona un archivo.");
+      return;
+    }
+    onAdd({ type, file, expirationDate: expirationDate || undefined });
+    // El padre cierra el dialog en éxito. No reseteamos state aquí porque
+    // si falla el upload queremos que el state se preserve.
+  }
+
+  function handleClose() {
     setType("CEDULA");
-    setFileName("");
+    setFile(null);
     setExpirationDate("");
+    onOpenChange(false);
   }
 
   return (
@@ -573,25 +603,30 @@ function AddDocumentDialog({
             </Select>
           </div>
           <div>
-            <Label className="mb-1.5 block">Nombre del archivo</Label>
-            <Input
-              value={fileName}
-              onChange={(e) => setFileName(e.target.value)}
-              placeholder="cedula.pdf"
+            <Label className="mb-1.5 block">Archivo (PDF, DOCX, JPG, PNG, XLSX · máx 50 MB)</Label>
+            <input
+              type="file"
+              accept=".pdf,.docx,.jpg,.jpeg,.png,.xlsx"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="block w-full text-sm file:mr-2 file:rounded file:border-0 file:bg-secondary file:px-3 file:py-1.5 file:text-sm file:font-medium hover:file:bg-secondary/80"
             />
-            <p className="mt-1 text-xs text-muted-foreground">
-              (Mock: la carga real se conectará después)
-            </p>
+            {file && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {file.name} · {(file.size / 1024 / 1024).toFixed(2)} MB
+              </p>
+            )}
           </div>
           <div>
             <Label className="mb-1.5 block">Fecha de vencimiento (opcional)</Label>
             <Input type="date" value={expirationDate} onChange={(e) => setExpirationDate(e.target.value)} />
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={handleClose}>
               Cancelar
             </Button>
-            <Button type="submit">Agregar</Button>
+            <Button type="submit" disabled={!file}>
+              Agregar
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

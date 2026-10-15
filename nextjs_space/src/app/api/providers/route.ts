@@ -45,11 +45,13 @@ function r(r: any, docs: any[] = []) {
     references: r.references ?? [],
     // P0 plan 2026-10-08 (fix bug proveedores): la UI hace p.documents.length.
     // Antes esto era undefined y la pagina crasheaba con TypeError.
+    // AC-10 (Corte 12 — P0 bugfix): NO devolvemos file_url. La URL de SharePoint
+    // es accesible solo via el endpoint de download con auth. La UI pide el
+    // documento via /api/providers/[id]/documents/[docId]/download.
     documents: docs.map((d) => ({
       id: d.id,
       type: d.type,
       fileName: d.file_name,
-      fileUrl: d.file_url,
       uploadedAt: d.uploaded_at,
       expirationDate: d.expiration_date,
     })),
@@ -70,11 +72,16 @@ export async function GET(req: Request) {
       args,
     );
     // P0 plan 2026-10-08: JOIN con provider_documents para devolver documents.
+    // AC-10 (Corte 12 — P0 bugfix): columnas EXPLICITAS (no SELECT *). La
+    // URL de SharePoint solo se obtiene via el endpoint de download con auth.
     const ids = rows.map((p) => p.id);
     const placeholders = ids.length ? ids.map(() => "?").join(",") : "''";
     const docs = ids.length
       ? await query<any[]>(
-          `SELECT * FROM provider_documents WHERE provider_id IN (${placeholders}) ORDER BY uploaded_at DESC`,
+          `SELECT id, provider_id, type, file_name, uploaded_at, expiration_date
+           FROM provider_documents
+           WHERE provider_id IN (${placeholders})
+           ORDER BY uploaded_at DESC`,
           ids,
         )
       : [];

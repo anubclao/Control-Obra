@@ -718,6 +718,40 @@ export const useProvidersStore = () => {
       s.update(id, { isActive: active } as any),
     setStatus: (id: string, status: any) => s.update(id, { status } as any),
     load: s.load,
+    // AC-9 (Corte 12 — P0 bugfix): addDocument real. Llama al API route
+    // multipart/form-data y refresca el state del provider.
+    addDocument: async (
+      providerId: string,
+      doc: {
+        type: string;
+        file: File;
+        expirationDate?: string;
+      },
+    ) => {
+      const formData = new FormData();
+      formData.append("file", doc.file);
+      formData.append("type", doc.type);
+      if (doc.expirationDate) {
+        formData.append("expirationDate", doc.expirationDate);
+      }
+      const res = await fetch(`/api/providers/${providerId}/documents`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(
+          (err as { error?: string; message?: string }).message ??
+            (err as { error?: string }).error ??
+            `Upload failed: ${res.status}`,
+        );
+      }
+      // Refresca el provider desde el server para que la lista de documents
+      // incluya el nuevo (el endpoint /api/providers hace el JOIN con
+      // provider_documents).
+      await s.load();
+    },
   } as any;
 };
 
