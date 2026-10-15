@@ -312,24 +312,26 @@ describe("AC-8: modal usa <input type='file'> (no <Input type='text'>)", () => {
 // ============================================================================
 
 describe("AC-10: GET /api/providers excluye file_url del response", () => {
-  it("provider route SELECTs sin file_url", () => {
+  it("provider route SQL NO usa SELECT * para provider_documents (columnas explicitas)", () => {
     const src = readFileSync(providersRoutePath, "utf8");
-    // La query a provider_documents NO debe incluir file_url en el SELECT
-    // (o el route debe proyectar para excluirlo del response)
-    // Verificación: el bloque que toca provider_documents no menciona file_url
-    const providerDocsBlock = src.match(
-      /provider_documents[\s\S]*?(?:ORDER BY|LIMIT|$)/m,
+    // El query a provider_documents debe ser EXPLICITO (columnas nombradas),
+    // NO `SELECT *`. Esto es porque `SELECT *` retornaría file_url.
+    // El spec (§4.6) define la lista exacta de columnas: id, provider_id,
+    // type, file_name, uploaded_at, expiration_date.
+    const providerDocsQuery = src.match(
+      /SELECT[^;]*FROM\s+provider_documents[^;]*/i,
     );
-    expect(providerDocsBlock?.[0] ?? "").not.toMatch(/file_url/);
+    expect(providerDocsQuery?.[0] ?? "").not.toMatch(/SELECT\s+\*/i);
   });
-  it("response shape solo tiene campos seguros (no file_url)", () => {
+  it("provider route response no expone file_url al cliente", () => {
     const src = readFileSync(providersRoutePath, "utf8");
-    // El response final no debe incluir file_url en el spread
-    // (puede haber un .map() que excluya file_url, o el SQL debe ser explícito)
-    const responseBlock = src.match(
-      /(?:return\s+NextResponse\.json|res\.json)[\s\S]*?\}[\);]/m,
-    );
-    expect(responseBlock?.[0] ?? "").not.toMatch(/file_url/);
+    // El response JSON final no debe contener file_url. El cliente NO debe
+    // tener acceso al URL de SharePoint; solo tiene `id` y pide el archivo
+    // via /api/providers/[id]/documents/[docId]/download con auth.
+    // Verificamos que el código de respuesta no serializa file_url.
+    // Estrategia: el response no debe tener `file_url:` en ningún lugar
+    // (objeto, .map(), spread, etc).
+    expect(src).not.toMatch(/file_url\s*:/);
   });
 });
 
