@@ -51,12 +51,8 @@ export function buildProviderDocumentPath(
   // Limpia cada segmento de leading/trailing slashes para evitar
   // "Proyectos//PV-001/..." (que SharePoint rechaza).
   const clean = (s: string) => s.replace(/^\/+|\/+$/g, "");
-  const base = clean(input.basePath);
-  const proj = clean(input.projectCode);
-  const prov = clean(input.providerCode);
-  const type = clean(input.documentType);
   return {
-    folderPath: `${base}/${proj}/Proveedores/${prov}/${type}`,
+    folderPath: `${clean(input.basePath)}/${clean(input.projectCode)}/Proveedores/${clean(input.providerCode)}/${clean(input.documentType)}`,
     fileName: input.fileName,
   };
 }
